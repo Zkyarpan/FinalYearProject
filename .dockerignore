@@ -1,0 +1,14 @@
+./node_modules
+Dockerfile
+.dockerignore
+docker-compose.yml
+# Log files
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next
+.git
+.env

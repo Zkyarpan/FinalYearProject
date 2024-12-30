@@ -15,7 +15,7 @@ const VerifyEmail = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout;
     if (resendCooldown > 0) {
       timer = setInterval(() => {
         setResendCooldown(prev => prev - 1);

@@ -21,7 +21,6 @@ export async function encrypt(
   payload: TokenPayload,
   expiresIn: string = "10m"
 ) {
-  console.log("Encrypting with payload:", payload);
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -31,12 +30,9 @@ export async function encrypt(
 
 export async function decrypt(token: string): Promise<TokenPayload | null> {
   try {
-    console.log("Decrypting token:", token);
     const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
-    console.log("Token successfully decrypted:", payload);
     return payload as TokenPayload;
   } catch (error) {
-    console.error("Token decryption failed:", error.message);
     return null;
   }
 }

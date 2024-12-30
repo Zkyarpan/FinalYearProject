@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 const Stories = () => {
   return (
-    <div className="container flex items-center justify-center">
+    <div className="">
       <StoriesSection />
     </div>
   );

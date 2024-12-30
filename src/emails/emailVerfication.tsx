@@ -7,7 +7,7 @@ import {
 } from "@react-email/components";
 
 interface VerificationEmailProps {
-  email: string; // Email is added but hidden in the email body
+  email: string; 
   otp: string;
 }
 
@@ -37,7 +37,6 @@ export default function VerificationEmail({ email, otp }: VerificationEmailProps
         >
           {otp}
         </Text>
-        {/* Hidden email to avoid rendering but still included */}
         <Text
           style={{
             display: "none",

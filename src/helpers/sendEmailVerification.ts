@@ -12,23 +12,22 @@ export async function sendVerificationEmail(
 
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail", // Use your email provider (e.g., Gmail)
+      service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER, // Replace with your environment variable
-        pass: process.env.EMAIL_PASS, // Replace with your environment variable
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS, 
       },
     });
 
-    // Render the React Email template to HTML
     const emailHTML = await render(
       VerificationEmail({ email, otp: verifyCode })
     );
 
     const mailOptions = {
-      from: "Mentality <teammentalityapp@gmail.com>", // Replace with your email
+      from: "Mentality <teammentalityapp@gmail.com>", 
       to: email,
       subject: "Your Verification Code",
-      html: emailHTML, // Use the rendered HTML
+      html: emailHTML, 
     };
 
     const info = await transporter.sendMail(mailOptions);

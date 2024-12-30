@@ -9,9 +9,12 @@ console.log("JWT Secret Key:", process.env.JWT_SECRET);
 const key = new TextEncoder().encode(secretKey);
 
 type TokenPayload = {
-  id: string;
+  id?: string;
+  email?: string;
+  password?: string;
   role?: string;
   type?: string;
+  isVerified?: boolean;
 };
 
 export async function encrypt(

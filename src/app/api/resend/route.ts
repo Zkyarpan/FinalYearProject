@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newCode = uuidv4().slice(0, 6); // Generate a new verification code
+    const newCode = uuidv4().slice(0, 6); 
     user.verificationCode = newCode;
     user.verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // Code valid for 15 minutes
     await user.save();

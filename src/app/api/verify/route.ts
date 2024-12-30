@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
         );
       }
   
-      // Check if the code is expired
       if (new Date() > new Date(user.verificationCodeExpiry)) {
         return NextResponse.json(
           createErrorResponse(400, "Verification code has expired."),
@@ -32,7 +31,6 @@ export async function POST(req: NextRequest) {
         );
       }
   
-      // Mark user as verified
       user.isVerified = true;
       user.verificationCode = null;
       user.verificationCodeExpiry = null;

@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+
 
 const VerifyEmail = () => {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const email = searchParams.get("email"); // Email passed from the signup page
-
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,26 +29,76 @@ const VerifyEmail = () => {
       const response = await fetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ code }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         toast.error(data.message || "Verification failed.");
-        setIsLoading(false);
         return;
       }
 
       toast.success("Email verified successfully!");
-      router.push("/dashboard"); // Redirect to dashboard or another page
+      localStorage.removeItem("email"); 
+      router.push("/dashboard"); 
     } catch (error) {
-      console.error(error);
+      console.error("Verification error:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleResend = async () => {
+    const storedEmail = localStorage.getItem("email");
+    console.log("Resend triggered for email:", storedEmail);
+
+
+    if (!storedEmail) {
+      toast.error("Email not found. Please sign up again.");
+      window.location.href = "/signup"; 
+      return;
+    }
+
+    if (resendCooldown > 0) return;
+
+    setIsResending(true);
+    try {
+      const response = await fetch("/api/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: storedEmail }),
+      });
+
+    console.log("Resend triggered for email:", storedEmail);
+
+      
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message || "Failed to resend code.");
+        return;
+      }
+
+      toast.success("Verification code resent!");
+      setResendCooldown(60); 
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev === 1) clearInterval(interval);
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Resend error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const storedEmail = localStorage.getItem("email") || "unknown";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -59,7 +109,8 @@ const VerifyEmail = () => {
           </h1>
           <p className="text-sm text-muted-foreground">
             A verification code was sent to{" "}
-            <span className="font-semibold">{email}</span>. If you don&apos;t see it, check your spam folder.
+            <span className="font-semibold">{storedEmail}</span>. If you don&apos;t
+            see it, check your spam folder.
           </p>
         </div>
 
@@ -75,6 +126,7 @@ const VerifyEmail = () => {
               onChange={(e) => setCode(e.target.value)}
               placeholder="Enter verification code"
               className="h-10 focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+              required
             />
           </div>
 
@@ -91,6 +143,18 @@ const VerifyEmail = () => {
             )}
           </Button>
         </form>
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={handleResend}
+            disabled={isResending || resendCooldown > 0}
+            className="text-sm text-primary font-medium hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resendCooldown > 0
+              ? `Resend code in ${resendCooldown}s`
+              : "Resend code"}
+          </button>
+        </div>
       </div>
     </div>
   );

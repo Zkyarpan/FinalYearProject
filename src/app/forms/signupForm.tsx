@@ -53,6 +53,7 @@ const SignupForm = () => {
       }
 
       toast.success("Signup successful!");
+      localStorage.setItem("email", email);
       router.push("/verify");
     } catch (error) {
       console.error(error);

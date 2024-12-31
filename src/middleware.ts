@@ -21,9 +21,19 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
 
-  // If the user is logged in but their email is not verified, redirect to verification page
+  // Allow access to `/verify` if no session exists (handled in the frontend with localStorage)
+  if (!session?.id && path === verificationRoute) {
+    return NextResponse.next(); // Allow access to verify page
+  }
+
+  // If the user is logged in but their email is not verified, redirect to the verification page
   if (session?.id && !session.isVerified && protectedRoutes.includes(path)) {
     return NextResponse.redirect(new URL(verificationRoute, req.nextUrl));
+  }
+
+  // If the user is verified and accesses the verification page, redirect to the dashboard
+  if (session?.isVerified && path === verificationRoute) {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
   // If the user is logged in and trying to access public routes like login or signup, redirect to their appropriate dashboard
@@ -43,11 +53,6 @@ export default async function middleware(req: NextRequest) {
     console.log(
       "Non-admin tried to access Admin Route, redirecting to /dashboard"
     );
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
-  }
-
-  // If the user is already verified and is on the verification page, redirect to dashboard
-  if (session?.isVerified && path === verificationRoute) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

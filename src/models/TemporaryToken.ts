@@ -1,24 +1,29 @@
 import mongoose from "mongoose";
 
 const TemporaryTokenSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true, 
+  },
   token: {
     type: String,
-    required: true, // Encrypted token containing email and password
+    required: true,
   },
   verificationCode: {
     type: String,
-    required: true, // Code sent to the user for verification
+    required: true,
   },
   verificationCodeExpiry: {
     type: Date,
-    required: true, // Expiry time for the verification code
+    required: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now, // Automatically set the creation time
-    expires: 900, // Automatically delete the document after 15 minutes (900 seconds)
+    default: Date.now,
+    expires: 900, 
   },
 });
+
 
 const TemporaryToken =
   mongoose.models.TemporaryToken ||

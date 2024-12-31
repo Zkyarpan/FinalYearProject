@@ -55,34 +55,44 @@ const VerifyEmail = () => {
 
   const handleResend = async () => {
     const storedEmail = localStorage.getItem("email");
+    const token = localStorage.getItem("token"); 
+    console.log("Retrieved token:", token);
+  
     if (!storedEmail) {
       toast.error("Email not found. Please sign up again.");
       router.push("/signup");
       return;
     }
-    setIsResending(true);
+  
+    setIsResending(true); 
     try {
       const response = await fetch("/api/resend", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: storedEmail }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: storedEmail , token :token }),
       });
+  
       const data = await response.json();
+  
       if (!response.ok) {
-        toast.error(data.message || "Failed to resend code.");
+        toast.error(data.message || "Failed to resend verification code.");
         return;
       }
-      toast.success("Verification code resent!");
-      setResendCooldown(60);
+  
+      toast.success("Verification code resent successfully!");
+  
+      setResendCooldown(60); 
     } catch (error) {
       console.error("Resend error:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {
-      setIsResending(false);
+      setIsResending(false); 
     }
   };
-
-  const storedEmail = localStorage.getItem("email") || "unknown";
+  
+  const storedEmail = localStorage.getItem("email") || "";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -105,7 +115,7 @@ const VerifyEmail = () => {
             </label>
                  <Input
               id="code"
-              type="email"
+              type="text"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
@@ -117,7 +127,7 @@ const VerifyEmail = () => {
           <button
             onClick={handleResend}
             disabled={isResending || resendCooldown > 0}
-            className="text-sm text-primary font-medium hover:underline disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 dark:text-foreground"
+            className="text-xs text-primary font-inter hover:underline disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 dark:text-foreground"
           >
             {isResending ? (
               <>

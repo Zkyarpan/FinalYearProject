@@ -1,12 +1,14 @@
 import nodemailer from "nodemailer";
 import VerificationEmail from "@/emails/emailVerfication";
 import { render } from "@react-email/render";
-import { createSuccessResponse, createErrorResponse } from "@/lib/response";
 
 export async function sendVerificationEmail(
   email: string,
   verifyCode: string
-): Promise<any> {
+): Promise<{ success: boolean; message: string }> {
+
+  console.log("Sending email to:", email); // Log recipient email
+    console.log("Verification Code:", verifyCode);
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -29,8 +31,9 @@ export async function sendVerificationEmail(
 
     await transporter.sendMail(mailOptions);
 
-    return createSuccessResponse(200, "Verification email sent successfully.");
+    return { success: true, message: "Verification email sent successfully." };
   } catch (error) {
-    return createErrorResponse(500, "Failed to send verification email.");
+    console.error("Error sending email:", error); 
+    return { success: false, message: "Failed to send verification email." };
   }
 }

@@ -5,7 +5,6 @@ import { NextResponse } from "next/server";
 
 const secretKey = process.env.JWT_SECRET;
 if (!secretKey) throw new Error("JWT_SECRET is not defined");
-console.log("JWT Secret Key:", process.env.JWT_SECRET);
 const key = new TextEncoder().encode(secretKey);
 
 type TokenPayload = {

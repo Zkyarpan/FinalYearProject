@@ -24,45 +24,41 @@ const SignupForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const result = signupSchema.safeParse({ email, password });
-
-    if (!result.success) {
-      result.error.errors.forEach((err) => {
-        toast.error(err.message);
-      });
-      return;
-    }
-
+  
     setIsLoading(true);
-
+  
     try {
       const response = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-
+  
       const data = await response.json();
-
+     
       if (!response.ok) {
-        const errorMessage =
-          data.ErrorMessage?.[0]?.message || "An unexpected error occurred.";
-        toast.error(errorMessage);
+        toast.error(data.ErrorMessage?.[0] || "An unexpected error occurred.");
         return;
       }
-
-      toast.success("Signup successful!");
-      localStorage.setItem("email", email);
+  
+      if (data?.Result?.token) {
+        localStorage.setItem("token", data.Result.token); 
+        localStorage.setItem("email", email); 
+      } else {
+        toast.error("Something went wrong. Please try again.");
+        return;
+      }
+  
+      toast.success(data?.Result?.message || "Signup successful! Verification email sent.");
       router.push("/verify");
     } catch (error) {
-      console.error(error);
+      console.error("Error during signup:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
+   
   return (
     <div className="w-full max-w-[380px] mx-auto">
       <div className="">

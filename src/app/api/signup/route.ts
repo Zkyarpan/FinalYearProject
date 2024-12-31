@@ -11,7 +11,7 @@ import { createSuccessResponse, createErrorResponse } from "@/lib/response";
 
 export async function POST(req: NextRequest) {
   try {
-    await connectDB(); 
+    await connectDB();
 
     const body = await req.json();
     const { email, password } = body;
@@ -40,25 +40,38 @@ export async function POST(req: NextRequest) {
 
     const existingTempToken = await TemporaryToken.findOne({ email });
     if (existingTempToken) {
+      existingTempToken.verificationCode = uuidv4().slice(0, 6);
+      existingTempToken.verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000);
+      await existingTempToken.save();
+
+      const emailResult = await sendVerificationEmail(email, existingTempToken.verificationCode);
+
+      if (!emailResult.success) {
+        return NextResponse.json(
+          createErrorResponse(500, "Failed to resend verification email."),
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
-        createErrorResponse(
-          400,
-          "A verification code has already been sent. Please verify your email."
-        ),
-        { status: 400 }
+        createSuccessResponse(200, {
+          message: "Verification email resent successfully.",
+          token: existingTempToken.token,
+        }),
+        { status: 200 }
       );
     }
 
     const verificationCode = uuidv4().slice(0, 6);
-
     const token = await encrypt({ email, password });
 
-    await TemporaryToken.create({
+    const tempToken = await TemporaryToken.create({
       email,
       token,
       verificationCode,
-      verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000), 
+      verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
     });
+
 
     const emailResult = await sendVerificationEmail(email, verificationCode);
 
@@ -70,14 +83,17 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      createSuccessResponse(200, "Verification email sent successfully."),
+      createSuccessResponse(200, {
+        message: "Verification email sent successfully.",
+        token: token,
+      }),
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error in signup:", error);
     return NextResponse.json(
       createErrorResponse(500, "Internal server error."),
       { status: 500 }
     );
   }
 }
+

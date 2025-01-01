@@ -20,7 +20,7 @@ const SignUpPage = () => {
     <main className="py-8 pt-14">
       <div className="min-h-[calc(100vh-80px)] flex flex-col items-center px-4 max-w-5xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-instrument text-foreground mb-3">
+          <h1 className="text-3xl main-font font-bold text-foreground mb-3 opacity-80">
             Choose Your Account Type
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto text-base">
@@ -35,7 +35,7 @@ const SignUpPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <User className="h-6 w-6 text-primary" />
-                <h3 className="text-xl font-semibold">Client Account</h3>
+                <h3 className="text-xl font-semibold main-font">Client Account</h3>
               </div>
               <p className="text-muted-foreground mb-6 text-sm">
                 Create a personal account to connect with mental health
@@ -49,7 +49,7 @@ const SignUpPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase className="h-6 w-6 text-primary" />
-                <h3 className="text-xl font-semibold">Professional Account</h3>
+                <h3 className="text-xl font-semibold main-font">Professional Account</h3>
               </div>
               <p className="text-muted-foreground mb-6 text-sm">
                 Join as a licensed professional to expand your practice and help

@@ -15,7 +15,7 @@ body {
 }
 
 .container {
-  @apply max-w-[630px] mx-auto w-full px-4 sm:px-6 lg:px-8;
+  @apply max-w-[658px] mx-auto w-full px-4 sm:px-6 lg:px-8;
 }
 
 html {
@@ -30,8 +30,18 @@ html {
   src: url("./fonts/Casad-Serial-Bold.ttf") format("truetype");
 }
 
+@font-face {
+  font-family: "mainfont";
+  src: url("./fonts/segoeuithis.ttf") format("truetype");
+}
+
 .logo-font {
   font-family: "logofont", sans-serif;
+}
+
+
+.main-font {
+  font-family: "mainfont", sans-serif;
 }
 
 ::-webkit-scrollbar-thumb {

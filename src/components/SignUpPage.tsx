@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import SignupForm from "@/app/forms/signupForm";
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import SignupForm from '@/app/forms/signupForm';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   BookOpen,
   Calendar,
@@ -13,14 +13,14 @@ import {
   ShieldCheck,
   Briefcase,
   User,
-} from "lucide-react";
+} from 'lucide-react';
 
 const SignUpPage = () => {
   return (
     <main className="py-8 pt-14">
       <div className="min-h-[calc(100vh-80px)] flex flex-col items-center px-4 max-w-5xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl main-font font-bold text-foreground mb-3 opacity-80">
+          <h1 className="text-3xl main-font font-bold text-foreground mb-3">
             Choose Your Account Type
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto text-base">
@@ -35,7 +35,9 @@ const SignUpPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <User className="h-6 w-6 text-primary" />
-                <h3 className="text-xl font-semibold main-font">Client Account</h3>
+                <h3 className="text-xl font-semibold main-font">
+                  Client Account
+                </h3>
               </div>
               <p className="text-muted-foreground mb-6 text-sm">
                 Create a personal account to connect with mental health
@@ -49,7 +51,9 @@ const SignUpPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase className="h-6 w-6 text-primary" />
-                <h3 className="text-xl font-semibold main-font">Professional Account</h3>
+                <h3 className="text-xl font-semibold main-font">
+                  Professional Account
+                </h3>
               </div>
               <p className="text-muted-foreground mb-6 text-sm">
                 Join as a licensed professional to expand your practice and help
@@ -92,14 +96,14 @@ const SignUpPage = () => {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            By signing up, you agree to our{" "}
+            By signing up, you agree to our{' '}
             <Link
               href="/terms"
               className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "
             >
               Terms of Service
-            </Link>{" "}
-            and{" "}
+            </Link>{' '}
+            and{' '}
             <Link
               href="/privacy"
               className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "
@@ -109,7 +113,7 @@ const SignUpPage = () => {
             .
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Already have an account?{" "}
+            Already have an account?{' '}
             <Link
               href="/login"
               className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "

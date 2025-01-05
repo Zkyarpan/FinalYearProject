@@ -1,59 +1,68 @@
-import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
-import { decrypt } from "./lib/token";
+import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { decrypt } from './lib/token';
 
-const protectedRoutes = ["/dashboard", "/profile"];
-const publicRoutes = ["/login", "/signup"];
-const adminRoutes = ["/admin", "/admin/dashboard"];
-const verificationRoute = "/verify"; // Route for email verification
+const protectedRoutes = ['/dashboard', '/profile'];
+const publicRoutes = ['/login', '/signup'];
+const adminRoutes = ['/admin', '/admin/dashboard'];
+const psychologistRoutes = ['/psychologist', '/psychologist/dashboard'];
+const verificationRoute = '/verify';
 
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("accessToken")?.value;
+  const sessionCookie = cookieStore.get('accessToken')?.value;
 
   // Decrypt the session from the cookie
   const session = sessionCookie ? await decrypt(sessionCookie) : null;
 
-  // If the user is trying to access a protected route but is not logged in
-  if (!session?.id && protectedRoutes.includes(path)) {
-    return NextResponse.redirect(new URL("/login", req.nextUrl));
+  // If user is already logged in and verified, redirect from public routes
+  if (session?.isVerified && publicRoutes.includes(path)) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
   }
 
-  // Allow access to `/verify` if no session exists (handled in the frontend with localStorage)
-  if (!session?.id && path === verificationRoute) {
-    return NextResponse.next(); // Allow access to verify page
-  }
-
-  // If the user is logged in but their email is not verified, redirect to the verification page
-  if (session?.id && !session.isVerified && protectedRoutes.includes(path)) {
-    return NextResponse.redirect(new URL(verificationRoute, req.nextUrl));
-  }
-
-  // If the user is verified and accesses the verification page, redirect to the dashboard
-  if (session?.isVerified && path === verificationRoute) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
-  }
-
-  // If the user is logged in and trying to access public routes like login or signup, redirect to their appropriate dashboard
-  if (session?.id && publicRoutes.includes(path)) {
-    if (session.role === "admin") {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.nextUrl));
-    } else {
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  // Handle verification route
+  if (path === verificationRoute) {
+    // Allow access to verify page if there's no session
+    if (!session) {
+      return NextResponse.next();
+    }
+    // Redirect verified users away from verify page
+    if (session.isVerified) {
+      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
     }
   }
 
-  // If a non-admin user tries to access admin routes, redirect them to their dashboard
-  if (
-    adminRoutes.some((route) => path.startsWith(route)) &&
-    session?.role !== "admin"
-  ) {
-    console.log(
-      "Non-admin tried to access Admin Route, redirecting to /dashboard"
+  // Protected routes require authentication
+  if (!session?.id && protectedRoutes.includes(path)) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl));
+  }
+
+  // Role-based redirections
+  if (session?.role === 'psychologist' && !path.startsWith('/psychologist')) {
+    return NextResponse.redirect(
+      new URL('/psychologist/dashboard', req.nextUrl)
     );
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  if (session?.role === 'admin' && !path.startsWith('/admin')) {
+    return NextResponse.redirect(new URL('/admin/dashboard', req.nextUrl));
+  }
+
+  // Prevent access to role-specific routes
+  if (
+    psychologistRoutes.some(route => path.startsWith(route)) &&
+    session?.role !== 'psychologist'
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+  }
+
+  if (
+    adminRoutes.some(route => path.startsWith(route)) &&
+    session?.role !== 'admin'
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
   }
 
   return NextResponse.next();
@@ -61,11 +70,13 @@ export default async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/login",
-    "/signup",
-    "/dashboard",
-    "/profile",
-    "/admin/:path*",
-    "/verify", // Include the verification route
+    '/login',
+    '/signup',
+    '/dashboard',
+    '/profile',
+    '/admin/:path*',
+    '/verify',
+    '/psychologist/:path*',
+    '/',
   ],
 };

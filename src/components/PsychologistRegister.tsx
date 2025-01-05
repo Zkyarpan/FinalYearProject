@@ -1,35 +1,101 @@
-"use client";
+'use client';
 
-import { PhotoIcon, UserCircleIcon } from "@heroicons/react/24/solid";
-import { ChevronDownIcon } from "@heroicons/react/16/solid";
-import { toast } from "sonner";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "./ui/button";
-import Loader from "@/components/common/Loader";
-import { ArrowRight } from "lucide-react";
+import { PhotoIcon, UserCircleIcon } from '@heroicons/react/24/solid';
+import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Button } from './ui/button';
+import Loader from '@/components/common/Loader';
+import { ArrowRight } from 'lucide-react';
+import StyledCountrySelect from './CountrySelect';
 
 const PsychologistRegister = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
+  const [countries, setCountries] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    username: "",
-    firstName: "",
-    lastName: "",
-    email: "",
-    country: "",
-    streetAddress: "",
-    city: "",
-    stateOrProvince: "",
-    postalCode: "",
-    about: "",
+    username: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    country: '',
+    streetAddress: '',
+    city: '',
+    stateOrProvince: '',
+    postalCode: '',
+    about: '',
     profilePhotoUrl: null,
     certificateOrLicense: null,
-    profilePhotoPreview: "",
-    certificateOrLicensePreview: "",
-    password: "",
+    profilePhotoPreview: '',
+    certificateOrLicensePreview: '',
+    password: '',
   });
+
+  useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
+    const fetchCountries = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('https://restcountries.com/v3.1/all', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (isMounted) {
+          const countryOptions = data
+            .sort((a: any, b: any) =>
+              a.name.common.localeCompare(b.name.common)
+            )
+            .map((country: any) => ({
+              label: country.name.common,
+              value: country.cca2,
+            }));
+
+          setCountries(countryOptions);
+          setIsLoading(false);
+          retryCount = 0;
+        }
+      } catch (error) {
+        console.error('Error fetching countries:', error);
+
+        if (isMounted) {
+          setError('Failed to load countries. Retrying...');
+          retryCount++;
+
+          if (retryCount < MAX_RETRIES) {
+            setTimeout(fetchCountries, 3000);
+          } else {
+            setError(
+              'Failed to load countries. Please refresh the page or try again later.'
+            );
+            setIsLoading(false);
+          }
+        }
+      }
+    };
+
+    fetchCountries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleChange = (e: { target: { name: any; value: any } }) => {
     const { name, value } = e.target;
@@ -61,81 +127,59 @@ const PsychologistRegister = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const {
-      username,
-      firstName,
-      lastName,
-      email,
-      country,
-      streetAddress,
-      city,
-      stateOrProvince,
-      postalCode,
-      about,
-      password,
-      profilePhotoPreview,
-      certificateOrLicense,
-    } = formData;
-
-    if (
-      !username ||
-      !firstName ||
-      !lastName ||
-      !email ||
-      !country ||
-      !streetAddress ||
-      !city ||
-      !stateOrProvince ||
-      !postalCode ||
-      !about ||
-      !password
-    ) {
-      toast.error("All fields are required.");
+    const requiredFields = [
+      'username',
+      'firstName',
+      'lastName',
+      'email',
+      'country',
+      'streetAddress',
+      'city',
+      'stateOrProvince',
+      'postalCode',
+      'about',
+      'password',
+    ];
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    if (missingFields.length > 0) {
+      toast.error(`Please fill in all fields.`);
+      setIsLoading(false);
+      return;
+    }
+    if (!formData.profilePhotoPreview || !formData.certificateOrLicense) {
+      toast.error(
+        `${!formData.profilePhotoPreview ? 'Profile photo' : 'Certificate or license'} is required.`
+      );
       setIsLoading(false);
       return;
     }
 
-    if (!profilePhotoPreview) {
-      toast.error("Profile photo is required.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (!certificateOrLicense) {
-      toast.error("Certificate or license file is required.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters long.");
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters long.');
       setIsLoading(false);
       return;
     }
 
     const formDataToSend = new FormData();
-    Object.keys(formData).forEach((key) => {
+    Object.keys(formData).forEach(key => {
+      if (key.endsWith('Preview')) return;
       formDataToSend.append(key, formData[key]);
     });
 
     try {
-      const response = await fetch("/api/psychologist", {
-        method: "POST",
+      const response = await fetch('/api/psychologist', {
+        method: 'POST',
         body: formDataToSend,
       });
-
       const data = await response.json();
-
       if (!response.ok) {
-        const errorMessage =
-          data.ErrorMessage?.[0]?.message || "An unexpected error occurred.";
-        toast.error(errorMessage);
-        setIsLoading(false);
-        return;
+        throw new Error(
+          data.ErrorMessage?.[0]?.message || 'An unexpected error occurred.'
+        );
       }
-      toast.success(data.message || "Account created successfully");
-    } catch (error: any) {
-      toast.error("Something went wrong. Please try again.");
+      toast.success(data.message || 'Account created successfully');
+    } catch (error) {
+      toast.error(error.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +190,7 @@ const PsychologistRegister = () => {
       <div className="space-y-12 pt-14">
         <div className="border-b border-[hsl(var(--border))] pb-12">
           <div className="flex items-center gap-2">
-            <h2 className="text-5xl font-instrument text-[hsl(var(--foreground))] mt-10">
+            <h2 className="text-2xl main-font font-bold text-[hsl(var(--foreground))] mt-10">
               Build Your Professional Identity
             </h2>
           </div>
@@ -164,7 +208,7 @@ const PsychologistRegister = () => {
                 Username
               </label>
               <div className="mt-2">
-                <div className="flex items-center rounded-md bg-[hsl(var(--card))] pl-3 outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[hsl(var(--primary))]">
+                <div className="flex items-center rounded-md  pl-3 outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] outline-none focus-visible:ring-transparent sm:text-sm">
                   <div className="shrink-0 select-none text-base text-[hsl(var(--muted-foreground))] sm:text-sm">
                     mentality.com/
                   </div>
@@ -175,7 +219,7 @@ const PsychologistRegister = () => {
                     placeholder="janesmith"
                     value={formData.username}
                     onChange={handleChange}
-                    className="block min-w-0 grow py-1.5 pl-1 pr-3 text-base text-[hsl(var(--foreground))] bg-[hsl(var(--card))] dark:bg-transparent placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none sm:text-sm"
+                    className="block min-w-0 grow py-1.5 pl-1 pr-3 text-base text-[hsl(var(--foreground))]  dark:bg-transparent placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                   />
                 </div>
               </div>
@@ -213,7 +257,7 @@ const PsychologistRegister = () => {
                   htmlFor="profilePhoto"
                   className="rounded-md bg-[hsl(var(--card))] px-2.5 py-1.5 text-sm font-semibold text-[hsl(var(--foreground))] shadow-sm ring-1 ring-inset ring-[hsl(var(--border))] hover:bg-[hsl(var(--secondary))] cursor-pointer"
                 >
-                  {formData.profilePhotoPreview ? "Change" : "Upload"} Photo
+                  {formData.profilePhotoPreview ? 'Change' : 'Upload'} Photo
                 </label>
               </div>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
@@ -236,7 +280,7 @@ const PsychologistRegister = () => {
                   rows={3}
                   value={formData.about}
                   onChange={handleChange}
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
               <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">
@@ -278,8 +322,8 @@ const PsychologistRegister = () => {
                     className="mt-4 inline-block rounded-md px-4 py-2 text-sm font-semibold focus-within:outline-none focus-within:ring-2 focus-within:ring-[hsl(var(--primary))] focus-within:ring-offset-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] cursor-pointer"
                   >
                     {formData.certificateOrLicensePreview
-                      ? "Change File"
-                      : "Upload File"}
+                      ? 'Change File'
+                      : 'Upload File'}
                   </label>
                   <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
                     PNG, JPG, GIF up to 10MB
@@ -292,7 +336,7 @@ const PsychologistRegister = () => {
 
         <div className="border-b border-[hsl(var(--border))] pb-12">
           <div className="flex items-center gap-2">
-            <h2 className="text-5xl font-instrument text-[hsl(var(--foreground))]">
+            <h2 className="text-2xl main-font font-bold text-[hsl(var(--foreground))]">
               Personal Information
             </h2>
           </div>
@@ -316,7 +360,7 @@ const PsychologistRegister = () => {
                   value={formData.firstName}
                   onChange={handleChange}
                   autoComplete="given-name"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -336,7 +380,7 @@ const PsychologistRegister = () => {
                   value={formData.lastName}
                   onChange={handleChange}
                   autoComplete="family-name"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -356,7 +400,7 @@ const PsychologistRegister = () => {
                   value={formData.email}
                   onChange={handleChange}
                   autoComplete="email"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -372,17 +416,17 @@ const PsychologistRegister = () => {
                 <input
                   id="password"
                   name="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleChange}
                   autoComplete="current-password"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-2 top-0.5 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent"
+                  className="absolute right-2 top-0 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -424,33 +468,11 @@ const PsychologistRegister = () => {
               </div>
             </div>
 
-            <div className="sm:col-span-3">
-              <label
-                htmlFor="country"
-                className="block text-sm font-medium text-[hsl(var(--foreground))]"
-              >
-                Country
-              </label>
-              <div className="mt-2 grid grid-cols-1">
-                <select
-                  id="country"
-                  name="country"
-                  value={formData.country}
-                  onChange={handleChange}
-                  autoComplete="country-name"
-                  className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-[hsl(var(--card))] py-1.5 pl-3 pr-8 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
-                >
-                  <option value="">Select Country</option>
-                  <option value="United States">United States</option>
-                  <option value="Canada">Canada</option>
-                  <option value="Mexico">Mexico</option>
-                </select>
-                <ChevronDownIcon
-                  aria-hidden="true"
-                  className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-[hsl(var(--muted-foreground))] sm:size-4"
-                />
-              </div>
-            </div>
+            <StyledCountrySelect
+              formData={formData}
+              handleChange={handleChange}
+              countries={countries}
+            />
 
             <div className="col-span-3">
               <label
@@ -467,12 +489,12 @@ const PsychologistRegister = () => {
                   value={formData.streetAddress}
                   onChange={handleChange}
                   autoComplete="street-address"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <label
                 htmlFor="city"
                 className="block text-sm font-medium text-[hsl(var(--foreground))]"
@@ -487,12 +509,12 @@ const PsychologistRegister = () => {
                   value={formData.city}
                   onChange={handleChange}
                   autoComplete="address-level2"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <label
                 htmlFor="stateOrProvince"
                 className="block text-sm font-medium text-[hsl(var(--foreground))]"
@@ -507,12 +529,12 @@ const PsychologistRegister = () => {
                   value={formData.stateOrProvince}
                   onChange={handleChange}
                   autoComplete="address-level1"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <label
                 htmlFor="postalCode"
                 className="block text-sm font-medium text-[hsl(var(--foreground))]"
@@ -527,7 +549,7 @@ const PsychologistRegister = () => {
                   value={formData.postalCode}
                   onChange={handleChange}
                   autoComplete="postal-code"
-                  className="block w-full rounded-md bg-[hsl(var(--card))] px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-[hsl(var(--primary))] sm:text-sm"
+                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -545,7 +567,7 @@ const PsychologistRegister = () => {
           <Button
             type="submit"
             className={`rounded-md bg-[hsl(var(--primary))] px-3 py-2 text-sm font-semibold text-[hsl(var(--primary-foreground))] shadow-sm hover:bg-[hsl(var(--primary))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--primary))] flex items-center justify-center gap-2 ${
-              isLoading ? "cursor-not-allowed opacity-75" : ""
+              isLoading ? 'cursor-not-allowed opacity-75' : ''
             }`}
             disabled={isLoading}
           >

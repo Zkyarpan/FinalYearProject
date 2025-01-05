@@ -1,6 +1,6 @@
 const page = () => {
   return (
-    <div className='pt-14 '>page</div>
+    <div className='pt-14'>Hello this is user dashboard</div>
   )
 }
 

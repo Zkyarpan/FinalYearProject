@@ -1,13 +1,14 @@
-"use server";
+'use server';
 
-import { NextRequest, NextResponse } from "next/server";
-import connectDB from "@/db/db";
-import Psychologist from "@/models/Psychologist";
-import bcrypt from "bcryptjs";
-import { uploadToCloudinary } from "@/utils/fileUpload";
-import Busboy from "busboy";
-import { createErrorResponse, createSuccessResponse } from "@/lib/response";
-import { encrypt } from "@/lib/token";
+import { NextRequest, NextResponse } from 'next/server';
+import connectDB from '@/db/db';
+import Psychologist from '@/models/Psychologist';
+import bcrypt from 'bcryptjs';
+import { uploadToCloudinary } from '@/utils/fileUpload';
+import Busboy from 'busboy';
+import { createErrorResponse, createSuccessResponse } from '@/lib/response';
+import { encrypt } from '@/lib/token';
+import validateFields from '@/helpers/validateFields';
 
 async function parseForm(
   req: NextRequest
@@ -20,7 +21,7 @@ async function parseForm(
     const fields: Record<string, any> = {};
     const files: Record<string, any> = {};
 
-    busboy.on("field", (fieldname, val) => {
+    busboy.on('field', (fieldname, val) => {
       fields[fieldname] = val;
     });
 
@@ -33,7 +34,7 @@ async function parseForm(
     }
 
     busboy.on(
-      "file",
+      'file',
       (
         fieldname: string,
         file: NodeJS.ReadableStream,
@@ -42,8 +43,8 @@ async function parseForm(
         mimetype: string
       ) => {
         const chunks: Buffer[] = [];
-        file.on("data", (chunk: Buffer) => chunks.push(chunk));
-        file.on("end", () => {
+        file.on('data', (chunk: Buffer) => chunks.push(chunk));
+        file.on('end', () => {
           (files as ParsedFiles)[fieldname] = {
             buffer: Buffer.concat(chunks),
             filename,
@@ -53,11 +54,11 @@ async function parseForm(
       }
     );
 
-    busboy.on("finish", () => {
+    busboy.on('finish', () => {
       resolve({ fields, files });
     });
 
-    busboy.on("error", (error) => reject(error));
+    busboy.on('error', error => reject(error));
 
     if (req.body) {
       const reader = req.body.getReader();
@@ -77,10 +78,10 @@ async function parseForm(
         },
       });
 
-      const nodeStream = require("stream").Readable.from(stream);
+      const nodeStream = require('stream').Readable.from(stream);
       nodeStream.pipe(busboy);
     } else {
-      reject(new Error("Request body is null"));
+      reject(new Error('Request body is null'));
     }
   });
 }
@@ -90,6 +91,21 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const { fields, files } = await parseForm(req);
+    const { profilePhoto, certificateOrLicense } = files;
+
+    const requiredFields = [
+      'username',
+      'firstName',
+      'lastName',
+      'email',
+      'country',
+      'streetAddress',
+      'city',
+      'stateOrProvince',
+      'postalCode',
+      'about',
+      'password',
+    ];
 
     const {
       username,
@@ -105,30 +121,16 @@ export async function POST(req: NextRequest) {
       password,
     } = fields;
 
-    const { profilePhoto, certificateOrLicense } = files;
-
-    if (
-      !username ||
-      !firstName ||
-      !lastName ||
-      !email ||
-      !country ||
-      !streetAddress ||
-      !city ||
-      !stateOrProvince ||
-      !postalCode ||
-      !about ||
-      !password
-    ) {
-      return NextResponse.json(
-        createErrorResponse(400, "All fields are required"),
-        { status: 400 }
-      );
+    const missingFieldError = validateFields(fields, requiredFields);
+    if (missingFieldError) {
+      return NextResponse.json(createErrorResponse(400, missingFieldError), {
+        status: 400,
+      });
     }
 
     if (password.length < 8) {
       return NextResponse.json(
-        createErrorResponse(400, "Password must be at least 8 characters long"),
+        createErrorResponse(400, 'Password must be at least 8 characters long'),
         { status: 400 }
       );
     }
@@ -139,18 +141,18 @@ export async function POST(req: NextRequest) {
 
     if (existingPsychologist) {
       return NextResponse.json(
-        createErrorResponse(400, "Username or email already exists"),
+        createErrorResponse(400, 'Username or email already exists'),
         { status: 400 }
       );
     }
 
-    let profilePhotoUrl = "";
-    let certificateOrLicenseUrl = "";
+    let profilePhotoUrl = '';
+    let certificateOrLicenseUrl = '';
 
     if (profilePhoto) {
       profilePhotoUrl = (await uploadToCloudinary({
         fileBuffer: profilePhoto.buffer,
-        folder: "photos/profile-images",
+        folder: 'photos/profile-images',
         filename: profilePhoto.originalFilename,
         mimetype: profilePhoto.mimetype,
       })) as string;
@@ -159,7 +161,7 @@ export async function POST(req: NextRequest) {
     if (certificateOrLicense) {
       certificateOrLicenseUrl = (await uploadToCloudinary({
         fileBuffer: certificateOrLicense.buffer,
-        folder: "photos/certificates",
+        folder: 'photos/certificates',
         filename: certificateOrLicense.originalFilename,
         mimetype: certificateOrLicense.mimetype,
       })) as string;
@@ -187,12 +189,12 @@ export async function POST(req: NextRequest) {
 
     const accessToken = await encrypt({
       id: psychologist._id,
-      role: "psychologist",
+      role: 'psychologist',
     });
 
     const refreshToken = await encrypt({
       id: psychologist._id,
-      type: "refresh",
+      type: 'refresh',
     });
 
     const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -200,7 +202,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json(
       createSuccessResponse(201, {
-        message: "Account created successfully",
+        message: 'Account created successfully',
         accessToken,
         user_data: {
           id: psychologist._id,
@@ -211,27 +213,27 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
 
-    response.cookies.set("refreshToken", refreshToken, {
+    response.cookies.set('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
       expires: refreshTokenExpires,
     });
 
-    response.cookies.set("accessToken", accessToken, {
+    response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
       expires: accessTokenExpires,
     });
 
     return response;
   } catch (error) {
-    console.error("Server Error:", error);
+    console.error('Server Error:', error);
     return NextResponse.json(
-      createErrorResponse(500, "Internal Server Error"),
+      createErrorResponse(500, 'Internal Server Error'),
       { status: 500 }
     );
   }

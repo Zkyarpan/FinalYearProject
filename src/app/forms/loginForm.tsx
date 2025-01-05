@@ -1,25 +1,24 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowRight } from "lucide-react";
-import { toast } from "sonner";
-import { z } from "zod";
-import { useRouter } from "next/navigation";
-import Loader from "@/components/common/Loader";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { z } from 'zod';
+import { useRouter } from 'next/navigation';
+import Loader from '@/components/common/Loader';
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  email: z.string().email('Invalid email format'),
 });
 
 const LoginForm = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,8 +26,8 @@ const LoginForm = () => {
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       const errorMessage = result.error.errors
-        .map((err) => err.message)
-        .join(", ");
+        .map(err => err.message)
+        .join(', ');
       toast.error(errorMessage);
       return;
     }
@@ -36,18 +35,17 @@ const LoginForm = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        const errorMessage =
-          data.ErrorMessage?.[0]?.message || "An unexpected error occurred.";
+        const errorMessage = data.ErrorMessage?.[0]?.message || 'Login failed';
         toast.error(errorMessage);
         setIsLoading(false);
         return;
@@ -55,15 +53,15 @@ const LoginForm = () => {
 
       document.cookie = `accessToken=${data.Result.accessToken}; path=/;`;
 
-      if (data.Result.user_data.role === "admin") {
-        toast.success("Login successful!");
-        router.push("/admin/dashboard");
+      if (data.Result.user_data.role === 'admin') {
+        toast.success('Login successful!');
+        router.push('/admin/dashboard');
       } else {
-        router.push("/dashboard");
+        router.push('/dashboard');
       }
     } catch (err) {
       console.error(err);
-      toast.error("Something went wrong. Please try again.");
+      toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -80,13 +78,12 @@ const LoginForm = () => {
             >
               Email
             </Label>
-            <Input
+            <input
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
-              autoComplete="username"
+              onChange={e => setEmail(e.target.value)}
+              className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
               required
             />
           </div>
@@ -99,20 +96,19 @@ const LoginForm = () => {
               Password
             </Label>
             <div className="relative">
-              <Input
+              <input
                 id="password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-8 focus-visible:ring-transparent outline-none shadow-sm hover:shadow transition-shadow"
-                autoComplete="current-password"
+                onChange={e => setPassword(e.target.value)}
+                className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 required
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-0 top-0 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent"
+                className="absolute right-0 top-0 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
@@ -166,7 +162,7 @@ const LoginForm = () => {
           <Button
             type="submit"
             className={`w-full mt-2 font-semibold rounded-2xl shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 ${
-              isLoading ? "cursor-not-allowed opacity-75" : ""
+              isLoading ? 'cursor-not-allowed opacity-75' : ''
             }`}
             disabled={isLoading}
           >

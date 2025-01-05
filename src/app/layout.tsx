@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import NavbarWrapper from "@/components/NavbarWrapper";
 import FooterWrapper from "@/components/FooterWrapper";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
@@ -53,7 +53,7 @@ export default function RootLayout({
           />
           <Toaster position="bottom-right" richColors />
           <SpinnerLoader>
-            <Navbar />
+            <NavbarWrapper />
             {children}
             <FooterWrapper />
           </SpinnerLoader>

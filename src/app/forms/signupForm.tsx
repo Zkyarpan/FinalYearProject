@@ -1,64 +1,50 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowRight } from "lucide-react";
-import { toast } from "sonner";
-import { z } from "zod";
-import Loader from "@/components/common/Loader";
-import { useRouter } from "next/navigation";
-
-const signupSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
+import Loader from '@/components/common/Loader';
+import { useRouter } from 'next/navigation';
 
 const SignupForm = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
     setIsLoading(true);
-  
+
     try {
-      const response = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-  
+
       const data = await response.json();
-     
+
       if (!response.ok) {
-        toast.error(data.ErrorMessage?.[0] || "An unexpected error occurred.");
+        const errorMessage = data.ErrorMessage?.[0]?.message || 'Signup failed';
+        toast.error(errorMessage);
+        setIsLoading(false);
         return;
       }
-  
-      if (data?.Result?.token) {
-        localStorage.setItem("token", data.Result.token); 
-        localStorage.setItem("email", email); 
-      } else {
-        toast.error("Something went wrong. Please try again.");
-        return;
-      }
-  
-      toast.success(data?.Result?.message || "Signup successful! Verification email sent.");
-      router.push("/verify");
+
+      toast.success('Signup successful!');
+      router.push('/verify');
     } catch (error) {
-      console.error("Error during signup:", error);
-      toast.error("Something went wrong. Please try again.");
+      toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-   
+
   return (
     <div className="w-full max-w-[380px] mx-auto">
       <div className="">
@@ -74,7 +60,7 @@ const SignupForm = () => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               className="h-8 focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
               autoComplete="username"
               placeholder="you@youremail.com"
@@ -92,9 +78,9 @@ const SignupForm = () => {
             <div className="relative">
               <Input
                 id="password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 className="h-8 focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
                 autoComplete="current-password"
                 placeholder="At least 8 characters"
@@ -149,7 +135,7 @@ const SignupForm = () => {
           <Button
             type="submit"
             className={`w-full mt-2 font-semibold text-1xl rounded-2xl shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 ${
-              isLoading ? "cursor-not-allowed opacity-75" : ""
+              isLoading ? 'cursor-not-allowed opacity-75' : ''
             }`}
             disabled={isLoading}
           >

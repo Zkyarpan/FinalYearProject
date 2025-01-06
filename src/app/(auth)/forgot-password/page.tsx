@@ -1,30 +1,72 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { z } from 'zod';
+
+// Define Zod schema for email validation
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address.'),
+});
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle password reset logic here
+
+    // Validate email using Zod
+    const validationResult = forgotPasswordSchema.safeParse({ email });
+
+    if (!validationResult.success) {
+      toast.error(validationResult.error.errors[0].message);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to send reset email.');
+        return;
+      }
+
+      toast.success('Verification code sent! Check your inbox.');
+      router.push('/forgot-password/confirmation');
+    } catch (error) {
+      console.error('Error sending reset email:', error);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <>
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="w-full max-w-[380px] rounded-2xl border border-gray-200 px-6 py-10">
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">
             <h1 className="text-lg font-semibold text-foreground mb-2">
               Forgot Password
             </h1>
             <p className="text-xs text-muted-foreground">
-              We will send an email with verification code. If you don&apos;t
-              see it, please check your spam folder.
+              We will send an email with a verification code. If you don't see
+              it, please check your spam folder.
             </p>
           </div>
 
@@ -36,27 +78,29 @@ export default function ForgotPassword() {
               >
                 Email
               </label>
+
               <Input
                 type="email"
                 id="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 placeholder="you@youremail.com"
-                className="h-8 bg-background hover:border-gray-300 focus-visible:ring-0 focus-visible:border-gray-300"
+                className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
               />
             </div>
 
             <Button
               type="submit"
-              className="mt-6 h-8 w-auto  items-center group font-semibold"
+              disabled={isLoading}
+              className="mt-6 h-8 w-auto flex items-center justify-center group font-semibold bg-primary text-primary-foreground"
             >
-              Next
+              {isLoading ? 'Sending...' : 'Next'}
               <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </form>
         </div>
       </div>
-      <div className="mt-6 text-center text-sm">
+      <div className="-mt-20 text-center text-sm">
         <span className="text-muted-foreground">Remember password? </span>
         <Link
           href="/login"

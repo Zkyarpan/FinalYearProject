@@ -72,7 +72,7 @@ const StyledCountrySelect = ({ formData, handleChange, countries }) => {
       </label>
       <div className="mt-2">
         <ReactSelect
-          instanceId="country-select" 
+          instanceId="country-select"
           id="country"
           name="country"
           value={countries.find(c => c.value === formData.country)}

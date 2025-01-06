@@ -1,5 +1,11 @@
-const page = () => {
-  return <div>Admin Dashboard page</div>;
+import Header from '@/components/Header';
+
+const AdminPanel = () => {
+  return (
+    <div>
+      <Header />
+    </div>
+  );
 };
 
-export default page;
+export default AdminPanel;

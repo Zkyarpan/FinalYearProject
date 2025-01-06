@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,7 +10,8 @@ import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().email('Please enter a valid email address.'),
+  password: z.string().min(1, 'Please enter a password.'),
 });
 
 const LoginForm = () => {
@@ -23,12 +23,11 @@ const LoginForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     const result = loginSchema.safeParse({ email, password });
+
     if (!result.success) {
-      const errorMessage = result.error.errors
-        .map(err => err.message)
-        .join(', ');
-      toast.error(errorMessage);
+      toast.error(result.error.errors[0].message);
       return;
     }
 
@@ -51,10 +50,8 @@ const LoginForm = () => {
         return;
       }
 
-      document.cookie = `accessToken=${data.Result.accessToken}; path=/;`;
-
+      toast.success('Login successful!');
       if (data.Result.user_data.role === 'admin') {
-        toast.success('Login successful!');
         router.push('/admin/dashboard');
       } else {
         router.push('/dashboard');
@@ -84,7 +81,6 @@ const LoginForm = () => {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
-              required
             />
           </div>
 
@@ -102,7 +98,6 @@ const LoginForm = () => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
-                required
               />
               <Button
                 type="button"

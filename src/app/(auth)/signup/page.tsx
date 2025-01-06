@@ -1,8 +1,8 @@
-import SignupForm from "@/components/SignUpPage";
-import { Metadata } from "next";
+import SignupForm from '@/components/SignUpPage';
+import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Join Mentality",
+  title: 'Join Mentality',
 };
 
 const Signup = () => {

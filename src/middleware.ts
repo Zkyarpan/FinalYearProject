@@ -5,7 +5,7 @@ import { decrypt } from './lib/token';
 const protectedRoutes = ['/dashboard', '/profile'];
 const publicRoutes = ['/login', '/signup'];
 const adminRoutes = ['/admin', '/admin/dashboard'];
-const psychologistRoutes = ['/psychologist', '/psychologist/dashboard'];
+const psychologistRoutes = ['/psychologist/dashboard', '/psychologist/profile'];
 const verificationRoute = '/verify';
 
 export default async function middleware(req: NextRequest) {
@@ -17,19 +17,26 @@ export default async function middleware(req: NextRequest) {
   // Decrypt the session from the cookie
   const session = sessionCookie ? await decrypt(sessionCookie) : null;
 
-  // If user is already logged in and verified, redirect from public routes
-  if (session?.isVerified && publicRoutes.includes(path)) {
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+  // Allow access to psychologist registration page
+  if (path === '/psychologist') {
+    // If already logged in as psychologist, redirect to dashboard
+    if (session?.role === 'psychologist') {
+      return NextResponse.redirect(
+        new URL('/psychologist/dashboard', req.nextUrl)
+      );
+    }
+    return NextResponse.next();
   }
 
-  // Handle verification route
-  if (path === verificationRoute) {
-    // Allow access to verify page if there's no session
-    if (!session) {
-      return NextResponse.next();
-    }
-    // Redirect verified users away from verify page
-    if (session.isVerified) {
+  // If user is already logged in and verified, redirect from public routes
+  if (session?.id && publicRoutes.includes(path)) {
+    if (session.role === 'psychologist') {
+      return NextResponse.redirect(
+        new URL('/psychologist/dashboard', req.nextUrl)
+      );
+    } else if (session.role === 'admin') {
+      return NextResponse.redirect(new URL('/admin/dashboard', req.nextUrl));
+    } else {
       return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
     }
   }
@@ -39,30 +46,24 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.nextUrl));
   }
 
-  // Role-based redirections
-  if (session?.role === 'psychologist' && !path.startsWith('/psychologist')) {
-    return NextResponse.redirect(
-      new URL('/psychologist/dashboard', req.nextUrl)
-    );
+  // Protect psychologist dashboard routes
+  if (psychologistRoutes.some(route => path.startsWith(route))) {
+    if (!session?.id) {
+      return NextResponse.redirect(new URL('/login', req.nextUrl));
+    }
+    if (session.role !== 'psychologist') {
+      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+    }
   }
 
-  if (session?.role === 'admin' && !path.startsWith('/admin')) {
-    return NextResponse.redirect(new URL('/admin/dashboard', req.nextUrl));
-  }
-
-  // Prevent access to role-specific routes
-  if (
-    psychologistRoutes.some(route => path.startsWith(route)) &&
-    session?.role !== 'psychologist'
-  ) {
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
-  }
-
-  if (
-    adminRoutes.some(route => path.startsWith(route)) &&
-    session?.role !== 'admin'
-  ) {
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+  // Protect admin routes
+  if (adminRoutes.some(route => path.startsWith(route))) {
+    if (!session?.id) {
+      return NextResponse.redirect(new URL('/login', req.nextUrl));
+    }
+    if (session.role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+    }
   }
 
   return NextResponse.next();
@@ -75,8 +76,8 @@ export const config = {
     '/dashboard',
     '/profile',
     '/admin/:path*',
-    '/verify',
     '/psychologist/:path*',
+    '/verify',
     '/',
   ],
 };

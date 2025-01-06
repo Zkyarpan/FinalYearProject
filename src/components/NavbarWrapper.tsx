@@ -1,12 +1,16 @@
-"use client";
+'use client';
 
-import Navbar from "@/components/Navbar";
-import { usePathname } from "next/navigation";
+import Navbar from '@/components/Navbar';
+import { usePathname } from 'next/navigation';
 
 const NavbarWrapper = () => {
   const pathname = usePathname();
 
-  const hideFooterPages = [""];
+  const hideFooterPages = [
+    '/dashboard',
+    '/admin/dashboard',
+    '/psychologist/dashboard',
+  ];
 
   if (hideFooterPages.includes(pathname)) {
     return null;

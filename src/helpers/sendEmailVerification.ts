@@ -1,20 +1,18 @@
-import nodemailer from "nodemailer";
-import VerificationEmail from "@/emails/emailVerfication";
-import { render } from "@react-email/render";
+import nodemailer from 'nodemailer';
+import VerificationEmail from '@/emails/emailVerfication';
+import { render } from '@react-email/render';
 
 export async function sendVerificationEmail(
   email: string,
   verifyCode: string
 ): Promise<{ success: boolean; message: string }> {
-
-  console.log("Sending email to:", email); // Log recipient email
-    console.log("Verification Code:", verifyCode);
+  console.log('Verification Code:', verifyCode);
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS, 
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
@@ -23,17 +21,17 @@ export async function sendVerificationEmail(
     );
 
     const mailOptions = {
-      from: "Mentality <teammentalityapp@gmail.com>", 
+      from: 'Mentality <teammentalityapp@gmail.com>',
       to: email,
-      subject: "Your Verification Code",
-      html: emailHTML, 
+      subject: 'Your Verification Code',
+      html: emailHTML,
     };
 
     await transporter.sendMail(mailOptions);
 
-    return { success: true, message: "Verification email sent successfully." };
+    return { success: true, message: 'Verification email sent successfully.' };
   } catch (error) {
-    console.error("Error sending email:", error); 
-    return { success: false, message: "Failed to send verification email." };
+    console.error('Error sending email:', error);
+    return { success: false, message: 'Failed to send verification email.' };
   }
 }

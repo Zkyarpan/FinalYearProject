@@ -8,8 +8,10 @@ import { Button } from './ui/button';
 import Loader from '@/components/common/Loader';
 import { ArrowRight } from 'lucide-react';
 import StyledCountrySelect from './CountrySelect';
+import { useRouter } from 'next/navigation';
 
 const PsychologistRegister = () => {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [countries, setCountries] = useState<
@@ -178,6 +180,7 @@ const PsychologistRegister = () => {
         );
       }
       toast.success(data.message || 'Account created successfully');
+      router.push('/psychologist/dashboard');
     } catch (error) {
       toast.error(error.message || 'Something went wrong. Please try again.');
     } finally {

@@ -21,13 +21,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json(
-        createErrorResponse(400, 'Password must be at least 8 characters long'),
-        { status: 400 }
-      );
-    }
-
     const account = await Account.findOne({ email });
     if (!account) {
       return NextResponse.json(

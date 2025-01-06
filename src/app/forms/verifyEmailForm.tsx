@@ -81,9 +81,9 @@ const VerifyEmail = () => {
         return;
       }
 
-      // ✅ Tokens are now handled via cookies, no need for localStorage anymore.
       toast.success('Verification successful! Redirecting to dashboard...');
-
+      localStorage.removeItem('verificationToken');
+      localStorage.removeItem('email');
       router.push('/dashboard');
     } catch (error) {
       console.error('Verification error:', error);
@@ -94,8 +94,11 @@ const VerifyEmail = () => {
   };
 
   const handleResend = async () => {
-    if (!storedEmail) {
-      toast.error('Email not found. Please sign up again.');
+    const storedToken = localStorage.getItem('verificationToken');
+    const storedEmail = localStorage.getItem('email');
+
+    if (!storedToken) {
+      toast.error('Session expired. Please sign up again.');
       router.push('/signup');
       return;
     }
@@ -104,18 +107,23 @@ const VerifyEmail = () => {
     try {
       const response = await fetch('/api/resend', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${storedToken}`,
+        },
         body: JSON.stringify({ email: storedEmail }),
       });
 
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.message || 'Failed to resend verification code.');
+        const message = data.message || 'Failed to resend verification code.';
+        toast.error(message);
+        setIsResending(false);
         return;
       }
 
       toast.success('Verification code resent successfully!');
-      setResendCooldown(60);
+      setResendCooldown(60); 
     } catch (error) {
       console.error('Resend error:', error);
       toast.error('Something went wrong. Please try again.');

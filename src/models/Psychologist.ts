@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPsychologist extends Document {
   username: string;
@@ -40,7 +40,7 @@ const PsychologistSchema: Schema = new Schema(
       required: true,
       unique: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address."],
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address.'],
     },
     country: {
       type: String,
@@ -73,6 +73,7 @@ const PsychologistSchema: Schema = new Schema(
     certificateOrLicenseUrl: {
       type: String,
     },
+    isVerified: { type: Boolean, default: false },
   },
   {
     timestamps: true,
@@ -81,6 +82,6 @@ const PsychologistSchema: Schema = new Schema(
 
 const Psychologist =
   mongoose.models.Psychologist ||
-  mongoose.model<IPsychologist>("Psychologist", PsychologistSchema);
+  mongoose.model<IPsychologist>('Psychologist', PsychologistSchema);
 
 export default Psychologist;

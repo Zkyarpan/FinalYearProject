@@ -3,10 +3,23 @@ import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
 import { v4 as uuidv4 } from 'uuid';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import TemporaryToken from '@/models/TemporaryToken';
+import connectDB from '@/db/db';
 
 export async function POST(req: NextRequest) {
   try {
-    const { token } = await req.json();
+    await connectDB();
+
+    // Get token from authorization header first
+    const authHeader = req.headers.get('authorization');
+    let token = authHeader?.split(' ')[1];
+
+    // If no auth header, try to get from body
+    if (!token) {
+      const body = await req.json();
+      token = body.token;
+    }
+
+    console.log('Received token:', token);
 
     if (!token) {
       return NextResponse.json(createErrorResponse(400, 'Token is required.'), {
@@ -51,13 +64,14 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      createSuccessResponse(
-        200,
-        'Verification code updated and resent successfully.'
-      ),
+      createSuccessResponse(200, {
+        message: 'Verification code updated and resent successfully.',
+        email: tempToken.email, // Send back email for UI feedback
+      }),
       { status: 200 }
     );
   } catch (error) {
+    console.error('Resend verification error:', error);
     return NextResponse.json(
       createErrorResponse(500, 'Internal server error.'),
       { status: 500 }

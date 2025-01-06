@@ -183,6 +183,7 @@ export async function POST(req: NextRequest) {
       profilePhotoUrl,
       certificateOrLicenseUrl,
       password: hashedPassword,
+      isVerified: true,
     });
 
     await psychologist.save();
@@ -190,11 +191,14 @@ export async function POST(req: NextRequest) {
     const accessToken = await encrypt({
       id: psychologist._id,
       role: 'psychologist',
+      isVerified: true,
+      email: psychologist.email,
     });
 
     const refreshToken = await encrypt({
       id: psychologist._id,
       type: 'refresh',
+      role: 'psychologist',
     });
 
     const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -203,11 +207,11 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json(
       createSuccessResponse(201, {
         message: 'Account created successfully',
-        accessToken,
         user_data: {
           id: psychologist._id,
           username: psychologist.username,
           email: psychologist.email,
+          role: 'psychologist',
         },
       }),
       { status: 201 }

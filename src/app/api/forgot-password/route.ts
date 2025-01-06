@@ -28,23 +28,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existingTempToken = await TemporaryToken.findOne({ email });
-    if (existingTempToken) {
-      return NextResponse.json(
-        createErrorResponse(
-          400,
-          'A reset request already exists. Please check your email or try again later.'
-        ),
-        { status: 400 }
-      );
-    }
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
 
-    const verificationCode = uuidv4().slice(0, 6);
-    const token = await encrypt({ email, type: 'password-reset' });
+    const resetToken = await encrypt({ email, type: 'password-reset' });
 
     await TemporaryToken.create({
       email,
-      token,
+      token: resetToken,
       verificationCode,
       verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
     });
@@ -57,17 +49,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       createSuccessResponse(200, 'Password reset email sent successfully.'),
       { status: 200 }
     );
+
+    response.cookies.set('resetToken', resetToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 900,
+    });
+
+    return response;
   } catch (error) {
     console.error('Error in forgot password:', error);
     return NextResponse.json(
-      createErrorResponse(
-        500,
-        'Internal server error. Please try again later.'
-      ),
+      createErrorResponse(500, 'Internal server error.'),
       { status: 500 }
     );
   }

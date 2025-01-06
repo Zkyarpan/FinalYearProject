@@ -9,17 +9,13 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    // Get token from authorization header first
     const authHeader = req.headers.get('authorization');
     let token = authHeader?.split(' ')[1];
 
-    // If no auth header, try to get from body
     if (!token) {
       const body = await req.json();
       token = body.token;
     }
-
-    console.log('Received token:', token);
 
     if (!token) {
       return NextResponse.json(createErrorResponse(400, 'Token is required.'), {
@@ -27,7 +23,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const newCode = uuidv4().slice(0, 6);
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     const tempToken = await TemporaryToken.findOneAndUpdate(
       { token },

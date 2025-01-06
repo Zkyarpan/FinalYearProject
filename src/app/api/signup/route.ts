@@ -70,7 +70,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const verificationCode = uuidv4().slice(0, 6);
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
     const token = await encrypt({ email, password });
 
     await TemporaryToken.create({
@@ -89,13 +91,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       createSuccessResponse(200, {
         message: 'Verification email sent successfully.',
         token: token,
       }),
       { status: 200 }
     );
+    response.cookies.set('tempToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    return response;
   } catch (error) {
     return NextResponse.json(
       createErrorResponse(500, 'Internal server error.'),

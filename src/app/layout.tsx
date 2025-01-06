@@ -1,31 +1,29 @@
-import type { Metadata } from "next";
-import { Inter, Instrument_Serif } from "next/font/google";
-import "./globals.css";
-import NavbarWrapper from "@/components/NavbarWrapper";
-import FooterWrapper from "@/components/FooterWrapper";
-import NextTopLoader from "nextjs-toploader";
-import { Toaster } from "sonner";
-import { Providers } from "./Providers";
-import SpinnerLoader from "@/components/Loader";
+import type { Metadata } from 'next';
+import { Inter, Instrument_Serif } from 'next/font/google';
+import './globals.css';
+import NavbarWrapper from '@/components/NavbarWrapper';
+import FooterWrapper from '@/components/FooterWrapper';
+import { Toaster } from 'sonner';
+import { Providers } from './Providers';
 
 const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  weight: ["100", "400", "500", "600", "700", "900"],
+  subsets: ['latin'],
+  variable: '--font-inter',
+  weight: ['100', '400', '500', '600', '700', '900'],
 });
 
 const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  variable: "--font-instrument-serif",
-  weight: "400",
+  subsets: ['latin'],
+  variable: '--font-instrument-serif',
+  weight: '400',
 });
 
 export const metadata: Metadata = {
   title: {
-    template: "%s",
-    default: "Mentality",
+    template: '%s',
+    default: 'Mentality',
   },
-  description: "Mental health and support platform",
+  description: 'Mental health and support platform',
 };
 
 export default function RootLayout({
@@ -39,24 +37,10 @@ export default function RootLayout({
         className={`${inter.variable} ${instrumentSerif.variable} antialiased`}
       >
         <Providers>
-          <NextTopLoader
-            color="#0466c8"
-            initialPosition={0.08}
-            crawlSpeed={200}
-            crawl={true}
-            showSpinner={false}
-            easing="ease"
-            speed={200}
-            shadow="0 0 10px #2299DD,0 0 5px #2299DD"
-            zIndex={1600}
-            showAtBottom={false}
-          />
           <Toaster position="bottom-right" richColors />
-          <SpinnerLoader>
-            <NavbarWrapper />
-            {children}
-            <FooterWrapper />
-          </SpinnerLoader>
+          <NavbarWrapper />
+          {children}
+          <FooterWrapper />
         </Providers>
       </body>
     </html>

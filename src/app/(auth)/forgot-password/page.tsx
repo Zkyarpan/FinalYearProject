@@ -8,8 +8,9 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
+import Loader from '@/components/common/Loader';
+import SpinnerLoader from '@/components/SpinnerLoader';
 
-// Define Zod schema for email validation
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
 });
@@ -22,7 +23,6 @@ export default function ForgotPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email using Zod
     const validationResult = forgotPasswordSchema.safeParse({ email });
 
     if (!validationResult.success) {
@@ -42,7 +42,10 @@ export default function ForgotPassword() {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.message || 'Failed to send reset email.');
+        const errorMessage =
+          data.ErrorMessage?.[0]?.message || 'Failed to reset password';
+        toast.error(errorMessage);
+        setIsLoading(false);
         return;
       }
 
@@ -58,6 +61,7 @@ export default function ForgotPassword() {
 
   return (
     <>
+      <SpinnerLoader isLoading={isLoading} />
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">
@@ -88,14 +92,21 @@ export default function ForgotPassword() {
                 className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
               />
             </div>
-
             <Button
               type="submit"
+              className={`w-full mt-5 font-semibold shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 ${
+                isLoading ? 'cursor-not-allowed opacity-75' : ''
+              }`}
               disabled={isLoading}
-              className="mt-6 h-8 w-auto flex items-center justify-center group font-semibold bg-primary text-primary-foreground"
             >
-              {isLoading ? 'Sending...' : 'Next'}
-              <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              {isLoading ? (
+                <Loader />
+              ) : (
+                <>
+                  Next{' '}
+                  <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </form>
         </div>

@@ -7,6 +7,7 @@ const publicRoutes = ['/login', '/signup'];
 const adminRoutes = ['/admin', '/admin/dashboard'];
 const psychologistRoutes = ['/psychologist/dashboard', '/psychologist/profile'];
 const verificationRoute = '/verify';
+const forgotPasswordRoute = '/forgot-password';
 const passwordConfirmationRoute = '/forgot-password/confirmation';
 
 export default async function middleware(req: NextRequest) {
@@ -22,26 +23,26 @@ export default async function middleware(req: NextRequest) {
   const session = sessionCookie ? await decrypt(sessionCookie) : null;
   const resetSession = resetToken ? await decrypt(resetToken) : null;
 
-  // Check if trying to access the verification page directly without a tempToken
-  if (path === verificationRoute) {
-    if (!tempToken) {
-      return NextResponse.redirect(new URL('/signup', req.nextUrl));
-    }
-  }
-
-  // Redirect to forgot-password if accessing confirmation without a reset token
+  // Protect the confirmation page, not the forgot-password page itself
   if (path === passwordConfirmationRoute && !resetSession) {
     return NextResponse.redirect(new URL('/forgot-password', req.nextUrl));
   }
 
-  // Redirect psychologist to their dashboard
-  if (path === '/psychologist') {
-    if (session?.role === 'psychologist') {
-      return NextResponse.redirect(
-        new URL('/psychologist/dashboard', req.nextUrl)
-      );
-    }
+  // Ensure accessing verification only with a tempToken
+  if (path === verificationRoute && !tempToken) {
+    return NextResponse.redirect(new URL('/signup', req.nextUrl));
+  }
+
+  // Allow access to forgot-password page without redirecting
+  if (path === forgotPasswordRoute) {
     return NextResponse.next();
+  }
+
+  // Redirect psychologist to their dashboard
+  if (path === '/psychologist' && session?.role === 'psychologist') {
+    return NextResponse.redirect(
+      new URL('/psychologist/dashboard', req.nextUrl)
+    );
   }
 
   // Redirect based on role after login
@@ -64,21 +65,15 @@ export default async function middleware(req: NextRequest) {
 
   // Check role for psychologist routes
   if (psychologistRoutes.some(route => path.startsWith(route))) {
-    if (!session?.id) {
+    if (!session?.id || session.role !== 'psychologist') {
       return NextResponse.redirect(new URL('/login', req.nextUrl));
-    }
-    if (session.role !== 'psychologist') {
-      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
     }
   }
 
   // Check role for admin routes
   if (adminRoutes.some(route => path.startsWith(route))) {
-    if (!session?.id) {
+    if (!session?.id || session.role !== 'admin') {
       return NextResponse.redirect(new URL('/login', req.nextUrl));
-    }
-    if (session.role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
     }
   }
 
@@ -94,6 +89,7 @@ export const config = {
     '/verify',
     '/admin/:path*',
     '/psychologist/:path*',
+    '/forgot-password',
     '/forgot-password/confirmation',
     '/',
   ],

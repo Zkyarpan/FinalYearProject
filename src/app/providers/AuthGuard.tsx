@@ -11,12 +11,23 @@ interface TokenPayload {
   isVerified?: boolean;
 }
 
+const publicRoutes = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+];
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+      const currentPath = window.location.pathname;
+
+      if (publicRoutes.includes(currentPath)) {
+        return;
+      }
 
       if (!token) {
         router.push('/login');
@@ -43,17 +54,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         switch (userData.role) {
           case 'admin':
-            if (!window.location.pathname.startsWith('/admin')) {
+            if (!currentPath.startsWith('/admin')) {
               router.push('/admin/dashboard');
             }
             break;
           case 'psychologist':
-            if (!window.location.pathname.startsWith('/psychologist')) {
+            if (!currentPath.startsWith('/psychologist')) {
               router.push('/psychologist/dashboard');
             }
             break;
           default:
-            if (!window.location.pathname.startsWith('/dashboard')) {
+            if (!currentPath.startsWith('/dashboard')) {
               router.push('/dashboard');
             }
             break;

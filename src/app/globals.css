@@ -15,7 +15,7 @@ body {
 }
 
 .container {
-  @apply max-w-[658px] mx-auto w-full px-4 sm:px-6 lg:px-8;
+  @apply max-w-[800px] mx-auto w-full px-4 sm:px-6 lg:px-8;
 }
 
 html {

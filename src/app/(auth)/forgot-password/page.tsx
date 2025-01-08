@@ -62,7 +62,7 @@ export default function ForgotPassword() {
   return (
     <>
       {/* <SpinnerLoader isLoading={isLoading} /> */}
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 -mt-5">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">
             <h1 className="text-lg font-semibold text-foreground mb-2">

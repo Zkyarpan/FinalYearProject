@@ -56,7 +56,10 @@ export default function RootLayout({
           />
           <Toaster position="bottom-right" richColors />
           <NavbarWrapper />
-          <AuthGuard>{children}</AuthGuard>
+          <AuthGuard>
+            {children}
+
+          </AuthGuard>
           <FooterWrapper />
         </Providers>
       </body>

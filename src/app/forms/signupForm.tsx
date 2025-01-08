@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import SpinnerLoader from '@/components/SpinnerLoader';
+// import SpinnerLoader from '@/components/SpinnerLoader';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -65,7 +65,7 @@ const SignupForm = () => {
 
   return (
     <>
-      <SpinnerLoader isLoading={isLoading} />
+      {/* <SpinnerLoader isLoading={isLoading} /> */}
       <div className="w-full max-w-[380px] mx-auto">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="space-y-1">

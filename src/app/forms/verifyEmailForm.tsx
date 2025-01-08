@@ -7,7 +7,7 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
-import SpinnerLoader from '@/components/SpinnerLoader';
+// import SpinnerLoader from '@/components/SpinnerLoader';
 
 const VerifyEmail = () => {
   const router = useRouter();
@@ -108,7 +108,7 @@ const VerifyEmail = () => {
 
   return (
     <>
-      <SpinnerLoader isLoading={isLoading} />
+      {/* <SpinnerLoader isLoading={isLoading} /> */}
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10 shadow-md">
           <div className="mb-6 text-center">

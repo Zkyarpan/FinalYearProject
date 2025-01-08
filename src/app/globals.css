@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --font-inter: "Inter", sans-serif;
-  --font-instrument-serif: "Instrument Serif", serif;
+  --font-inter: 'Inter', sans-serif;
+  --font-instrument-serif: 'Instrument Serif', serif;
 }
 
 body {
@@ -26,22 +26,21 @@ html {
 }
 
 @font-face {
-  font-family: "logofont";
-  src: url("./fonts/Casad-Serial-Bold.ttf") format("truetype");
+  font-family: 'logofont';
+  src: url('./fonts/Casad-Serial-Bold.ttf') format('truetype');
 }
 
 @font-face {
-  font-family: "mainfont";
-  src: url("./fonts/segoeuithis.ttf") format("truetype");
+  font-family: 'mainfont';
+  src: url('./fonts/segoeuithis.ttf') format('truetype');
 }
 
 .logo-font {
-  font-family: "logofont", sans-serif;
+  font-family: 'logofont', sans-serif;
 }
 
-
 .main-font {
-  font-family: "mainfont", sans-serif;
+  font-family: 'mainfont', sans-serif;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -78,7 +77,17 @@ select:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
   box-shadow: 0 0 0px 1000px transparent inset !important;
   -webkit-text-fill-color: inherit !important;
-  transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 :root {

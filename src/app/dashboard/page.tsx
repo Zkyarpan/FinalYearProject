@@ -1,131 +1,181 @@
-import { Home, Rocket, FileText, Briefcase, Search, Edit3 } from 'lucide-react';
+import ServicesIcon from '@/icons/ServicesIcon';
+import PsychologistIcon from '@/icons/Psychologist';
+import ArticlesIcon from '@/icons/Atricles';
+import ResourcesIcon from '@/icons/ResourceIcon';
+import BlogIcon from '@/icons/BlogIcon';
+
+import Image from 'next/image';
+import Link from 'next/link';
 
 function HomePage() {
+  const currentYear = new Date().getFullYear();
+  const posts = [
+    {
+      id: 1,
+      title: 'Boost your conversion rate',
+      href: '#',
+      description:
+        'Illo sint voluptas. Error voluptates culpa eligendi. Hic vel totam vitae illo. Non aliquid explicabo necessitatibus unde.',
+      date: 'Mar 16, 2020',
+      category: 'Marketing',
+      author: {
+        name: 'Michael Foster',
+        role: 'Co-Founder / CTO',
+      },
+    },
+    {
+      id: 2,
+      title: 'How to use search engine optimization to drive sales',
+      href: '#',
+      description:
+        'Optio sit exercitation et ex ullamco aliquid explicabo. Dolore do ut officia anim non ad eu.',
+      date: 'Mar 10, 2020',
+      category: 'Sales',
+      author: {
+        name: 'Lindsay Walton',
+        role: 'Front-end Developer',
+      },
+    },
+    {
+      id: 3,
+      title: 'Improve your customer experience',
+      href: '#',
+      description:
+        'Dolore commodo in nulla do nulla esse consectetur. Adipisicing voluptate velit sint adipisicing ex duis elit deserunt sint ipsum.',
+      date: 'Feb 12, 2020',
+      category: 'Business',
+      author: {
+        name: 'Tom Cook',
+        role: 'Director of Product',
+      },
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen bg-white p-10">
+    <div className="flex min-h-screen bg-white">
       {/* Left Sidebar */}
-      <div className="w-[212px] border-r border-gray-200 flex-col flex-shrink-0 fixed h-screen pb-2 lg:flex justify-between">
-        <div>
-          <div className="relative my-3 px-6">
-            {/* <h1 className="text-xl font-bold">Peerlist</h1> */}
+      <div className="w-[212px] border-r border-gray-200 fixed h-screen flex flex-col justify-between py-4">
+        <div className="flex flex-col h-full overflow-y-auto">
+          <div className="px-4 -py-2">
+            <Link href="/" className="flex items-center">
+              <Image
+                alt="Mentality"
+                width={40}
+                height={30}
+                className="object-contain"
+                src="/logo1.png?v=1"
+                priority
+              />
+              <span className="ml-2 text-2xl font-extrabold logo-font">
+                Mentality
+              </span>
+            </Link>
           </div>
-          <div className="pr-6 flex flex-col justify-between h-full overflow-y-auto">
-            <div className="mt-6">
-              <NavItem icon={<Home />} text="Scroll" active />
-              <NavItem icon={<Rocket />} text="Spotlight" />
-              <NavItem icon={<FileText />} text="Articles" />
-              <NavItem icon={<Briefcase />} text="Jobs" />
-              <NavItem icon={<Search />} text="Search" />
-              <NavItem icon={<Edit3 />} text="Blog" />
-            </div>
-          </div>
+          <nav className="px-6 flex-1 mt-10">
+            <NavItem icon={<ServicesIcon />} text="Services" active />
+            <NavItem icon={<PsychologistIcon />} text="Psychologist" />
+            <NavItem icon={<ArticlesIcon />} text="Articles" />
+            <NavItem icon={<ResourcesIcon />} text="Resources" />
+            <NavItem icon={<BlogIcon />} text="Blog" />
+          </nav>
         </div>
         <div className="px-6">
-          <div className="text-gray-500 text-xs mb-1">
-            <a href="#" className="hover:underline">
-              Blog
-            </a>{' '}
-            •{' '}
-            <a href="#" className="hover:underline">
-              Support
-            </a>{' '}
-            •{' '}
-            <a href="#" className="hover:underline">
-              Help
-            </a>{' '}
-            •{' '}
-            <a href="#" className="hover:underline">
-              Legal
-            </a>
-          </div>
-          <p className="text-gray-500 text-[10px]">© 2025 Peerlist, Inc.</p>
+          <p className="text-gray-500 text-[10px]">
+            © {currentYear} Mentality, Inc.
+          </p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 lg:pl-[212px] lg:pr-[348px]">
-        <div className="flex h-14">
-          <div className="h-14 z-40 lg:z-50 lg:border-r border-b border-gray-200 box-border lg:max-w-[640px] lg:w-full fixed top-0 bg-white py-4 px-6 flex items-center justify-center">
-            <div className="flex items-center justify-center w-full relative">
-              <div className="absolute left-0">
-                <h1 className="text-base font-semibold">Scroll</h1>
-              </div>
-              <div className="border border-gray-200 flex rounded-xl">
-                <a
-                  className="px-4 py-2 uppercase border-r border-gray-200 flex items-center"
-                  href="#"
-                >
-                  <p className="text-green-500 font-semibold text-xs">Newest</p>
-                </a>
-                <a className="px-4 uppercase flex gap-2 items-center" href="#">
-                  <p className="text-gray-700 font-semibold text-xs">
-                    Trending
-                  </p>
-                </a>
-              </div>
-            </div>
+      <div className="flex-1 ml-[212px] mr-[348px]">
+        {/* Fixed Header */}
+        <div className="h-14 border-b border-gray-200 fixed top-0 left-[212px] right-[348px] bg-white z-50">
+          <div className="h-full px-6 flex items-center justify-between">
+            <h1 className="text-base font-semibold">Scroll</h1>
           </div>
         </div>
 
-        {/* Post Creation Box */}
-        <div className="pt-14">
-          <div className="group flex flex-col gap-2 bg-gray-50 hover:bg-white border-b border-gray-200 px-6 py-4 hover:cursor-pointer">
-            <div className="flex gap-2 items-center">
-              <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-              <div className="text-gray-500 font-normal text-sm">
-                What are you building?
-              </div>
-            </div>
-            <div className="flex justify-between items-center pl-10">
-              <div className="flex gap-2">
-                <ActionButton icon={<FileText className="w-4 h-4" />} />
-                <ActionButton icon={<Edit3 className="w-4 h-4" />} />
-                <ActionButton icon={<Briefcase className="w-4 h-4" />} />
-              </div>
-              <div className="flex items-center gap-x-4">
-                <button className="text-gray-700 border border-gray-200 rounded-xl px-4 py-1.5 text-sm font-semibold hover:shadow-sm">
-                  Write Article
-                </button>
-                <button className="bg-green-500 text-white rounded-xl px-4 py-1.5 text-sm font-semibold hover:bg-green-600">
-                  Post
-                </button>
-              </div>
+        {/* Scrollable Content */}
+        <div className="pt-14 h-[calc(100vh-3.5rem)] overflow-y-auto hide-scrollbar">
+          <div className="p-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+              {posts.map(post => (
+                <article
+                  key={post.id}
+                  className="flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex items-center gap-x-4 text-xs">
+                      <time dateTime={post.date} className="text-gray-500">
+                        {post.date}
+                      </time>
+                      <Link
+                        href={post.href}
+                        className="relative z-10 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        {post.category}
+                      </Link>
+                    </div>
+                    <div className="group relative">
+                      <h3 className="mt-3 text-lg font-semibold text-gray-900 group-hover:text-green-600">
+                        <Link href={post.href}>
+                          <span className="absolute inset-0" />
+                          {post.title}
+                        </Link>
+                      </h3>
+                      <p className="mt-5 line-clamp-3 text-sm leading-6 text-gray-600">
+                        {post.description}
+                      </p>
+                    </div>
+                    <div className="relative mt-8 flex items-center gap-x-4">
+                      <div className="h-10 w-10 rounded-full bg-gray-200" />
+                      <div className="text-sm leading-6">
+                        <p className="font-semibold text-gray-900">
+                          <Link href={post.href}>
+                            <span className="absolute inset-0" />
+                            {post.author.name}
+                          </Link>
+                        </p>
+                        <p className="text-gray-600">{post.author.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
       {/* Right Sidebar */}
-      <aside className="w-[348px] fixed right-0 top-0 border-l border-gray-200 h-screen p-6 lg:block">
-        <div className="flex flex-col gap-10">
-          <div
-            className="flex flex-col items-center p-4 rounded-2xl border border-gray-200"
-            style={{
-              background:
-                'linear-gradient(215deg, rgba(0, 170, 69, 0.2) 0%, rgba(255, 255, 255, 0) 49.92%)',
-            }}
-          >
-            <p className="text-2xl text-center mb-1">
-              Not your typical content feed!
+      <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-gray-200 p-6">
+        <div
+          className="rounded-2xl border border-gray-200 p-6"
+          style={{
+            background:
+              'linear-gradient(215deg, rgba(0, 170, 69, 0.2) 0%, rgba(255, 255, 255, 0) 49.92%)',
+          }}
+        >
+          <h2 className="text-2xl text-center mb-4">
+            Not your typical content feed!
+          </h2>
+          <p className="text-sm text-center mb-2">
+            Are you building side projects, writing articles, designing UIs,
+            reading books, hiring, or looking for a new job?
+          </p>
+          <p className="text-sm text-center mb-6">
+            Share it here to get valuable feedback, intros, and opportunities.
+          </p>
+          <div className="flex flex-col items-center gap-2">
+            <button className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-green-600 w-full">
+              Create Profile
+            </button>
+            <p className="text-xs text-center italic">
+              Claim your username before it's too late!
             </p>
-            <p className="text-sm text-center">
-              Are you building side projects, writing articles, designing UIs,
-              reading books, hiring, or looking for a new job?
-            </p>
-            <p className="text-sm text-center mt-2">
-              Share it here to get valuable feedback, intros, and opportunities.
-            </p>
-            <div className="flex flex-col items-center gap-2 mt-4">
-              <button className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-green-600">
-                Create Profile
-              </button>
-              <p className="text-xs text-center italic">
-                Claim your username before it's too late!
-              </p>
-            </div>
           </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }
@@ -133,24 +183,12 @@ function HomePage() {
 function NavItem({ icon, text, active = false }) {
   return (
     <a
-      className={`flex items-center group pt-2 lg:py-2.5 ${
-        active ? 'border-t-2 border-green-500 md:border-0' : ''
-      }`}
+      className={`flex items-center py-2.5 group ${active ? 'text-green-500' : 'text-gray-700'}`}
       href="#"
     >
-      <span
-        className={`text-gray-700 shrink-0 ${active ? 'text-green-500' : 'text-gray-700'}`}
-      >
-        {icon}
-      </span>
-      <span className="flex flex-col lg:ml-2 mt-2 lg:mt-0 transition-all lg:group-hover:translate-x-1">
-        <span
-          className={`lg:text-base text-xxs font-semibold ${
-            active ? 'text-green-500' : 'text-gray-700'
-          }`}
-        >
-          {text}
-        </span>
+      <span className="shrink-0">{icon}</span>
+      <span className="ml-2 font-semibold transition-transform group-hover:translate-x-1">
+        {text}
       </span>
     </a>
   );

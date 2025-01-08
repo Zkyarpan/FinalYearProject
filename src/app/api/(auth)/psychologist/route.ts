@@ -195,14 +195,7 @@ export async function POST(req: NextRequest) {
       email: psychologist.email,
     });
 
-    const refreshToken = await encrypt({
-      id: psychologist._id,
-      type: 'refresh',
-      role: 'psychologist',
-    });
-
     const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    const refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const response = NextResponse.json(
       createSuccessResponse(201, {
@@ -216,14 +209,6 @@ export async function POST(req: NextRequest) {
       }),
       { status: 201 }
     );
-
-    response.cookies.set('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      expires: refreshTokenExpires,
-    });
 
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,

@@ -41,13 +41,8 @@ export async function POST(req: NextRequest) {
       id: account._id,
       role: account.role,
     });
-    const refreshToken = await encrypt({
-      id: account._id,
-      type: 'refresh',
-    });
 
     const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    const refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const response = NextResponse.json(
       createSuccessResponse(200, {
@@ -62,15 +57,6 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    response.cookies.set('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      expires: refreshTokenExpires,
-    });
-    console.log('Refresh Token Cookie Set:', refreshToken);
-
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -78,7 +64,6 @@ export async function POST(req: NextRequest) {
       path: '/',
       expires: accessTokenExpires,
     });
-    console.log('Access Token Cookie Set:', accessToken);
 
     return response;
   } catch (error) {

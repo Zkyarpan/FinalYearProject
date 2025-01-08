@@ -1,8 +1,8 @@
-import VerifyEmail from "@/app/forms/verifyEmailForm";
-import { Metadata } from "next";
+import VerifyEmail from '@/app/forms/verifyEmailForm';
+import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Verify Email",
+  title: 'Verify Email',
 };
 
 const Signup = () => {

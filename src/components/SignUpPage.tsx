@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   BookOpen,
   Calendar,
-  Award,
   Users,
   MessageSquare,
   ArrowRight,

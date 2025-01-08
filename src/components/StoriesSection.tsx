@@ -1,9 +1,14 @@
-'use client';
+import ServicesIcon from '@/icons/ServicesIcon';
+import PsychologistIcon from '@/icons/Psychologist';
+import ArticlesIcon from '@/icons/Atricles';
+import ResourcesIcon from '@/icons/ResourceIcon';
+import BlogIcon from '@/icons/BlogIcon';
 
 import Image from 'next/image';
 import Link from 'next/link';
 
-const BlogSection = () => {
+function HomePage() {
+  const currentYear = new Date().getFullYear();
   const posts = [
     {
       id: 1,
@@ -16,11 +21,7 @@ const BlogSection = () => {
       author: {
         name: 'Michael Foster',
         role: 'Co-Founder / CTO',
-        imageUrl:
-          'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       },
-      imageUrl:
-        'https://images.unsplash.com/photo-1496128858413-b36217c2ce36?ixlib=rb-4.0.3&auto=format&fit=crop&w=3603&q=80',
     },
     {
       id: 2,
@@ -33,11 +34,7 @@ const BlogSection = () => {
       author: {
         name: 'Lindsay Walton',
         role: 'Front-end Developer',
-        imageUrl:
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       },
-      imageUrl:
-        'https://images.unsplash.com/photo-1547586696-ea22b4d4235d?ixlib=rb-4.0.3&auto=format&fit=crop&w=3270&q=80',
     },
     {
       id: 3,
@@ -50,92 +47,159 @@ const BlogSection = () => {
       author: {
         name: 'Tom Cook',
         role: 'Director of Product',
-        imageUrl:
-          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       },
-      imageUrl:
-        'https://images.unsplash.com/photo-1492724441997-5dc865305da7?ixlib=rb-4.0.3&auto=format&fit=crop&w=3270&q=80',
     },
   ];
 
   return (
-    <div className="bg-[hsl(var(--background))] py-24 sm:py-32">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-4xl">
-            From the blog
-          </h2>
-          <p className="mt-2 text-lg leading-8 text-[hsl(var(--muted-foreground))]">
-            Learn how to grow your business with our expert advice.
+    <div className="flex min-h-screen bg-white">
+      {/* Left Sidebar */}
+      <div className="w-[212px] border-r border-gray-200 fixed h-screen flex flex-col justify-between py-4">
+        <div className="flex flex-col h-full overflow-y-auto">
+          <div className="px-4 -py-2">
+            <Link href="/" className="flex items-center">
+              <Image
+                alt="Mentality"
+                width={40}
+                height={30}
+                className="object-contain"
+                src="/logo1.png?v=1"
+                priority
+              />
+              <span className="ml-2 text-2xl font-extrabold logo-font">
+                Mentality
+              </span>
+            </Link>
+          </div>
+          <nav className="px-6 flex-1 mt-10">
+            <NavItem icon={<ServicesIcon />} text="Services" active />
+            <NavItem icon={<PsychologistIcon />} text="Psychologist" />
+            <NavItem icon={<ArticlesIcon />} text="Articles" />
+            <NavItem icon={<ResourcesIcon />} text="Resources" />
+            <NavItem icon={<BlogIcon />} text="Blog" />
+          </nav>
+        </div>
+        <div className="px-6">
+          <p className="text-gray-500 text-[10px]">
+            © {currentYear} Mentality, Inc.
           </p>
         </div>
-        <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-          {posts.map(post => (
-            <article key={post.id} className="flex flex-col items-start">
-              <div className="relative w-full">
-                <Image
-                  src={post.imageUrl}
-                  alt=""
-                  width={2400}
-                  height={1600}
-                  className="aspect-[16/9] w-full rounded-2xl bg-[hsl(var(--muted))] object-cover sm:aspect-[2/1] lg:aspect-[3/2]"
-                />
-                <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-[hsl(var(--border))]" />
-              </div>
-              <div className="max-w-xl">
-                <div className="mt-8 flex items-center gap-x-4 text-xs">
-                  <time
-                    dateTime={post.date}
-                    className="text-[hsl(var(--muted-foreground))]"
-                  >
-                    {post.date}
-                  </time>
-                  <Link
-                    href={post.href}
-                    className="relative z-10 rounded-full bg-[hsl(var(--muted))] px-3 py-1.5 font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                  >
-                    {post.category}
-                  </Link>
-                </div>
-                <div className="group relative">
-                  <h3 className="mt-3 text-lg font-semibold leading-6 text-[hsl(var(--foreground))] group-hover:text-[hsl(var(--primary))]">
-                    <Link href={post.href}>
-                      <span className="absolute inset-0" />
-                      {post.title}
-                    </Link>
-                  </h3>
-                  <p className="mt-5 line-clamp-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    {post.description}
-                  </p>
-                </div>
-                <div className="relative mt-8 flex items-center gap-x-4">
-                  <Image
-                    src={post.author.imageUrl}
-                    alt=""
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 rounded-full bg-[hsl(var(--muted))]"
-                  />
-                  <div className="text-sm leading-6">
-                    <p className="font-semibold text-[hsl(var(--foreground))]">
-                      <Link href={post.href}>
-                        <span className="absolute inset-0" />
-                        {post.author.name}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 ml-[212px] mr-[348px]">
+        {/* Fixed Header */}
+        <div className="h-14 border-b border-gray-200 fixed top-0 left-[212px] right-[348px] bg-white z-50">
+          <div className="h-full px-6 flex items-center justify-between">
+            <h1 className="text-base font-semibold">Scroll</h1>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="pt-14 h-[calc(100vh-3.5rem)] overflow-y-auto hide-scrollbar">
+          <div className="p-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+              {posts.map(post => (
+                <article
+                  key={post.id}
+                  className="flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex items-center gap-x-4 text-xs">
+                      <time dateTime={post.date} className="text-gray-500">
+                        {post.date}
+                      </time>
+                      <Link
+                        href={post.href}
+                        className="relative z-10 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        {post.category}
                       </Link>
-                    </p>
-                    <p className="text-[hsl(var(--muted-foreground))]">
-                      {post.author.role}
-                    </p>
+                    </div>
+                    <div className="group relative">
+                      <h3 className="mt-3 text-lg font-semibold text-gray-900 group-hover:text-green-600">
+                        <Link href={post.href}>
+                          <span className="absolute inset-0" />
+                          {post.title}
+                        </Link>
+                      </h3>
+                      <p className="mt-5 line-clamp-3 text-sm leading-6 text-gray-600">
+                        {post.description}
+                      </p>
+                    </div>
+                    <div className="relative mt-8 flex items-center gap-x-4">
+                      <div className="h-10 w-10 rounded-full bg-gray-200" />
+                      <div className="text-sm leading-6">
+                        <p className="font-semibold text-gray-900">
+                          <Link href={post.href}>
+                            <span className="absolute inset-0" />
+                            {post.author.name}
+                          </Link>
+                        </p>
+                        <p className="text-gray-600">{post.author.role}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </article>
-          ))}
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Sidebar */}
+      <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-gray-200 p-6">
+        <div
+          className="rounded-2xl border border-gray-200 p-6"
+          style={{
+            background:
+              'linear-gradient(215deg, rgba(0, 170, 69, 0.2) 0%, rgba(255, 255, 255, 0) 49.92%)',
+          }}
+        >
+          <h2 className="text-2xl text-center mb-4">
+            Not your typical content feed!
+          </h2>
+          <p className="text-sm text-center mb-2">
+            Are you building side projects, writing articles, designing UIs,
+            reading books, hiring, or looking for a new job?
+          </p>
+          <p className="text-sm text-center mb-6">
+            Share it here to get valuable feedback, intros, and opportunities.
+          </p>
+          <div className="flex flex-col items-center gap-2">
+            <button className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-green-600 w-full">
+              Create Profile
+            </button>
+            <p className="text-xs text-center italic">
+              Claim your username before it's too late!
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
-};
+}
 
-export default BlogSection;
+function NavItem({ icon, text, active = false }) {
+  return (
+    <a
+      className={`flex items-center py-2.5 group ${active ? 'text-green-500' : 'text-gray-700'}`}
+      href="#"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="ml-2 font-semibold transition-transform group-hover:translate-x-1">
+        {text}
+      </span>
+    </a>
+  );
+}
 
+function ActionButton({ icon }) {
+  return (
+    <button className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-700">
+      {icon}
+    </button>
+  );
+}
+
+export default HomePage;

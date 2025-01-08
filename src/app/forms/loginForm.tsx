@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
-import SpinnerLoader from '@/components/SpinnerLoader';
+// import SpinnerLoader from '@/components/SpinnerLoader';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -51,14 +51,24 @@ const LoginForm = () => {
         return;
       }
 
+      if (data.Result?.accessToken) {
+        localStorage.setItem('accessToken', data.Result.accessToken);
+      }
+
       toast.success('Login successful!');
-      if (data.Result.user_data.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/dashboard');
+
+      const userRole = data.Result?.user_data?.role;
+      switch (userRole) {
+        case 'admin':
+          router.push('/admin/dashboard');
+          break;
+        case 'psychologist':
+          router.push('/psychologist/dashboard');
+          break;
+        default:
+          router.push('/dashboard');
       }
     } catch (err) {
-      console.error(err);
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -67,7 +77,7 @@ const LoginForm = () => {
 
   return (
     <>
-      <SpinnerLoader isLoading={isLoading} />
+      {/* <SpinnerLoader isLoading={isLoading} /> */}
       <div className="w-full max-w-[380px] mx-auto">
         <div className="border px-6 py-10 rounded-2xl flex flex-col gap-6 sm:shadow-md">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

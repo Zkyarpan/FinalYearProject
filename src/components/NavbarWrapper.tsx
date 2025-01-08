@@ -9,6 +9,7 @@ const NavbarWrapper = () => {
   const hideFooterPages = [
     '/dashboard',
     '/admin/dashboard',
+    '/stories',
     '/psychologist/dashboard',
   ];
 

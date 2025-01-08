@@ -15,8 +15,8 @@ const FooterWrapper = () => {
     '/psychologist/dashboard',
     '/admin/dashboard',
     '/forgot-password',
-    '/forgot-password/confirmation'
-
+    '/forgot-password/confirmation',
+    '/stories',
   ];
 
   if (hideFooterPages.includes(pathname)) {

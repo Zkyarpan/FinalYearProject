@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import Loader from '@/components/common/Loader';
-import SpinnerLoader from '@/components/SpinnerLoader';
+// import SpinnerLoader from '@/components/SpinnerLoader';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -61,7 +61,7 @@ export default function ForgotPassword() {
 
   return (
     <>
-      <SpinnerLoader isLoading={isLoading} />
+      {/* <SpinnerLoader isLoading={isLoading} /> */}
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">

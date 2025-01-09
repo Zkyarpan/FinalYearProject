@@ -1,13 +1,18 @@
+'use client';
+
 import ServicesIcon from '@/icons/ServicesIcon';
 import PsychologistIcon from '@/icons/Psychologist';
 import ArticlesIcon from '@/icons/Atricles';
 import ResourcesIcon from '@/icons/ResourceIcon';
 import BlogIcon from '@/icons/BlogIcon';
-
+import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import Link from 'next/link';
+import ThemeSwitch from '@/components/ThemeSwitch';
+import { useState } from 'react';
 
 function HomePage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const currentYear = new Date().getFullYear();
   const posts = [
     {
@@ -52,9 +57,9 @@ function HomePage() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       {/* Left Sidebar */}
-      <div className="w-[212px] border-r border-gray-200 fixed h-screen flex flex-col justify-between py-4">
+      <div className="w-[212px] border-r border-[hsl(var(--border))] fixed h-screen flex flex-col justify-between py-4">
         <div className="flex flex-col h-full overflow-y-auto">
           <div className="px-4 -py-2">
             <Link href="/" className="flex items-center">
@@ -80,7 +85,7 @@ function HomePage() {
           </nav>
         </div>
         <div className="px-6">
-          <p className="text-gray-500 text-[10px]">
+          <p className="text-[hsl(var(--muted-foreground))] text-[10px]">
             © {currentYear} Mentality, Inc.
           </p>
         </div>
@@ -89,7 +94,7 @@ function HomePage() {
       {/* Main Content */}
       <div className="flex-1 ml-[212px] mr-[348px]">
         {/* Fixed Header */}
-        <div className="h-14 border-b border-gray-200 fixed top-0 left-[212px] right-[348px] bg-white z-50">
+        <div className="h-14 border-b border-[hsl(var(--border))] fixed top-0 left-[212px] right-[348px] bg-[hsl(var(--background))] z-50">
           <div className="h-full px-6 flex items-center justify-between">
             <h1 className="text-base font-semibold">Scroll</h1>
           </div>
@@ -102,41 +107,46 @@ function HomePage() {
               {posts.map(post => (
                 <article
                   key={post.id}
-                  className="flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden"
+                  className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl overflow-hidden"
                 >
                   <div className="p-6">
                     <div className="flex items-center gap-x-4 text-xs">
-                      <time dateTime={post.date} className="text-gray-500">
+                      <time
+                        dateTime={post.date}
+                        className="text-[hsl(var(--muted-foreground))]"
+                      >
                         {post.date}
                       </time>
                       <Link
                         href={post.href}
-                        className="relative z-10 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100"
+                        className="relative z-10 rounded-full bg-[hsl(var(--secondary))] px-3 py-1.5 font-medium text-[hsl(var(--secondary-foreground))] hover:bg-[hsl(var(--accent))]"
                       >
                         {post.category}
                       </Link>
                     </div>
                     <div className="group relative">
-                      <h3 className="mt-3 text-lg font-semibold text-gray-900 group-hover:text-green-600">
+                      <h3 className="mt-3 text-lg font-semibold text-[hsl(var(--foreground))] group-hover:text-[hsl(var(--primary))]">
                         <Link href={post.href}>
                           <span className="absolute inset-0" />
                           {post.title}
                         </Link>
                       </h3>
-                      <p className="mt-5 line-clamp-3 text-sm leading-6 text-gray-600">
+                      <p className="mt-5 line-clamp-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                         {post.description}
                       </p>
                     </div>
                     <div className="relative mt-8 flex items-center gap-x-4">
-                      <div className="h-10 w-10 rounded-full bg-gray-200" />
+                      <div className="h-10 w-10 rounded-full bg-[hsl(var(--secondary))]" />
                       <div className="text-sm leading-6">
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-semibold text-[hsl(var(--foreground))]">
                           <Link href={post.href}>
                             <span className="absolute inset-0" />
                             {post.author.name}
                           </Link>
                         </p>
-                        <p className="text-gray-600">{post.author.role}</p>
+                        <p className="text-[hsl(var(--muted-foreground))]">
+                          {post.author.role}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -148,31 +158,75 @@ function HomePage() {
       </div>
 
       {/* Right Sidebar */}
-      <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-gray-200 p-6">
-        <div
-          className="rounded-2xl border border-gray-200 p-6"
-          style={{
-            background:
-              'linear-gradient(215deg, rgba(0, 170, 69, 0.2) 0%, rgba(255, 255, 255, 0) 49.92%)',
-          }}
-        >
-          <h2 className="text-2xl text-center mb-4">
-            Not your typical content feed!
-          </h2>
-          <p className="text-sm text-center mb-2">
-            Are you building side projects, writing articles, designing UIs,
-            reading books, hiring, or looking for a new job?
-          </p>
-          <p className="text-sm text-center mb-6">
-            Share it here to get valuable feedback, intros, and opportunities.
-          </p>
-          <div className="flex flex-col items-center gap-2">
-            <button className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-green-600 w-full">
+      <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-[hsl(var(--border))] flex flex-col">
+        {/* Top section with buttons */}
+        <div className="m-5">
+          <div className="flex items-center justify-between gap-x-2">
+            <Link
+              href="/login"
+              className="font-semibold text-sm py-2 px-6 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="font-semibold text-sm py-2 px-6 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--ring))] transition-colors"
+            >
               Create Profile
-            </button>
-            <p className="text-xs text-center italic">
-              Claim your username before it's too late!
+            </Link>
+            <ThemeSwitch />
+            <Button
+              type="button"
+              className="p-1 rounded-full block sm:hidden"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Toggle Menu"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 5H21M3 12H21M3 19H21"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
+          </div>
+        </div>
+
+        {/* Content section */}
+        <div className="flex-1 p-6">
+          <div
+            className="rounded-2xl border border-[hsl(var(--border))] p-6 h-full"
+            style={{
+              background:
+                'linear-gradient(215deg, hsl(var(--primary) / 0.2) 0%, hsl(var(--background) / 0) 49.92%)',
+            }}
+          >
+            <h2 className="text-2xl text-center mb-4 text-[hsl(var(--foreground))]">
+              Not your typical content feed!
+            </h2>
+            <p className="text-sm text-center mb-2 text-[hsl(var(--muted-foreground))]">
+              Are you building side projects, writing articles, designing UIs,
+              reading books, hiring, or looking for a new job?
             </p>
+            <p className="text-sm text-center mb-6 text-[hsl(var(--muted-foreground))]">
+              Share it here to get valuable feedback, intros, and opportunities.
+            </p>
+            <div className="flex flex-col items-center gap-2">
+              <button className="bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[hsl(var(--ring))] transition-colors w-full">
+                Create Profile
+              </button>
+              <p className="text-xs text-center italic text-[hsl(var(--muted-foreground))]">
+                Claim your username before it's too late!
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -183,7 +237,11 @@ function HomePage() {
 function NavItem({ icon, text, active = false }) {
   return (
     <a
-      className={`flex items-center py-2.5 group ${active ? 'text-green-500' : 'text-gray-700'}`}
+      className={`flex items-center py-2.5 group ${
+        active
+          ? 'text-[hsl(var(--primary))]'
+          : 'text-[hsl(var(--muted-foreground))]'
+      }`}
       href="#"
     >
       <span className="shrink-0">{icon}</span>
@@ -191,14 +249,6 @@ function NavItem({ icon, text, active = false }) {
         {text}
       </span>
     </a>
-  );
-}
-
-function ActionButton({ icon }) {
-  return (
-    <button className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-700">
-      {icon}
-    </button>
   );
 }
 

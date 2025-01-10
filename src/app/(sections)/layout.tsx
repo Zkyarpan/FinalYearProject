@@ -1,4 +1,3 @@
-// app/layout.js
 'use client';
 
 import { useState } from 'react';
@@ -8,15 +7,16 @@ import Image from 'next/image';
 import ThemeSwitch from '@/components/ThemeSwitch';
 import { useUserStore } from '@/store/userStore';
 
-// Import your icons
 import ServicesIcon from '@/icons/ServicesIcon';
 import PsychologistIcon from '@/icons/Psychologist';
 import ArticlesIcon from '@/icons/Atricles';
 import ResourcesIcon from '@/icons/ResourceIcon';
 import BlogIcon from '@/icons/BlogIcon';
+import StoriesIcon from '@/icons/Stories';
 import { toast } from 'sonner';
 
 const NAV_ITEMS = [
+  { icon: <StoriesIcon />, text: 'Stories', href: '/stories' },
   { icon: <ServicesIcon />, text: 'Services', href: '/services' },
   { icon: <PsychologistIcon />, text: 'Psychologist', href: '/psychologists' },
   { icon: <ArticlesIcon />, text: 'Articles', href: '/articles' },
@@ -24,19 +24,27 @@ const NAV_ITEMS = [
   { icon: <BlogIcon />, text: 'Blogs', href: '/blogs' },
 ];
 
-const NavItem = ({ icon, text, isActive, href }) => (
-  <Link
-    href={href}
-    className={`flex items-center px-4 py-2.5 text-[15px] transition-colors duration-200 ${
-      isActive
-        ? 'text-gray-900 font-medium dark:text-[#fff]'
-        : 'hover:text-gray-900 dark:text-[#fff]'
-    }`}
-  >
-    <span className="w-6 h-6 flex items-center justify-center">{icon}</span>
-    <span className="ml-3 text-lg">{text}</span>
-  </Link>
-);
+const NavItem = ({ icon, text, isActive, href }) => {
+  const textStyle = isActive
+    ? {
+        fontWeight: '600',
+        color: 'var(--foreground)',
+      }
+    : {};
+
+  return (
+    <Link href={href}>
+      <span className="flex lg:flex-row flex-col items-center group pt-2 lg:py-2.5 transition-all hover:text-gray-900 dark:text-white">
+        <span className="relative text-current shrink-0">{icon}</span>
+        <span className="flex flex-col lg:ml-2 mt-2 lg:mt-0 transition-all lg:group-hover:translate-x-1">
+          <span className="ml-1 text-lg font-normal" style={textStyle}>
+            {text}
+          </span>
+        </span>
+      </span>
+    </Link>
+  );
+};
 
 const ProfileDropdown = ({ isOpen, onLogout }) =>
   isOpen && (
@@ -86,7 +94,7 @@ const RootLayout = ({ children }) => {
       <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333]">
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <Link href="/" className="flex items-center ml-5">
+            <Link href="/" className="flex items-center">
               <Image
                 alt="Mentality"
                 width={40}

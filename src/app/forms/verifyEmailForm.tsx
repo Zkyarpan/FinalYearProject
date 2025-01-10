@@ -51,11 +51,14 @@ const VerifyEmail = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.message || 'Verification failed.');
+        const errorMessage =
+          data.ErrorMessage?.[0]?.message || 'Verification failed.';
+        toast.error(errorMessage);
+        setIsLoading(false);
         return;
       }
 
-      toast.success('Verification successful! Redirecting to dashboard...');
+      toast.success('Verification successful!');
       localStorage.removeItem('verificationToken');
       localStorage.removeItem('email');
       router.push('/dashboard');

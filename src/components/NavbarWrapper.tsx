@@ -11,6 +11,12 @@ const NavbarWrapper = () => {
     '/admin/dashboard',
     '/stories',
     '/psychologist/dashboard',
+    '/blogs',
+    '/psychologists',
+    '/psychologist',
+    '/resources',
+    '/services',
+    '/articles',
   ];
 
   if (hideFooterPages.includes(pathname)) {

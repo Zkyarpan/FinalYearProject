@@ -51,6 +51,12 @@ export async function setSessionCookie(session: string, expires: Date) {
 
 export async function clearSessionCookie() {
   const response = NextResponse.next();
-  response.cookies.set('session', '', { expires: new Date(0) });
+  response.cookies.set('session', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    expires: new Date(0),
+    path: '/',
+  });
   return response;
 }

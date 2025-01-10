@@ -1,11 +1,13 @@
 'use client';
 
-import LoginForm from '@/app/forms/loginForm';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
+
+const LoginForm = dynamic(() => import('@/app/forms/LoginForm'));
 
 const LoginPage = () => {
   return (
-    <main className="pt-14">
+    <main className="pt-14 -mt-10">
       <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4">
         <div className="text-center mb-10 space-y-2">
           <h1 className="text-3xl main-font font-bold text-[hsl(var(--foreground))]">
@@ -23,7 +25,7 @@ const LoginPage = () => {
           Don’t have a Mentality profile?{' '}
           <Link
             href="/signup"
-            className="text-primary dark:text-white hover:underline font-semibold hover:text-primary/80 dark:hover:text-gray-300 transition-colors"
+            className="text-gray-600 dark:text-white/50 hover:underline font-semibold hover:text-black dark:hover:text-gray-100"
           >
             Create One!
           </Link>

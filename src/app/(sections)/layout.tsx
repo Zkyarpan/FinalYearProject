@@ -1,15 +1,14 @@
+// app/layout.js
 'use client';
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-
-import { Button } from '@/components/ui/button';
 import ThemeSwitch from '@/components/ThemeSwitch';
 import { useUserStore } from '@/store/userStore';
 
-// Icons
+// Import your icons
 import ServicesIcon from '@/icons/ServicesIcon';
 import PsychologistIcon from '@/icons/Psychologist';
 import ArticlesIcon from '@/icons/Atricles';
@@ -17,86 +16,26 @@ import ResourcesIcon from '@/icons/ResourceIcon';
 import BlogIcon from '@/icons/BlogIcon';
 import { toast } from 'sonner';
 
-// Constants
 const NAV_ITEMS = [
   { icon: <ServicesIcon />, text: 'Services', href: '/services' },
-  { icon: <PsychologistIcon />, text: 'Psychologist', href: '/psychologist' },
+  { icon: <PsychologistIcon />, text: 'Psychologist', href: '/psychologists' },
   { icon: <ArticlesIcon />, text: 'Articles', href: '/articles' },
   { icon: <ResourcesIcon />, text: 'Resources', href: '/resources' },
-  { icon: <BlogIcon />, text: 'Blog', href: '/blog' },
+  { icon: <BlogIcon />, text: 'Blogs', href: '/blogs' },
 ];
 
-const BLOG_POSTS = [
-  {
-    id: 1,
-    title: 'Boost your conversion rate',
-    href: '#',
-    description:
-      'Illo sint voluptas. Error voluptates culpa eligendi. Hic vel totam vitae illo. Non aliquid explicabo necessitatibus unde.',
-    date: 'Mar 16, 2020',
-    category: 'Marketing',
-    author: {
-      name: 'Michael Foster',
-      role: 'Co-Founder / CTO',
-    },
-  },
-  // ... other posts
-];
-
-// Components
 const NavItem = ({ icon, text, isActive, href }) => (
   <Link
     href={href}
-    className={`flex items-center gap-x-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+    className={`flex items-center px-4 py-2.5 text-[15px] transition-colors duration-200 ${
       isActive
-        ? 'bg-secondary text-secondary-foreground'
-        : 'text-muted-foreground hover:bg-secondary/80 hover:text-secondary-foreground'
+        ? 'text-gray-900 font-medium dark:text-[#fff]'
+        : 'hover:text-gray-900 dark:text-[#fff]'
     }`}
   >
-    {icon}
-    <span>{text}</span>
+    <span className="w-6 h-6 flex items-center justify-center">{icon}</span>
+    <span className="ml-3 text-lg">{text}</span>
   </Link>
-);
-
-const BlogPost = ({ post }) => (
-  <article className="flex flex-col bg-card border border-border rounded-xl overflow-hidden dark:border-[#333333]">
-    <div className="p-6">
-      <div className="flex items-center gap-x-4 text-xs">
-        <time dateTime={post.date} className="text-muted-foreground">
-          {post.date}
-        </time>
-        <Link
-          href={post.href}
-          className="relative rounded-full bg-secondary px-3 py-1.5 font-medium text-secondary-foreground hover:bg-accent"
-        >
-          {post.category}
-        </Link>
-      </div>
-      <div className="group relative">
-        <h3 className="mt-3 text-lg font-semibold text-foreground group-hover:text-primary">
-          <Link href={post.href}>
-            <span className="absolute inset-0" />
-            {post.title}
-          </Link>
-        </h3>
-        <p className="mt-5 line-clamp-3 text-sm leading-6 text-muted-foreground">
-          {post.description}
-        </p>
-      </div>
-      <div className="relative mt-8 flex items-center gap-x-4">
-        <div className="h-10 w-10 rounded-full bg-secondary" />
-        <div className="text-sm leading-6">
-          <p className="font-semibold text-foreground">
-            <Link href={post.href}>
-              <span className="absolute inset-0" />
-              {post.author.name}
-            </Link>
-          </p>
-          <p className="text-muted-foreground">{post.author.role}</p>
-        </div>
-      </div>
-    </div>
-  </article>
 );
 
 const ProfileDropdown = ({ isOpen, onLogout }) =>
@@ -116,7 +55,7 @@ const ProfileDropdown = ({ isOpen, onLogout }) =>
     </div>
   );
 
-const HomePage = () => {
+const RootLayout = ({ children }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -147,18 +86,16 @@ const HomePage = () => {
       <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333]">
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <Link href="/" className="flex items-center">
+            <Link href="/" className="flex items-center ml-5">
               <Image
                 alt="Mentality"
                 width={40}
                 height={30}
                 className="object-contain dark:bg-white rounded-full"
-                src="/logo1.png?v=1"
+                src="/Logo1.png?v=1"
                 priority
               />
-              <span className="ml-2 text-2xl font-extrabold logo-font">
-                Mentality
-              </span>
+              <span className="ml-1 text-2xl logo-font">Mentality</span>
             </Link>
           </div>
           <nav className="px-6 flex-1 mt-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -182,18 +119,14 @@ const HomePage = () => {
       <div className="flex-1 ml-[212px] mr-[348px] h-screen flex flex-col">
         <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333]">
           <div className="h-full px-6 flex items-center justify-between">
-            <h1 className="text-base font-semibold">Scroll</h1>
+            <h1 className="text-base font-semibold">
+              {pathname === '/' ? 'Scroll' : pathname.slice(1)}
+            </h1>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto hide-scrollbar">
-          <div className="p-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
-              {BLOG_POSTS.map(post => (
-                <BlogPost key={post.id} post={post} />
-              ))}
-            </div>
-          </div>
+          <div className="p-6">{children}</div>
         </div>
       </div>
 
@@ -205,7 +138,7 @@ const HomePage = () => {
               <>
                 <Link
                   href="/login"
-                  className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]"
+                  className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#f8f9fa] dark:border-[#ced4da] hover:dark:bg-[#e9ecef] dark:text-black"
                 >
                   Log in
                 </Link>
@@ -280,4 +213,4 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+export default RootLayout;

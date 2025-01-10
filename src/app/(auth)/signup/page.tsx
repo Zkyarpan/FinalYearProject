@@ -1,15 +1,13 @@
-import SignupForm from '@/components/SignUpPage';
-import { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Join Mentality',
-};
+import dynamic from 'next/dynamic';
+const SignupForm = dynamic(() => import('@/components/SignUpPage'));
 
 const Signup = () => {
   return (
-    <main className="">
+    <div>
       <SignupForm />
-    </main>
+    </div>
   );
 };
 

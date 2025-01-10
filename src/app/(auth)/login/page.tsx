@@ -1,9 +1,7 @@
-import LoginPage from "@/components/LoginPage";
-import { Metadata } from "next";
+'use client';
+import dynamic from 'next/dynamic';
 
-export const metadata: Metadata = {
-  title: "Login to Mentallity",
-};
+const LoginPage = dynamic(() => import('@/components/LoginPage'));
 
 const Login = () => {
   return (

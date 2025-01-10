@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const account = await Account.findOne({ email });
+    const account = await Account.findOne({ email }).select('+password');
     if (!account) {
       return NextResponse.json(
         createErrorResponse(400, 'Invalid email or password'),
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       sameSite: 'lax',
       path: '/',
       expires: accessTokenExpires,
+      maxAge: 60 * 15, // 15 minutes
     });
 
     return response;

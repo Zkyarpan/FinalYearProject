@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
-import Image from "next/image";
+import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 
 export default function ThemeSwitch() {
   const [mounted, setMounted] = useState(false);
-  const { setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
-  useEffect(() => setMounted(true), []);
+  // Only show the component after mounting to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (!mounted)
+  // Render a hidden button during SSR and initial client render
+  if (!mounted) {
     return (
-      <Image
-        src="data:image/svg+xml;base64,PHN2ZyBzdHJva2U9IiNGRkZGRkYiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMCIgdmlld0JveD0iMCAwIDI0IDI0IiBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMjAwcHgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiB4PSIyIiB5PSIyIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjIiIHJ4PSIyIj48L3JlY3Q+PC9zdmc+Cg=="
-        width={36}
-        height={36}
-        sizes="36x36"
-        alt="Loading Light/Dark Toggle"
-        priority={false}
-        title="Loading Light/Dark Toggle"
+      <button
+        aria-label="Toggle theme"
+        className="w-8 h-8 invisible" // Hide but preserve space
+        disabled
       />
     );
+  }
 
   return (
     <div role="button" tabIndex={0}>
       <button
         type="button"
-        onClick={() => setTheme(resolvedTheme === "light" ? "dark" : "light")}
+        onClick={() => setTheme(resolvedTheme === 'light' ? 'dark' : 'light')}
         className="justify-center shrink-0 flex items-center font-semibold border 
         transition-all ease-in duration-75 whitespace-nowrap text-center 
         select-none disabled:shadow-none disabled:opacity-50 
@@ -38,7 +38,7 @@ export default function ThemeSwitch() {
         shadow-5 hover:shadow-10"
         aria-label="Toggle theme"
       >
-        {resolvedTheme === "light" ? (
+        {resolvedTheme === 'light' ? (
           <svg
             width="20"
             height="20"

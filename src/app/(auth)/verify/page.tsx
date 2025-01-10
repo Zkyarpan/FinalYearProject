@@ -1,15 +1,13 @@
-import VerifyEmail from '@/app/forms/verifyEmailForm';
-import { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Verify Email',
-};
+import dynamic from 'next/dynamic';
+const VerifyEmail = dynamic(() => import('@/app/forms/VerifyEmailForm'));
 
 const Signup = () => {
   return (
-    <main className="">
+    <div>
       <VerifyEmail />
-    </main>
+    </div>
   );
 };
 

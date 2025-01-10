@@ -7,6 +7,7 @@ const ServicesIcon = () => (
     height={24}
     color={'#000000'}
     fill={'none'}
+    className="text-black dark:text-white"
   >
     <path
       d="M12.5 8L10 12H14L11.5 16"

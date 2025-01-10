@@ -1,9 +1,9 @@
-import { Schema, model, models, Document } from "mongoose";
+import { Schema, model, models, Document } from 'mongoose';
 
 interface IUser extends Document {
   email: string;
   password: string;
-  role: "admin" | "psychologist" | "user";
+  role: 'admin' | 'psychologist' | 'user';
   isActive: boolean;
   isVerified: boolean;
   verificationCode?: string;
@@ -15,19 +15,27 @@ interface IUser extends Document {
 
 const userSchema = new Schema<IUser>(
   {
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false
+    },
     role: {
       type: String,
-      enum: ["admin", "psychologist", "user"],
-      default: "user",
+      enum: ['admin', 'psychologist', 'user'],
+      default: 'user',
+      index: true,
     },
     isActive: { type: Boolean, default: true },
     isVerified: { type: Boolean, default: false },
     verificationCode: { type: String },
     verificationCodeExpiry: { type: Date },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
     lastLogin: { type: Date },
   },
   {
@@ -35,10 +43,5 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-userSchema.pre("save", function (next) {
-  this.updatedAt = new Date();
-  next();
-});
-
-const User = models.User || model<IUser>("User", userSchema);
+const User = models.User || model<IUser>('User', userSchema);
 export default User;

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
-// import SpinnerLoader from '@/components/SpinnerLoader';
+import { useUserStore } from '@/store/userStore';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -16,6 +16,7 @@ const loginSchema = z.object({
 });
 
 const LoginForm = () => {
+  const { setUser } = useUserStore();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -52,7 +53,12 @@ const LoginForm = () => {
       }
 
       if (data.Result?.accessToken) {
-        localStorage.setItem('accessToken', data.Result.accessToken);
+        // localStorage.setItem('accessToken', data.Result.accessToken);
+        setUser({
+          id: data.Result.user_data.id,
+          email: data.Result.user_data.email,
+          role: data.Result.user_data.role,
+        });
       }
 
       toast.success('Login successful!');
@@ -93,7 +99,7 @@ const LoginForm = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
               />
             </div>
 
@@ -110,13 +116,13 @@ const LoginForm = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
+                  className="absolute right-0 top-0 h-8 w-8 text-foreground/50 hover:text-foreground hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -161,7 +167,7 @@ const LoginForm = () => {
             <div className="text-right">
               <a
                 href="/forgot-password"
-                className="text-xs text-foreground/60  hover:underline hover:text-foreground/80  font-semibold transition-colors"
+                className="text-xs text-gray-600 dark:text-white/50 hover:underline font-semibold hover:text-black dark:hover:text-gray-100"
               >
                 Forgot Password?
               </a>

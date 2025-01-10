@@ -15,6 +15,12 @@ const publicRoutes = [
   '/login',
   '/signup',
   '/forgot-password',
+  '/blogs',
+  '/psychologist',
+  '/resources',
+  '/stories',
+  '/services',
+  '/articles',
 ];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {

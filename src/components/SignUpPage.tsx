@@ -1,6 +1,6 @@
 'use client';
 
-import SignupForm from '@/app/forms/signupForm';
+import SignupForm from '@/app/forms/SignupForm';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -16,7 +16,7 @@ import {
 
 const SignUpPage = () => {
   return (
-    <main className="py-8 pt-14">
+    <main className="py-8 pt-14 -mt-10">
       <div className="min-h-[calc(100vh-80px)] flex flex-col items-center px-4 max-w-5xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl main-font font-bold text-foreground mb-3">

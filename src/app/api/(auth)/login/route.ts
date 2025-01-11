@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import Account from '@/models/Account';
+import Psychologist from '@/models/Psychologist';
 import bcrypt from 'bcryptjs';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import { encrypt } from '@/lib/token';
@@ -12,6 +13,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const body = await req.json();
+    console.log('Request Body:', body);
+
     const { email, password } = body;
 
     if (!email || !password) {
@@ -21,15 +24,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const account = await Account.findOne({ email }).select('+password');
-    if (!account) {
+    let user = await Account.findOne({ email }).select('+password');
+    let userType = 'user';
+
+    if (!user) {
+      user = await Psychologist.findOne({ email }).select('+password');
+      if (user) {
+        userType = 'psychologist';
+      }
+    }
+
+    if (!user) {
       return NextResponse.json(
         createErrorResponse(400, 'Invalid email or password'),
         { status: 400 }
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(password, account.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return NextResponse.json(
         createErrorResponse(400, 'Invalid email or password'),
@@ -38,20 +50,23 @@ export async function POST(req: NextRequest) {
     }
 
     const accessToken = await encrypt({
-      id: account._id,
-      role: account.role,
+      id: user._id,
+      email: user.email,
+      role: userType,
+      isVerified: user.isVerified,
     });
 
-    const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
 
     const response = NextResponse.json(
       createSuccessResponse(200, {
         message: 'Login successful',
         accessToken,
         user_data: {
-          id: account._id,
-          email: account.email,
-          role: account.role,
+          id: user._id,
+          email: user.email,
+          role: userType,
+          isVerified: user.isVerified,
         },
       }),
       { status: 200 }
@@ -63,14 +78,16 @@ export async function POST(req: NextRequest) {
       sameSite: 'lax',
       path: '/',
       expires: accessTokenExpires,
-      maxAge: 60 * 15, // 15 minutes
     });
 
     return response;
   } catch (error) {
-    console.error(error);
+    console.error('Server Error:', error);
     return NextResponse.json(
-      createErrorResponse(500, 'Internal Server Error'),
+      createErrorResponse(
+        500,
+        'Internal Server Error due to: ' + error.message
+      ),
       { status: 500 }
     );
   }

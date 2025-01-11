@@ -75,12 +75,12 @@ const SignupForm = () => {
             >
               Email
             </Label>
-            <Input
+            <input
               id="email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="h-8 focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+              className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
               autoComplete="username"
               placeholder="you@youremail.com"
             />
@@ -94,12 +94,12 @@ const SignupForm = () => {
               Password
             </Label>
             <div className="relative">
-              <Input
+              <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="h-8 focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 autoComplete="current-password"
                 placeholder="At least 8 characters"
               />
@@ -107,7 +107,7 @@ const SignupForm = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-0 top-0 h-8 w-8 text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-transparent focus:bg-transparent active:bg-transparent"
+                className="absolute right-0 top-0 h-8 w-8 text-foreground/50 hover:text-foreground hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (

@@ -6,6 +6,7 @@ export interface IPsychologist extends Document {
   lastName: string;
   email: string;
   country: string;
+  role: 'admin' | 'psychologist' | 'user';
   streetAddress: string;
   city: string;
   stateOrProvince: string;
@@ -13,6 +14,7 @@ export interface IPsychologist extends Document {
   about: string;
   profilePhotoUrl?: string;
   certificateOrLicenseUrl?: string;
+  password: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +48,12 @@ const PsychologistSchema: Schema = new Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: String,
+      enum: ['admin', 'psychologist', 'user'],
+      default: 'user',
+      index: true,
+    },
     streetAddress: {
       type: String,
       required: true,
@@ -72,6 +80,10 @@ const PsychologistSchema: Schema = new Schema(
     },
     certificateOrLicenseUrl: {
       type: String,
+    },
+    password: {
+      type: String,
+      required: true,
     },
     isVerified: { type: Boolean, default: false },
   },

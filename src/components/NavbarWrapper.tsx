@@ -13,7 +13,6 @@ const NavbarWrapper = () => {
     '/psychologist/dashboard',
     '/blogs',
     '/psychologists',
-    '/psychologist',
     '/resources',
     '/services',
     '/articles',

@@ -30,7 +30,7 @@ const SignUpPage = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          <Card className="w-full max-w-md mx-auto border rounded-3xl">
+          <div className="w-full max-w-md mx-auto border rounded-3xl">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <User className="h-6 w-6 text-primary" />
@@ -44,9 +44,9 @@ const SignUpPage = () => {
               </p>
               <SignupForm />
             </CardContent>
-          </Card>
+          </div>
 
-          <Card className="w-full max-w-md mx-auto border rounded-3xl">
+          <div className="w-full max-w-md mx-auto border rounded-3xl">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase className="h-6 w-6 text-primary" />
@@ -90,7 +90,7 @@ const SignUpPage = () => {
                 </Link>
               </div>
             </CardContent>
-          </Card>
+          </div>
         </div>
 
         <div className="mt-6 text-center">

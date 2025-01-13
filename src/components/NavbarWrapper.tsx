@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 const NavbarWrapper = () => {
   const pathname = usePathname();
 
-  const hideFooterPages = [
+  const hideNavbarPages = [
     '/dashboard',
     '/admin/dashboard',
     '/stories',
@@ -18,7 +18,17 @@ const NavbarWrapper = () => {
     '/articles',
   ];
 
-  if (hideFooterPages.includes(pathname)) {
+  const shouldHideNavbar = pathname => {
+    return hideNavbarPages.some(page => {
+      if (page.includes('*')) {
+        const regex = new RegExp(`^${page.replace('*', '.*')}$`);
+        return regex.test(pathname);
+      }
+      return pathname.startsWith(page);
+    });
+  };
+
+  if (shouldHideNavbar(pathname)) {
     return null;
   }
 

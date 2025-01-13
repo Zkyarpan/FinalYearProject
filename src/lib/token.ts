@@ -14,6 +14,8 @@ type TokenPayload = {
   role?: string;
   type?: string;
   isVerified?: boolean;
+  hashedPassword?: string;
+  profileComplete?: boolean;
   exp?: number;
   iat?: number;
 };

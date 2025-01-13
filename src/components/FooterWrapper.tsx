@@ -19,14 +19,24 @@ const FooterWrapper = () => {
     '/stories',
     '/blogs',
     '/psychologists',
-    '/psychologist',
     '/resources',
     '/services',
     '/articles',
+    '/user'
 
   ];
 
-  if (hideFooterPages.includes(pathname)) {
+  const shouldHideFooter = pathname => {
+    return hideFooterPages.some(page => {
+      if (page.includes('*')) {
+        const regex = new RegExp(`^${page.replace('*', '.*')}$`);
+        return regex.test(pathname);
+      }
+      return pathname.startsWith(page);
+    });
+  };
+
+  if (shouldHideFooter(pathname)) {
     return null;
   }
 

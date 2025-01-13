@@ -43,18 +43,8 @@ html {
   font-family: 'mainfont', sans-serif;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #a9afb8;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6c757d;
-}
-
-::-webkit-scrollbar-track {
-  background: #f5f5f5;
-  border-radius: 4px;
+::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -94,7 +84,7 @@ select:-webkit-autofill:focus {
   --background: 210 0% 100%;
   --foreground: 210 0% 10%;
   --card: 210 0% 100%;
-  --card-foreground: 210 0% 15%;
+  --card-foreground: 210 0% 100%%;
   --popover: 210 0% 100%;
   --popover-foreground: 210 95% 10%;
   --primary: 210 96.1% 40%;

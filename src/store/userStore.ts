@@ -1,24 +1,54 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface UserState {
+interface User {
   id: string | null;
   email: string | null;
   role: string | null;
   isAuthenticated: boolean;
-  setUser: (user: { id: string; email: string; role: string }) => void;
-  logout: () => void;
+  isVerified: boolean;
+  profileComplete: boolean;
+}
+
+interface SetUser {
+  id: string;
+  email: string;
+  role: string;
+  isVerified: boolean;
+  profileComplete: boolean;
+}
+
+interface UserStore extends User {
+  setUser: (user: SetUser) => void;
+  setProfileComplete: (complete: boolean) => void;
+  logout: () => Promise<void>;
 }
 
 export const useUserStore = create(
-  persist<UserState>(
+  persist<UserStore>(
     set => ({
       id: null,
       email: null,
       role: null,
       isAuthenticated: false,
+      isVerified: false,
+      profileComplete: false,
 
-      setUser: user => set({ ...user, isAuthenticated: true }),
+      setUser: user =>
+        set({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          isAuthenticated: true,
+          isVerified: user.isVerified,
+          profileComplete: user.profileComplete,
+        }),
+
+      setProfileComplete: complete =>
+        set(state => ({
+          ...state,
+          profileComplete: complete,
+        })),
 
       logout: async () => {
         try {
@@ -27,7 +57,14 @@ export const useUserStore = create(
             credentials: 'include',
           });
           if (response.ok) {
-            set({ id: null, email: null, role: null, isAuthenticated: false });
+            set({
+              id: null,
+              email: null,
+              role: null,
+              isAuthenticated: false,
+              isVerified: false,
+              profileComplete: false,
+            });
           } else {
             console.error('Failed to logout.');
           }
@@ -37,7 +74,7 @@ export const useUserStore = create(
       },
     }),
     {
-      name: 'user-storage', // Key for localStorage
+      name: 'user-storage',
     }
   )
 );

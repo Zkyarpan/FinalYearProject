@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
+import { useUserStore } from '@/store/userStore';
+
 // import SpinnerLoader from '@/components/SpinnerLoader';
 
 const signupSchema = z.object({
@@ -17,6 +19,7 @@ const signupSchema = z.object({
 });
 
 const SignupForm = () => {
+  const { setUser } = useUserStore();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -42,6 +45,7 @@ const SignupForm = () => {
       });
 
       const data = await response.json();
+      console.log(data);
 
       if (!response.ok) {
         toast.error(data.ErrorMessage?.[0]?.message || 'Signup failed');
@@ -50,6 +54,15 @@ const SignupForm = () => {
       }
 
       const { token } = data.Result;
+      if (data.Result?.accessToken) {
+        setUser({
+          id: data.Result.user_data.id,
+          email: data.Result.user_data.email,
+          role: data.Result.user_data.role,
+          isVerified: data.Result.user_data.isVerified,
+          profileComplete: data.Result.user_data.profileComplete,
+        });
+      }
 
       toast.success('Signup successful!');
       localStorage.setItem('verificationToken', token);

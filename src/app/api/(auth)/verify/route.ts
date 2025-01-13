@@ -4,18 +4,17 @@ import { decrypt, encrypt } from '@/lib/token';
 import { NextRequest, NextResponse } from 'next/server';
 import TemporaryToken from '@/models/TemporaryToken';
 import Account from '@/models/Account';
-import bcrypt from 'bcryptjs';
 import connectDB from '@/db/db';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 
 export async function POST(req: NextRequest) {
   try {
-    connectDB();
+    await connectDB();
     const { code } = await req.json();
 
     if (!code) {
       return NextResponse.json(
-        createSuccessResponse(400, 'Verification code is required.'),
+        createErrorResponse(400, 'Verification code is required.'),
         { status: 400 }
       );
     }
@@ -24,37 +23,35 @@ export async function POST(req: NextRequest) {
 
     if (!record) {
       return NextResponse.json(
-        createSuccessResponse(400, 'Invalid verification code.'),
+        createErrorResponse(400, 'Invalid verification code.'),
         { status: 400 }
       );
     }
 
     if (new Date() > new Date(record.verificationCodeExpiry)) {
       return NextResponse.json(
-        createSuccessResponse(400, 'Verification code has expired.'),
+        createErrorResponse(400, 'Verification code expired.'),
         { status: 400 }
       );
     }
 
     const payload = await decrypt(record.token);
-
-    if (!payload) {
+    if (!payload || !payload.email || !payload.hashedPassword) {
       return NextResponse.json(
-        createSuccessResponse(400, 'Failed to decrypt token.'),
+        createErrorResponse(400, 'Invalid token data.'),
         { status: 400 }
       );
     }
 
-    const { email, password } = payload;
+    const { email, hashedPassword } = payload;
 
-    if (!password) {
+    const existingAccount = await Account.findOne({ email });
+    if (existingAccount) {
       return NextResponse.json(
-        createSuccessResponse(400, 'Password is required.'),
+        createErrorResponse(400, 'Account already exists.'),
         { status: 400 }
       );
     }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
 
     const newAccount = new Account({
       email,
@@ -75,25 +72,23 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json(
       createSuccessResponse(200, {
-        message: 'Verified successfully.',
+        message: 'Account verified successfully.',
         redirectUrl: '/dashboard',
       })
     );
 
-    response.cookies.set({
-      name: 'accessToken',
-      value: sessionToken,
+    response.cookies.set('accessToken', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 60 * 60 * 1000,
     });
 
     return response;
   } catch (error) {
-    console.error('Error in verification:', error);
+    console.error('Verification Error:', error);
     return NextResponse.json(
-      createErrorResponse(500, 'Internal server error.'),
+      createErrorResponse(500, 'Internal server error'),
       { status: 500 }
     );
   }

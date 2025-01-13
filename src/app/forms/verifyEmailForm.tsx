@@ -133,12 +133,12 @@ const VerifyEmail = () => {
               >
                 Verification Code
               </label>
-              <Input
+              <input
                 id="code"
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value)}
-                className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 required
               />
             </div>

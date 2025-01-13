@@ -97,13 +97,13 @@ const ConfirmationForm = () => {
               >
                 Verification Code
               </Label>
-              <Input
+              <input
                 type="text"
                 id="code"
                 value={verificationCode}
                 onChange={e => setVerificationCode(e.target.value)}
                 placeholder="Enter verification code"
-                className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
               />
             </div>
 
@@ -115,13 +115,13 @@ const ConfirmationForm = () => {
                 New Password
               </Label>
               <div className="relative">
-                <Input
+                <input
                   id="password"
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 />
                 <Button
                   type="button"
@@ -177,12 +177,12 @@ const ConfirmationForm = () => {
                 Confirm Password
               </Label>
               <div className="relative">
-                <Input
+                <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
-                  className="h-8 outline-none focus-visible:ring-transparent shadow-sm hover:shadow transition-shadow"
+                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 />
                 <Button
                   type="button"

@@ -5,8 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
 import TemporaryToken from '@/models/TemporaryToken';
 import Account from '@/models/Account';
-import { v4 as uuidv4 } from 'uuid';
 import connectDB from '@/db/db';
+import bcrypt from 'bcryptjs';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 
 export async function POST(req: NextRequest) {
@@ -36,51 +36,26 @@ export async function POST(req: NextRequest) {
     const existingAccount = await Account.findOne({ email });
     if (existingAccount) {
       return NextResponse.json(
-        createErrorResponse(400, 'Email is already registered. Please login.'),
+        createErrorResponse(400, 'Email already registered. Please login.'),
         { status: 400 }
-      );
-    }
-
-    const existingTempToken = await TemporaryToken.findOne({ email });
-    if (existingTempToken) {
-      existingTempToken.verificationCode = uuidv4().slice(0, 6);
-      existingTempToken.verificationCodeExpiry = new Date(
-        Date.now() + 15 * 60 * 1000
-      );
-      await existingTempToken.save();
-
-      const emailResult = await sendVerificationEmail(
-        email,
-        existingTempToken.verificationCode
-      );
-
-      if (!emailResult.success) {
-        return NextResponse.json(
-          createErrorResponse(500, 'Failed to resend verification email.'),
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json(
-        createSuccessResponse(200, {
-          message: 'Verification email resent successfully.',
-          token: existingTempToken.token,
-        }),
-        { status: 200 }
       );
     }
 
     const verificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const token = await encrypt({ email, password });
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const token = await encrypt({ email, hashedPassword });
 
-    await TemporaryToken.create({
-      email,
-      token,
-      verificationCode,
-      verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
-    });
+    await TemporaryToken.findOneAndUpdate(
+      { email },
+      {
+        token,
+        verificationCode,
+        verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      { upsert: true, new: true }
+    );
 
     const emailResult = await sendVerificationEmail(email, verificationCode);
 
@@ -98,6 +73,7 @@ export async function POST(req: NextRequest) {
       }),
       { status: 200 }
     );
+
     response.cookies.set('tempToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -107,6 +83,7 @@ export async function POST(req: NextRequest) {
     });
     return response;
   } catch (error) {
+    console.error('Signup Error:', error);
     return NextResponse.json(
       createErrorResponse(500, 'Internal server error.'),
       { status: 500 }

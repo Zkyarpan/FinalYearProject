@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import Account from '@/models/Account';
 import Psychologist from '@/models/Psychologist';
+import Profile from '@/models/Profile';
 import bcrypt from 'bcryptjs';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import { encrypt } from '@/lib/token';
@@ -13,10 +14,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const body = await req.json();
-    console.log('Request Body:', body);
 
     const { email, password } = body;
-
     if (!email || !password) {
       return NextResponse.json(
         createErrorResponse(400, 'All fields are required'),
@@ -27,7 +26,9 @@ export async function POST(req: NextRequest) {
     let user = await Account.findOne({ email }).select('+password');
     let userType = 'user';
 
-    if (!user) {
+    if (user) {
+      userType = user.role || 'user';
+    } else {
       user = await Psychologist.findOne({ email }).select('+password');
       if (user) {
         userType = 'psychologist';
@@ -49,11 +50,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const profile = await Profile.findOne({ userId: user._id });
+
+    const profileComplete = profile ? profile.profileCompleted : false;
+
     const accessToken = await encrypt({
       id: user._id,
       email: user.email,
       role: userType,
       isVerified: user.isVerified,
+      profileComplete,
     });
 
     const accessTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
@@ -67,6 +73,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           role: userType,
           isVerified: user.isVerified,
+          profileComplete,
         },
       }),
       { status: 200 }

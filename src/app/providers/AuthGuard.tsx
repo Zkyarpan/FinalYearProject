@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
+import Cookies from 'js-cookie';
 
 interface TokenPayload {
   id?: string;
@@ -23,18 +25,39 @@ const publicRoutes = [
   '/articles',
 ];
 
+const validRoutes = [
+  ...publicRoutes,
+  '/admin',
+  '/admin/dashboard',
+  '/psychologist/dashboard',
+  '/dashboard',
+  '/verify',
+  '/',
+];
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
       const currentPath = window.location.pathname;
+
+      const isValidPath = validRoutes.some(
+        route =>
+          currentPath === route ||
+          (currentPath.startsWith(route + '/') && route !== '/')
+      );
+
+      if (!isValidPath) {
+        notFound();
+        return;
+      }
 
       if (publicRoutes.includes(currentPath)) {
         return;
       }
 
+      const token = Cookies.get('accessToken');
       if (!token) {
         router.push('/login');
         return;
@@ -77,7 +100,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
+        Cookies.remove('accessToken');
         router.push('/login');
       }
     };
@@ -87,3 +110,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+
+
+

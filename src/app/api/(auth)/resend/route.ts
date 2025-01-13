@@ -1,6 +1,6 @@
+'use server';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
-import { v4 as uuidv4 } from 'uuid';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import TemporaryToken from '@/models/TemporaryToken';
 import connectDB from '@/db/db';

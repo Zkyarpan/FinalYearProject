@@ -1,3 +1,5 @@
+'use server';
+
 import { decrypt } from '@/lib/token';
 import { NextRequest, NextResponse } from 'next/server';
 import { createErrorResponse } from '@/lib/response';
@@ -5,7 +7,7 @@ import { createErrorResponse } from '@/lib/response';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer')) {
       return NextResponse.json({ error: 'No token provided' }, { status: 401 });
     }
 

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
 import { useUserStore } from '@/store/userStore';
+import Link from 'next/link';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -53,11 +54,12 @@ const LoginForm = () => {
       }
 
       if (data.Result?.accessToken) {
-        // localStorage.setItem('accessToken', data.Result.accessToken);
         setUser({
           id: data.Result.user_data.id,
           email: data.Result.user_data.email,
           role: data.Result.user_data.role,
+          isVerified: data.Result.user_data.isVerified,
+          profileComplete: data.Result.user_data.profileComplete,
         });
       }
 
@@ -165,12 +167,12 @@ const LoginForm = () => {
             </div>
 
             <div className="text-right">
-              <a
+              <Link
                 href="/forgot-password"
                 className="text-xs text-gray-600 dark:text-white/50 hover:underline font-semibold hover:text-black dark:hover:text-gray-100"
               >
                 Forgot Password?
-              </a>
+              </Link>
             </div>
 
             <Button

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-const LoginForm = dynamic(() => import('@/app/forms/LoginForm'));
+const LoginForm = dynamic(() => import('@/app/forms/loginForm'));
 
 const LoginPage = () => {
   return (

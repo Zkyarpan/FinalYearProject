@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const profile = await Profile.findOne({ userId: user._id });
+    const profile = await Profile.findOne({ user: user._id });
 
     const profileComplete = profile ? profile.profileCompleted : false;
 
@@ -73,7 +73,10 @@ export async function POST(req: NextRequest) {
           email: user.email,
           role: userType,
           isVerified: user.isVerified,
-          profileComplete,
+          profileComplete: profile ? profile.profileCompleted : false,
+          firstName: profile ? profile.firstName : null,
+          lastName: profile ? profile.lastName : null,
+          profileImage: profile ? profile.image : null,
         },
       }),
       { status: 200 }

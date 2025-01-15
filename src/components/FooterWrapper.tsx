@@ -22,7 +22,8 @@ const FooterWrapper = () => {
     '/resources',
     '/services',
     '/articles',
-    '/user'
+    '/user',
+    '/account'
 
   ];
 

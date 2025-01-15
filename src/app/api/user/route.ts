@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
           mimetype: imageFile.mimetype,
         });
       } catch (uploadError) {
+        console.log(uploadError);
         return NextResponse.json(
           createErrorResponse(500, 'Error uploading image'),
           { status: 500 }

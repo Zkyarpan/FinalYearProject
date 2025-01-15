@@ -14,6 +14,8 @@ import ResourcesIcon from '@/icons/ResourceIcon';
 import BlogIcon from '@/icons/BlogIcon';
 import StoriesIcon from '@/icons/Stories';
 import { toast } from 'sonner';
+import Account from '@/icons/Account';
+import Notification from '@/icons/Notification';
 
 const NAV_ITEMS = [
   { icon: <StoriesIcon />, text: 'Stories', href: '/stories' },
@@ -31,6 +33,7 @@ const routeTitles = {
   '/articles': 'Latest Articles',
   '/resources': 'Resources',
   '/blogs': 'Mentality Blogs',
+  '/account': 'Your Account',
 };
 
 const NavItem = ({ icon, text, isActive, href }) => {
@@ -78,11 +81,13 @@ const RootLayout = ({ children }) => {
   const router = useRouter();
   const { isAuthenticated, logout } = useUserStore();
   const currentYear = new Date().getFullYear();
-
-  // Check if the current path is a main route or a subroute
   const isMainRoute = Object.keys(routeTitles).includes(pathname);
   const title = routeTitles[pathname];
+  const authenticatedNavItems = isAuthenticated
+    ? [{ icon: <Account />, text: 'Account', href: '/account' }]
+    : [];
 
+  const combinedNavItems = [...NAV_ITEMS, ...authenticatedNavItems];
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/logout', {
@@ -101,12 +106,14 @@ const RootLayout = ({ children }) => {
     }
   };
 
-  const showRightSidebar = isMainRoute;
+  const showRightSidebar =
+    Object.keys(routeTitles).includes(pathname) ||
+    (pathname === '/account' && isAuthenticated);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Left Sidebar - Always visible */}
-      <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333]">
+      <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto ">
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <Link href="/" className="flex items-center">
@@ -122,7 +129,7 @@ const RootLayout = ({ children }) => {
             </Link>
           </div>
           <nav className="px-6 flex-1 mt-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            {NAV_ITEMS.map(item => (
+            {combinedNavItems.map(item => (
               <NavItem
                 key={item.text}
                 {...item}
@@ -143,7 +150,7 @@ const RootLayout = ({ children }) => {
           showRightSidebar ? 'mr-[348px]' : 'mr-0'
         } h-screen flex flex-col`}
       >
-        <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333]">
+        <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] mt-2">
           <div className="h-full px-6 flex items-center justify-between">
             <h1 className="text-base font-semibold">{title}</h1>
             {!showRightSidebar && (
@@ -203,85 +210,96 @@ const RootLayout = ({ children }) => {
 
       {/* Right Sidebar - Only show on main routes */}
       {showRightSidebar && (
-        <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-border flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333]">
-          <div className="h-14 border-b border-border flex items-center px-10 dark:border-[#333333] shrink-0">
-            <div className="flex items-center justify-between gap-x-3 w-full">
-              {!isAuthenticated ? (
-                <>
-                  <Link
-                    href="/login"
-                    className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#f8f9fa] dark:border-[#ced4da] hover:dark:bg-[#e9ecef] dark:text-black"
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="font-semibold text-sm py-1.5 px-4 rounded-xl bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--ring))] hover:shadow-md hover:dark:bg-[#0072ce]"
-                  >
-                    Create Profile
-                  </Link>
-                </>
-              ) : (
-                <div className="relative">
-                  <button
-                    className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:shadow-md"
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth="1.5"
-                      stroke="currentColor"
-                      className="w-6 h-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 14c3.5 0 6 2.5 6 6H6c0-3.5 2.5-6 6-6zm0-4c1.657 0 3-1.343 3-3S13.657 4 12 4 9 5.343 9 7s1.343 3 3 3z"
-                      />
-                    </svg>
-                  </button>
-                  <ProfileDropdown
-                    isOpen={dropdownOpen}
-                    onLogout={handleLogout}
+        <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col">
+          <div className="h-16 border-b dark:border-[#333333]  flex items-center px-7 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
+            <div className="flex flex-1 items-center mr-3">
+              <div className="relative flex w-full items-center rounded-lg border border-gray-200 dark:border-[#333333] px-3 py-2">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-full text-sm bg-transparent border-none outline-none focus:ring-0"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <ThemeSwitch />
+              <div className="">
+                <Notification />
+              </div>
+              <button className="hover:opacity-80 transition-opacity">
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <Image
+                    src="/api/placeholder/32/32"
+                    alt="Profile"
+                    width={32}
+                    height={32}
+                    className="object-cover"
                   />
                 </div>
-              )}
-              <ThemeSwitch />
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto hide-scrollbar">
-            <div className="p-6 h-full">
-              <div
-                className="rounded-2xl border border-border p-6 h-full dark:border-[#333333]"
-                style={{
-                  background:
-                    'linear-gradient(215deg, hsl(var(--primary) / 0.2) 0%, hsl(var(--background) / 0) 49.92%)',
-                }}
-              >
-                <h2 className="text-2xl text-center mb-4 text-foreground">
-                  Your Journey to Better Mental Health Starts Here
-                </h2>
-                <p className="text-sm text-center mb-2 text-muted-foreground">
-                  Feeling overwhelmed, anxious, or just need someone to talk to?
-                  Our professional psychologists are here to provide the support
-                  you need.
-                </p>
-                <p className="text-sm text-center mb-6 text-muted-foreground">
-                  Connect with licensed therapists, join supportive communities,
-                  and access personalized mental wellness resources - all in one
-                  place.
-                </p>
-                <div className="flex flex-col items-center gap-2">
-                  <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-ring transition-colors w-full">
-                    Start Your Wellness Journey
-                  </button>
-                  <p className="text-xs text-center italic text-muted-foreground">
-                    Take the first step towards better mental health today
-                  </p>
-                </div>
+          {/* Scrollable Content with improved handling */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+            <div className="p-6">
+              <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
+                {pathname === '/account' ? (
+                  <div className="h-full flex flex-col space-y-6">
+                    <div className="space-y-4">
+                      <h2 className="text-2xl font-semibold text-center text-foreground">
+                        Welcome to Your Account
+                      </h2>
+                      <div className="space-y-2">
+                        <p className="text-sm text-center text-muted-foreground">
+                          Manage your profile, appointments, and mental wellness
+                          journey all in one place.
+                        </p>
+                        <p className="text-sm text-center text-muted-foreground">
+                          Track your progress, access your resources, and stay
+                          connected with your support network.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-auto space-y-3">
+                      <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
+                        Schedule an Appointment
+                      </button>
+                      <p className="text-xs text-center italic text-muted-foreground">
+                        Your well-being is our priority
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col space-y-6">
+                    <div className="space-y-4">
+                      <h2 className="text-2xl font-semibold text-center text-foreground">
+                        Your Journey to Better Mental Health Starts Here
+                      </h2>
+                      <div className="space-y-2">
+                        <p className="text-sm text-center text-muted-foreground">
+                          Feeling overwhelmed, anxious, or just need someone to
+                          talk to? Our professional psychologists are here to
+                          provide the support you need.
+                        </p>
+                        <p className="text-sm text-center text-muted-foreground">
+                          Connect with licensed therapists, join supportive
+                          communities, and access personalized mental wellness
+                          resources - all in one place.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-auto space-y-3">
+                      <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
+                        Start Your Wellness Journey
+                      </button>
+                      <p className="text-xs text-center italic text-muted-foreground">
+                        Take the first step towards better mental health today
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

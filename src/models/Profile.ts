@@ -1,7 +1,7 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 
 interface IProfile extends Document {
-  userId: Types.ObjectId;
+  user: Types.ObjectId;  
   firstName: string;
   lastName: string;
   image: string;
@@ -22,10 +22,10 @@ interface IProfile extends Document {
 
 const profileSchema = new Schema<IProfile>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true }, 
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
-    image: { type: String, trim: true },
+    image: { type: String },
     address: { type: String, trim: true },
     phone: { type: String, required: true, trim: true },
     age: { type: Number, min: 0, required: true },

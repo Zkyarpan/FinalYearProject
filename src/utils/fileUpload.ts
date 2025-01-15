@@ -16,7 +16,7 @@ export async function uploadToCloudinary({
   folder: string;
   filename: string;
   mimetype: string;
-}) {
+}): Promise<string> {
   return new Promise((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(

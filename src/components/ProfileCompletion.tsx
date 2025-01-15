@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -34,9 +34,10 @@ const ProfileCompletion = ({ onComplete }) => {
     preferredCommunication: string;
     briefBio: string;
     struggles: string[];
-    image: string | null;
+    image: string | File | null;
   }
   const [isLoading, setIsLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
     lastName: '',
@@ -83,18 +84,61 @@ const ProfileCompletion = ({ onComplete }) => {
     }));
   };
 
-  const handleImageUpload = e => {
-    const file = e.target.files[0];
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
-      // Create a URL for the uploaded file to display as a preview
-      const imageUrl = URL.createObjectURL(file);
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload an image file');
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
+
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+
+      // Update form data
       setFormData(prev => ({
         ...prev,
-        file: file, // Storing the File object for submission
-        image: imageUrl, // Storing the URL for local display
+        image: file,
       }));
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  // const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     // Optional: Add file type and size validation
+  //     if (!file.type.startsWith('image/')) {
+  //       toast.error('Please upload an image file');
+  //       return;
+  //     }
+
+  //     if (file.size > 5 * 1024 * 1024) { // 5MB limit
+  //       toast.error('Image size should be less than 5MB');
+  //       return;
+  //     }
+
+  //     setFormData(prev => ({
+  //       ...prev,
+  //       image: file
+  //     }));
+  //   }
+  // };
 
   const handleStruggleToggle = struggle => {
     setFormData(prev => ({
@@ -126,36 +170,45 @@ const ProfileCompletion = ({ onComplete }) => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const newErrors = validateForm();
+
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
 
-      const formDataObj = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'file' && value) {
-          // Appending the file object stored in the state
-          formDataObj.append('image', value);
-        } else {
-          formDataObj.append(key, value.toString()); // Ensure conversion to string for all non-file data
-        }
-      });
-
       try {
-        const response = await fetch('/api/user', {
-          method: 'POST',
-          body: formDataObj, // Sending FormData without Content-Type header, allowing the browser to set it
+        const formDataObj = new FormData();
+
+        // Append all form fields
+        Object.entries(formData).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            if (key === 'struggles' && Array.isArray(value)) {
+              // Join array values with comma
+              formDataObj.append(key, value.join(','));
+            } else if (key === 'image' && value instanceof File) {
+              formDataObj.append(key, value);
+            } else {
+              formDataObj.append(key, value.toString());
+            }
+          }
         });
 
-        if (response.ok) {
-          onComplete();
-          toast.success('Profile completed successfully!');
-          router.push('/dashboard');
-        } else {
-          const errorText = await response.text();
-          toast.error(`Failed to complete profile: ${errorText}`);
+        const response = await fetch('/api/user', {
+          method: 'POST',
+          body: formDataObj,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to complete profile');
         }
+
+        toast.success('Profile completed successfully!');
+        router.push('/account');
       } catch (error) {
         console.error('Error submitting profile:', error);
-        toast.error('Failed to complete profile');
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to complete profile'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -179,21 +232,31 @@ const ProfileCompletion = ({ onComplete }) => {
           <div className="flex justify-center">
             <div className="relative">
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-blue-500 relative">
-                {formData.image ? (
+                {imagePreview ? (
                   <img
-                    src={formData.image}
-                    alt="Profile"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
+                    src={imagePreview}
+                    alt="Profile Preview"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-100 dark:bg-background flex items-center justify-center">
                     <Camera className="w-8 h-8 text-gray-400" />
                   </div>
                 )}
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="profile-image"
+                />
+                <label
+                  htmlFor="profile-image"
+                  className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity"
+                >
+                  <span className="sr-only">Upload Profile Picture</span>
+                </label>
               </div>
               <label
                 htmlFor="image-upload"

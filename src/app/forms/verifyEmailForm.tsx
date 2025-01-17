@@ -2,36 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
-// import SpinnerLoader from '@/components/SpinnerLoader';
+import SpinnerLoader from '@/components/SpinnerLoader';
+import { useUserStore } from '@/store/userStore';
 
 const VerifyEmail = () => {
+  const { setUser } = useUserStore();
   const router = useRouter();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [storedEmail, setStoredEmail] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const email = localStorage.getItem('email') || '';
-      setStoredEmail(email);
-    }
+    const email = localStorage.getItem('email') || '';
+    setStoredEmail(email);
   }, []);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
     if (resendCooldown > 0) {
-      timer = setInterval(() => {
+      const timer = setInterval(() => {
         setResendCooldown(prev => prev - 1);
       }, 1000);
+      return () => clearInterval(timer);
     }
-    return () => clearInterval(timer);
   }, [resendCooldown]);
 
   const handleVerify = async (e: React.FormEvent) => {
@@ -58,10 +57,24 @@ const VerifyEmail = () => {
         return;
       }
 
+      setUser({
+        id: data.Result.user.id,
+        email: storedEmail,
+        role: 'user',
+        isVerified: true,
+        profileComplete: false,
+        firstName: null,
+        lastName: null,
+        profileImage: null,
+      });
+
       toast.success('Verification successful!');
       localStorage.removeItem('verificationToken');
       localStorage.removeItem('email');
-      router.push('/dashboard');
+      setIsRedirecting(true);
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
     } catch (error) {
       console.error('Verification error:', error);
       toast.error('Something went wrong. Please try again.');
@@ -111,7 +124,7 @@ const VerifyEmail = () => {
 
   return (
     <>
-      {/* <SpinnerLoader isLoading={isLoading} /> */}
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10 shadow-md">
           <div className="mb-6 text-center">

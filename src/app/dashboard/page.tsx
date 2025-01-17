@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import ThemeSwitch from '@/components/ThemeSwitch';
 import { useUserStore } from '@/store/userStore';
+import UserSidebar from '@/components/UserSidebar';
 
 import ServicesIcon from '@/icons/ServicesIcon';
 import PsychologistIcon from '@/icons/Psychologist';
@@ -13,9 +12,9 @@ import ArticlesIcon from '@/icons/Atricles';
 import ResourcesIcon from '@/icons/ResourceIcon';
 import BlogIcon from '@/icons/BlogIcon';
 import StoriesIcon from '@/icons/Stories';
-import { toast } from 'sonner';
 import Account from '@/icons/Account';
-import Notification from '@/icons/Notification';
+import UserActions from '@/components/UserActions';
+import NavItem from '@/components/NavItem';
 
 const NAV_ITEMS = [
   { icon: <StoriesIcon />, text: 'Stories', href: '/stories' },
@@ -34,86 +33,26 @@ const routeTitles = {
   '/resources': 'Resources',
   '/blogs': 'Mentality Blogs',
   '/account': 'Your Account',
+  '/notifications': 'Notifications',
 };
-
-const NavItem = ({ icon, text, isActive, href }) => {
-  const textStyle = isActive
-    ? {
-        fontWeight: '600',
-        color: 'var(--foreground)',
-      }
-    : {};
-
-  return (
-    <Link href={href}>
-      <span className="flex lg:flex-row flex-col items-center group pt-2 lg:py-2.5 transition-all hover:text-gray-900 dark:text-white">
-        <span className="relative text-current shrink-0">{icon}</span>
-        <span className="flex flex-col lg:ml-2 mt-2 lg:mt-0 transition-all lg:group-hover:translate-x-1">
-          <span className="ml-1 text-lg font-normal" style={textStyle}>
-            {text}
-          </span>
-        </span>
-      </span>
-    </Link>
-  );
-};
-
-const ProfileDropdown = ({ isOpen, onLogout }) =>
-  isOpen && (
-    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#333333] shadow-lg rounded-xl border dark:border-[#444] z-50">
-      <ul className="py-2">
-        <li className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-[#444] cursor-pointer">
-          <Link href="/profile">View Profile</Link>
-        </li>
-        <li
-          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-[#444] cursor-pointer"
-          onClick={onLogout}
-        >
-          Logout
-        </li>
-      </ul>
-    </div>
-  );
 
 const RootLayout = ({ children }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, logout } = useUserStore();
+  const { isAuthenticated, profileImage } = useUserStore();
   const currentYear = new Date().getFullYear();
-  const isMainRoute = Object.keys(routeTitles).includes(pathname);
+  const isAccountPage = pathname === '/account';
   const title = routeTitles[pathname];
-  const authenticatedNavItems = isAuthenticated
-    ? [{ icon: <Account />, text: 'Account', href: '/account' }]
-    : [];
-
-  const combinedNavItems = [...NAV_ITEMS, ...authenticatedNavItems];
-  const handleLogout = async () => {
-    try {
-      const response = await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        logout();
-        router.push('/login');
-      } else {
-        toast.error('Logout failed');
-      }
-    } catch (error) {
-      toast.error('Something went wrong during logout');
-    }
-  };
 
   const showRightSidebar =
     Object.keys(routeTitles).includes(pathname) ||
+    pathname === '/dashboard' ||
     (pathname === '/account' && isAuthenticated);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Left Sidebar - Always visible */}
-      <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto ">
+      <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto">
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <Link href="/" className="flex items-center">
@@ -129,13 +68,21 @@ const RootLayout = ({ children }) => {
             </Link>
           </div>
           <nav className="px-6 flex-1 mt-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            {combinedNavItems.map(item => (
+            {NAV_ITEMS.map(item => (
               <NavItem
                 key={item.text}
                 {...item}
                 isActive={pathname === item.href}
               />
             ))}
+            {isAuthenticated && (
+              <NavItem
+                icon={<Account />}
+                text="Account"
+                href="/account"
+                isActive={pathname === '/account'}
+              />
+            )}
           </nav>
         </div>
         <div className="px-6">
@@ -154,51 +101,11 @@ const RootLayout = ({ children }) => {
           <div className="h-full px-6 flex items-center justify-between">
             <h1 className="text-base font-semibold">{title}</h1>
             {!showRightSidebar && (
-              <div className="flex items-center gap-4">
-                {isAuthenticated ? (
-                  <div className="relative">
-                    <button
-                      className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:shadow-md"
-                      onClick={() => setDropdownOpen(!dropdownOpen)}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth="1.5"
-                        stroke="currentColor"
-                        className="w-6 h-6"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 14c3.5 0 6 2.5 6 6H6c0-3.5 2.5-6 6-6zm0-4c1.657 0 3-1.343 3-3S13.657 4 12 4 9 5.343 9 7s1.343 3 3 3z"
-                        />
-                      </svg>
-                    </button>
-                    <ProfileDropdown
-                      isOpen={dropdownOpen}
-                      onLogout={handleLogout}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <Link
-                      href="/login"
-                      className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#f8f9fa] dark:border-[#ced4da] hover:dark:bg-[#e9ecef] dark:text-black"
-                    >
-                      Log in
-                    </Link>
-                    <Link
-                      href="/signup"
-                      className="font-semibold text-sm py-1.5 px-4 rounded-xl bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--ring))] hover:shadow-md hover:dark:bg-[#0072ce]"
-                    >
-                      Create Profile
-                    </Link>
-                  </div>
-                )}
-                <ThemeSwitch />
-              </div>
+              <UserActions
+                isAuthenticated={isAuthenticated}
+                profileImage={profileImage}
+                router={router}
+              />
             )}
           </div>
         </div>
@@ -211,66 +118,25 @@ const RootLayout = ({ children }) => {
       {/* Right Sidebar - Only show on main routes */}
       {showRightSidebar && (
         <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col">
-          <div className="h-16 border-b dark:border-[#333333]  flex items-center px-7 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
-            <div className="flex flex-1 items-center mr-3">
-              <div className="relative flex w-full items-center rounded-lg border border-gray-200 dark:border-[#333333] px-3 py-2">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className="w-full text-sm bg-transparent border-none outline-none focus:ring-0"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <ThemeSwitch />
-              <div className="">
-                <Notification />
-              </div>
-              <button className="hover:opacity-80 transition-opacity">
-                <div className="w-8 h-8 rounded-full overflow-hidden">
-                  <Image
-                    src="/api/placeholder/32/32"
-                    alt="Profile"
-                    width={32}
-                    height={32}
-                    className="object-cover"
-                  />
-                </div>
-              </button>
-            </div>
+          <div className="h-16 border-b dark:border-[#333333] flex items-center px-7 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
+            <UserActions
+              isAuthenticated={isAuthenticated}
+              profileImage={profileImage}
+              router={router}
+            />
           </div>
 
-          {/* Scrollable Content with improved handling */}
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
             <div className="p-6">
-              <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
+              <div
+                className={`${
+                  !isAccountPage
+                    ? 'rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background'
+                    : ''
+                }`}
+              >
                 {pathname === '/account' ? (
-                  <div className="h-full flex flex-col space-y-6">
-                    <div className="space-y-4">
-                      <h2 className="text-2xl font-semibold text-center text-foreground">
-                        Welcome to Your Account
-                      </h2>
-                      <div className="space-y-2">
-                        <p className="text-sm text-center text-muted-foreground">
-                          Manage your profile, appointments, and mental wellness
-                          journey all in one place.
-                        </p>
-                        <p className="text-sm text-center text-muted-foreground">
-                          Track your progress, access your resources, and stay
-                          connected with your support network.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-auto space-y-3">
-                      <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
-                        Schedule an Appointment
-                      </button>
-                      <p className="text-xs text-center italic text-muted-foreground">
-                        Your well-being is our priority
-                      </p>
-                    </div>
-                  </div>
+                  <UserSidebar />
                 ) : (
                   <div className="h-full flex flex-col space-y-6">
                     <div className="space-y-4">

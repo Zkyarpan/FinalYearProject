@@ -2,16 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import { useUserStore } from '@/store/userStore';
-
-// import SpinnerLoader from '@/components/SpinnerLoader';
+import SpinnerLoader from '@/components/SpinnerLoader';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -19,19 +16,22 @@ const signupSchema = z.object({
 });
 
 const SignupForm = () => {
-  const { setUser } = useUserStore();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationResult = signupSchema.safeParse({ email, password });
-    if (!validationResult.success) {
-      toast.error(validationResult.error.errors[0].message);
+    const result = signupSchema.safeParse({ email, password });
+
+    if (!result.success) {
+      const errorMessage = result.error.issues[0]?.message || 'Invalid input';
+      toast.error(errorMessage);
+      setIsLoading(false);
       return;
     }
 
@@ -45,40 +45,43 @@ const SignupForm = () => {
       });
 
       const data = await response.json();
-      console.log(data);
 
       if (!response.ok) {
-        toast.error(data.ErrorMessage?.[0]?.message || 'Signup failed');
+        const errorMessage = data.ErrorMessage?.[0]?.message || 'Signup failed';
+        toast.error(errorMessage);
         setIsLoading(false);
         return;
       }
 
-      const { token } = data.Result;
-      if (data.Result?.accessToken) {
-        setUser({
-          id: data.Result.user_data.id,
-          email: data.Result.user_data.email,
-          role: data.Result.user_data.role,
-          isVerified: data.Result.user_data.isVerified,
-          profileComplete: data.Result.user_data.profileComplete,
-        });
-      }
+      if (data.StatusCode === 200 && data.IsSuccess && data.Result?.token) {
+        localStorage.setItem('verificationToken', data.Result.token);
+        localStorage.setItem('email', email);
+        toast.success(data.Result.message || 'Signup successful!');
+        setIsLoading(false);
+        setIsRedirecting(true);
 
-      toast.success('Signup successful!');
-      localStorage.setItem('verificationToken', token);
-      localStorage.setItem('email', email);
-      router.push('/verify');
+        setTimeout(() => {
+          router.push('/verify');
+        }, 500);
+      } else {
+        const errorMessage =
+          data.ErrorMessage?.[0]?.message || 'Unexpected error during signup';
+        console.error('Unexpected data structure:', data);
+        toast.error(errorMessage);
+      }
     } catch (error) {
       console.error('Signup error:', error);
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
+      setIsRedirecting(false);
     }
   };
 
+
   return (
     <>
-      {/* <SpinnerLoader isLoading={isLoading} /> */}
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
       <div className="w-full max-w-[380px] mx-auto">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="space-y-1">

@@ -74,6 +74,13 @@ export async function POST(req: NextRequest) {
       createSuccessResponse(200, {
         message: 'Account verified successfully.',
         redirectUrl: '/dashboard',
+        user: {
+          id: newAccount._id.toString(),
+          email: newAccount.email,
+          role: newAccount.role,
+          isVerified: true,
+          profileComplete: false,
+        },
       })
     );
 

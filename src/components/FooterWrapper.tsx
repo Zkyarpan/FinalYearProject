@@ -23,8 +23,9 @@ const FooterWrapper = () => {
     '/services',
     '/articles',
     '/user',
-    '/account'
-
+    '/account',
+    '/notifications',
+    '/settings',
   ];
 
   const shouldHideFooter = pathname => {

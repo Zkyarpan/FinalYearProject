@@ -3,16 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import Loader from '@/components/common/Loader';
-// import SpinnerLoader from '@/components/SpinnerLoader';
+import SpinnerLoader from '@/components/SpinnerLoader';
 
-// Zod schema for validation
 const confirmationSchema = z
   .object({
     verificationCode: z.string().min(6, 'Verification code must be 6 digits.'),
@@ -32,6 +30,7 @@ const ConfirmationForm = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +57,9 @@ const ConfirmationForm = () => {
 
       const data = await response.json();
 
-      if (!data.IsSuccess) {
+      setIsLoading(false);
+
+      if (!response.ok) {
         const errorMessage =
           data.ErrorMessage?.[0]?.message || 'Something went wrong.';
         toast.error(errorMessage);
@@ -66,17 +67,20 @@ const ConfirmationForm = () => {
       }
 
       toast.success('Password reset successfully! Please log in.');
-      router.push('/login');
+      setIsRedirecting(true);
+      setTimeout(() => {
+        router.push('/login');
+      }, 500);
     } catch (error) {
+      console.error('An unexpected error occurred:', error);
       toast.error('An unexpected error occurred. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <>
-      {/* <SpinnerLoader isLoading={isLoading}/> */}
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
       <div className="min-h-screen flex items-center justify-center px-4 -mt-10">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">

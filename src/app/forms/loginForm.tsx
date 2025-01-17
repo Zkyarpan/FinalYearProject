@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
 import { useUserStore } from '@/store/userStore';
 import Link from 'next/link';
+import SpinnerLoader from '@/components/SpinnerLoader';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -23,6 +24,7 @@ const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +33,7 @@ const LoginForm = () => {
 
     if (!result.success) {
       toast.error(result.error.errors[0].message);
+      setIsLoading(false);
       return;
     }
 
@@ -45,47 +48,55 @@ const LoginForm = () => {
       });
 
       const data = await response.json();
+      setIsLoading(false);
 
       if (!response.ok) {
         const errorMessage = data.ErrorMessage?.[0]?.message || 'Login failed';
         toast.error(errorMessage);
-        setIsLoading(false);
         return;
       }
 
       if (data.Result?.accessToken) {
+        const userData = data.Result.user_data;
+
         setUser({
-          id: data.Result.user_data.id,
-          email: data.Result.user_data.email,
-          role: data.Result.user_data.role,
-          isVerified: data.Result.user_data.isVerified,
-          profileComplete: data.Result.user_data.profileComplete,
+          id: userData.id,
+          email: userData.email,
+          role: userData.role,
+          isVerified: userData.isVerified,
+          profileComplete: userData.profileComplete,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          profileImage: userData.profileImage || null,
         });
-      }
 
-      toast.success('Login successful!');
+        toast.success('Login successful!');
+        setIsLoading(false);
+        setIsRedirecting(true);
 
-      const userRole = data.Result?.user_data?.role;
-      switch (userRole) {
-        case 'admin':
-          router.push('/admin/dashboard');
-          break;
-        case 'psychologist':
-          router.push('/psychologist/dashboard');
-          break;
-        default:
-          router.push('/dashboard');
+        setTimeout(() => {
+          switch (userData.role) {
+            case 'admin':
+              router.push('/admin/dashboard');
+              break;
+            case 'psychologist':
+              router.push('/psychologist/dashboard');
+              break;
+            default:
+              router.push('/dashboard');
+          }
+        }, 500);
       }
     } catch (err) {
+      console.error('Login error:', err);
       toast.error('Something went wrong. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <>
-      {/* <SpinnerLoader isLoading={isLoading} /> */}
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
       <div className="w-full max-w-[380px] mx-auto">
         <div className="border px-6 py-10 rounded-2xl flex flex-col gap-6 sm:shadow-md">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

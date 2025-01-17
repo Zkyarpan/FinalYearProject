@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import Loader from '@/components/common/Loader';
-// import SpinnerLoader from '@/components/SpinnerLoader';
+import SpinnerLoader from '@/components/SpinnerLoader';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -19,6 +18,7 @@ const ForgotPasswordForm = () => {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,18 +50,21 @@ const ForgotPasswordForm = () => {
       }
 
       toast.success('Verification code sent! Check your inbox.');
-      router.push('/forgot-password/confirmation');
+      setIsLoading(false);
+      setIsRedirecting(true);
+      setTimeout(() => {
+        router.push('/forgot-password/confirmation');
+      }, 500);
     } catch (error) {
       console.error('Error sending reset email:', error);
       toast.error('Something went wrong. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <>
-      {/* <SpinnerLoader isLoading={isLoading} /> */}
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
       <div className="min-h-screen flex items-center justify-center px-4 -mt-5">
         <div className="w-full max-w-[380px] rounded-2xl border px-6 py-10">
           <div className="mb-6 text-center">

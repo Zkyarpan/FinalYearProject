@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { decrypt } from './lib/token';
 
-const protectedRoutes = ['/dashboard', '/account'];
+const protectedRoutes = ['/dashboard', '/account', '/settings/profile'];
 const publicRoutes = ['/login', '/signup'];
 const adminRoutes = ['/admin', '/admin/dashboard'];
 const psychologistRoutes = ['/psychologist/dashboard', '/psychologist/profile'];
@@ -91,6 +91,7 @@ export const config = {
     '/psychologist/:path*',
     '/forgot-password',
     '/forgot-password/confirmation',
+    '/settings/profile',
     '/',
   ],
 };

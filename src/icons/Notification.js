@@ -1,25 +1,47 @@
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 const Notification = () => {
+  const router = useRouter();
+
+  const handleNotificationClick = () => {
+    router.push('/notifications');
+  };
+
   return (
     <div
-      className="justify-center shrink-0 flex items-center font-semibold border 
-        transition-all ease-in duration-75 whitespace-nowrap text-center 
-        select-none  disabled:opacity-50 
+      onClick={handleNotificationClick}
+      role="button"
+      tabIndex={0}
+      aria-label="View notifications"
+      className="justify-center shrink-0 flex items-center font-semibold  
+        transition-all ease-in duration-200 whitespace-nowrap text-center 
+        select-none disabled:opacity-50 
         disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm 
-        leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-1k bg-gray-00 
-        border-gray-200 dark:border-gray-300 
-        dark:disabled:bg-gray-00 
-        shadow-5 hover:shadow-10 cursor-pointer"
+        leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-1k
+        bg-gray-100 hover:bg-gray-200 
+        border border-[hsl(var(--border))]
+        active:bg-gray-300 active:scale-95
+        dark:bg-input dark:hover:bg-[#505050]
+        dark:active:bg-gray-600
+        shadow-sm hover:shadow-md
+           text-gray-700 dark:text-gray-200
+        transform motion-safe:hover:scale-105
+        motion-safe:active:scale-95
+        cursor-pointer"
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          handleNotificationClick();
+        }
+      }}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         width={24}
         height={24}
-        color={'#000000'}
-        fill={'none'}
-        className="text-black dark:text-white"
+        className="text-gray-700 dark:text-gray-200"
+        fill="none"
       >
         <path
           d="M2.52992 14.394C2.31727 15.7471 3.268 16.6862 4.43205 17.1542C8.89481 18.9486 15.1052 18.9486 19.5679 17.1542C20.732 16.6862 21.6827 15.7471 21.4701 14.394C21.3394 13.5625 20.6932 12.8701 20.2144 12.194C19.5873 11.2975 19.525 10.3197 19.5249 9.27941C19.5249 5.2591 16.1559 2 12 2C7.84413 2 4.47513 5.2591 4.47513 9.27941C4.47503 10.3197 4.41272 11.2975 3.78561 12.194C3.30684 12.8701 2.66061 13.5625 2.52992 14.394Z"

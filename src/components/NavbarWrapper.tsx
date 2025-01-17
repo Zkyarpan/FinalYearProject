@@ -16,7 +16,10 @@ const NavbarWrapper = () => {
     '/resources',
     '/services',
     '/articles',
-    '/account'
+    '/account',
+    '/notifications',
+    '/settings'
+
 
   ];
 

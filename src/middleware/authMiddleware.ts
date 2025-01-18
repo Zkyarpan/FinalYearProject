@@ -5,6 +5,7 @@ import { createErrorResponse } from '@/lib/response';
 
 export const getTokenFromRequest = (req: NextRequest) => {
   const token = req.cookies.get('accessToken')?.value;
+
   if (!token) return null;
 
   try {

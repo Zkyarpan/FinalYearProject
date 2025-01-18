@@ -2,13 +2,38 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface Blog {
+  _id: string;
+  title: string;
+  content: string;
+  blogImage: string;
+  category: string;
+  tags: string[];
+  readTime: number;
+  author: {
+    name: string;
+    avatar: string;
+  };
+  publishDate: string;
+}
+
+interface ApiResponse {
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    message: string;
+    blog: Blog;
+  };
+}
 
 const BlogPost = () => {
   const params = useParams();
-  const router = useRouter();
-  const [blog, setBlog] = useState<any>(null);
+  const [blog, setBlog] = useState<Blog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,23 +44,26 @@ const BlogPost = () => {
     const fetchBlog = async () => {
       try {
         if (!params?.slug) {
-          setError('Blog post not found');
-          return;
+          throw new Error('Blog post not found');
         }
 
         const res = await fetch(`/api/blogs/${params.slug}`);
+        const data: ApiResponse = await res.json();
+
         if (!res.ok) {
-          throw new Error(`Failed to fetch blog: ${res.status}`);
+          throw new Error(data.ErrorMessage[0] || 'Failed to load blog post');
         }
 
-        const data = await res.json();
-        if (!data.blog) {
+        if (!data.IsSuccess || !data.Result.blog) {
           throw new Error('Blog not found');
         }
-        setBlog(data.blog);
+
+        setBlog(data.Result.blog);
       } catch (error) {
         console.error('Failed to fetch blog:', error);
-        setError('Failed to load blog post');
+        setError(
+          error instanceof Error ? error.message : 'Failed to load blog post'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -48,12 +76,24 @@ const BlogPost = () => {
     return (
       <main className="min-h-screen">
         <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-96 bg-gray-200 rounded"></div>
-            <div className="space-y-2">
-              <div className="h-4 bg-gray-200 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+          <div className="max-w-4xl mx-auto space-y-6">
+            <Skeleton className="h-12 w-3/4" />
+            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <Skeleton className="h-[500px] w-full rounded-2xl" />
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-4 w-full" />
             </div>
           </div>
         </div>
@@ -74,7 +114,7 @@ const BlogPost = () => {
               temporarily unavailable.
             </p>
             <Link
-              href="/blog"
+              href="/blogs"
               className="text-blue-600 hover:text-blue-800 font-semibold"
             >
               ← Back to all blogs
@@ -90,9 +130,16 @@ const BlogPost = () => {
       <div className="container mx-auto px-4 py-8">
         <article className="max-w-4xl mx-auto">
           <header className="mb-8">
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+              <span>{blog.category}</span>
+              <span>•</span>
+              <span>{blog.readTime} min read</span>
+            </div>
+
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
               {blog.title}
             </h1>
+
             <div className="flex items-center justify-between border-b border-gray-200 pb-4">
               <div className="flex items-center gap-3">
                 <div className="relative h-10 w-10">
@@ -114,7 +161,7 @@ const BlogPost = () => {
                 </div>
               </div>
               <Link
-                href="/blog"
+                href="/blogs"
                 className="text-blue-600 hover:text-blue-800 font-semibold"
               >
                 ← Back to all blogs
@@ -136,6 +183,21 @@ const BlogPost = () => {
           <div className="prose prose-lg max-w-none">
             <p className="text-gray-700 leading-relaxed">{blog.content}</p>
           </div>
+
+          {blog.tags && blog.tags.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex flex-wrap gap-2">
+                {blog.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </article>
       </div>
     </main>

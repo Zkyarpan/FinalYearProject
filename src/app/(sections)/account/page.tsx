@@ -138,7 +138,7 @@ const AccountPage = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <h3 className="text-lg font-medium text-center">
+                    <h3 className="text-sm font-medium text-center">
                       Areas of Focus
                     </h3>
                     <div className="grid grid-cols-2 gap-3">

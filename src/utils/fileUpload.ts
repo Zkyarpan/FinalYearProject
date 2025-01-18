@@ -27,10 +27,10 @@ export async function uploadToCloudinary({
         },
         (error, result) => {
           if (error) {
-            console.error("Cloudinary Upload Error:", error);
+            console.error('Cloudinary Upload Error:', error);
             reject(error);
           } else if (result) {
-            console.info("Cloudinary Upload Success:", result);
+            console.info('Cloudinary Upload Success.');
             resolve(result.secure_url);
           } else {
             reject(new Error('Upload failed, result is undefined'));
@@ -51,7 +51,7 @@ export async function deleteFromCloudinary(publicId: string): Promise<void> {
           console.error('Cloudinary Delete Error:', error);
           reject(error);
         } else if (result && result.result === 'ok') {
-          console.info('Cloudinary Delete Success:', result);
+          console.info('Cloudinary Delete Success.');
           resolve();
         } else {
           reject(

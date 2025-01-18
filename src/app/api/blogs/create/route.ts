@@ -106,16 +106,42 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const existingBlog = await Blog.findOne({
+        title: fields.title,
+        author: user.id,
+      });
+
+      if (existingBlog) {
+        return NextResponse.json(
+          createErrorResponse(409, 'Blog with the same title already exists'),
+          { status: 409 }
+        );
+      }
+
       let blogImageUrl = '';
+      let publicId = '';
 
       if (blogImageFile) {
         try {
-          blogImageUrl = (await uploadToCloudinary({
+          const uploadResult = await uploadToCloudinary({
             fileBuffer: blogImageFile.buffer,
             folder: 'photos/blog-images',
-            filename: blogImageFile.filename,
+            filename: `blog-${Date.now()}`,
             mimetype: blogImageFile.mimetype,
-          })) as string;
+          });
+
+          // Since uploadResult can be a string or an object, handle both cases
+          if (typeof uploadResult === 'string') {
+            blogImageUrl = uploadResult;
+            publicId = `photos/blog-images/${uploadResult.split('/').pop()?.split('.')[0]}`;
+          } else {
+            // Cast uploadResult to any to handle the Cloudinary response type
+            const cloudinaryResult = uploadResult as any;
+            blogImageUrl = cloudinaryResult.secure_url || cloudinaryResult.url;
+            publicId =
+              cloudinaryResult.public_id ||
+              `photos/blog-images/${cloudinaryResult.url?.split('/').pop()?.split('.')[0]}`;
+          }
         } catch (error) {
           return NextResponse.json(
             createErrorResponse(500, 'Failed to upload image'),
@@ -128,6 +154,7 @@ export async function POST(req: NextRequest) {
         ...fields,
         author: user.id,
         blogImage: blogImageUrl,
+        imagePublicId: publicId,
         isPublished: true,
       });
 

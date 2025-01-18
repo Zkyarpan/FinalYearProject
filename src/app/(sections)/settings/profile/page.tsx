@@ -89,14 +89,21 @@ const EditProfile = () => {
           setFormData(prev => ({
             ...prev,
             ...profile,
+            struggles: profile.struggles || [],
             image: null,
           }));
-          setImagePreview(profile.image || '');
+
+          if (profile.image) {
+            setImagePreview(profile.image);
+          }
         } else {
           throw new Error(data.ErrorMessage[0] || 'Profile data not found');
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong');
+        const errorMessage =
+          err instanceof Error ? err.message : 'Something went wrong';
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -126,7 +133,6 @@ const EditProfile = () => {
     try {
       const formDataToSend = new FormData();
 
-      // Add each form field to FormData
       Object.entries(formData).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
           if (key === 'struggles' && Array.isArray(value)) {
@@ -141,7 +147,7 @@ const EditProfile = () => {
 
       const response = await fetch('/api/profile', {
         method: 'PUT',
-        body: formDataToSend, // Don't set Content-Type header - browser will set it with boundary
+        body: formDataToSend,
       });
 
       if (!response.ok) {
@@ -435,18 +441,18 @@ const EditProfile = () => {
                   >
                     <input
                       type="checkbox"
-                      checked={formData.struggles.includes(struggle)}
+                      checked={formData.struggles?.includes(struggle)}
                       onChange={() => {
                         setFormData(prev => ({
                           ...prev,
-                          struggles: prev.struggles.includes(struggle)
+                          struggles: prev.struggles?.includes(struggle)
                             ? prev.struggles.filter(s => s !== struggle)
-                            : [...prev.struggles, struggle],
+                            : [...(prev.struggles || []), struggle],
                         }));
                       }}
                       className="mr-2"
                     />
-                    <span className="text-xs">{struggle}</span>
+                    <span className="text-sm">{struggle}</span>
                   </label>
                 ))}
               </div>

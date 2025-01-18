@@ -1,150 +1,128 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Types } from 'mongoose';
 import connectDB from '@/db/db';
 import Blog from '@/models/Blogs';
-import { uploadToCloudinary, deleteFromCloudinary } from '@/utils/fileUpload';
-import Busboy from 'busboy';
+import Profile from '@/models/Profile';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
+import { deleteFromCloudinary, uploadToCloudinary } from '@/utils/fileUpload';
 
-interface ParsedForm {
-  fields: { [key: string]: string };
-  blogImageFile?: {
-    buffer: Buffer;
-    filename: string;
-    mimetype: string;
+// Define interfaces for type safety
+interface BlogDocument {
+  _id: Types.ObjectId;
+  title: string;
+  content: string;
+  blogImage: string;
+  category: string;
+  tags: string[];
+  readTime: number;
+  publishDate: Date;
+  author: {
+    _id: Types.ObjectId;
+    username: string;
   };
 }
 
-async function parseForm(req: NextRequest): Promise<ParsedForm> {
-  return new Promise((resolve, reject) => {
-    const busboy = Busboy({
-      headers: Object.fromEntries(req.headers.entries()),
-    });
-    const fields = {};
-    let blogImageFile;
-
-    busboy.on('field', (fieldname, val) => {
-      fields[fieldname] = val;
-    });
-
-    busboy.on(
-      'file',
-      (
-        fieldname: string,
-        file: NodeJS.ReadableStream,
-        filename: string,
-        encoding: string,
-        mimetype: string
-      ) => {
-        if (fieldname === 'blogImage') {
-          const chunks: Buffer[] = [];
-          file.on('data', (chunk: Buffer) => chunks.push(chunk));
-          file.on('end', () => {
-            blogImageFile = {
-              buffer: Buffer.concat(chunks),
-              filename,
-              mimetype,
-            };
-          });
-        }
-      }
-    );
-
-    busboy.on('finish', () => {
-      resolve({ fields, blogImageFile });
-    });
-
-    busboy.on('error', error => reject(error));
-
-    if (req.body) {
-      const reader = req.body.getReader();
-      const stream = new ReadableStream({
-        start(controller) {
-          function push() {
-            reader.read().then(({ done, value }) => {
-              if (done) {
-                controller.close();
-                return;
-              }
-              controller.enqueue(value);
-              push();
-            });
-          }
-          push();
-        },
-      });
-
-      const nodeStream = require('stream').Readable.from(stream);
-      nodeStream.pipe(busboy);
-    } else {
-      reject(new Error('Request body is null'));
-    }
-  });
+interface ProfileDocument {
+  firstName: string;
+  lastName: string;
+  image: string;
+  user: Types.ObjectId;
 }
 
-export async function PATCH(req: NextRequest) {
+interface FormattedBlog {
+  _id: string;
+  title: string;
+  content: string;
+  blogImage: string;
+  category: string;
+  tags: string[];
+  readTime: number;
+  author: {
+    name: string;
+    avatar: string;
+  };
+  publishDate: string;
+}
+
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    const blogId = req.nextUrl.searchParams.get('id');
+    const slug = req.nextUrl.pathname.split('/').pop();
 
-    if (!blogId) {
-      return NextResponse.json(createErrorResponse(400, 'Invalid blog ID'), {
-        status: 400,
-      });
-    }
-
-    const { fields, blogImageFile } = await parseForm(req);
-    const blog = await Blog.findById(blogId);
-    if (!blog) {
-      return NextResponse.json(createErrorResponse(404, 'Blog not found'), {
-        status: 404,
-      });
-    }
-
-    // Update provided fields
-    Object.entries(fields).forEach(([key, value]) => {
-      blog[key] = value;
-    });
-
-    // Handle image update if provided
-    if (blogImageFile) {
-      if (blog.blogImage) {
-        const oldPublicId = blog.blogImage.split('/').pop()?.split('.')[0];
-        if (oldPublicId) {
-          await deleteFromCloudinary(oldPublicId);
+    if (!slug) {
+      return NextResponse.json(
+        createErrorResponse(400, 'Blog slug is required'),
+        {
+          status: 400,
         }
-      }
-
-      const blogImageUrl = await uploadToCloudinary({
-        fileBuffer: blogImageFile.buffer,
-        folder: 'photos/blog-images',
-        filename: blogImageFile.filename,
-        mimetype: blogImageFile.mimetype,
-      });
-      blog.blogImage = blogImageUrl;
+      );
     }
 
-    await blog.save();
+    const titleFromSlug = decodeURIComponent(slug).replace(/-/g, ' ');
+
+    const blog = (await Blog.findOne({
+      title: { $regex: new RegExp(`^${titleFromSlug}$`, 'i') },
+    })
+      .populate('author', 'username')
+      .lean()) as BlogDocument | null;
+
+    if (!blog) {
+      return NextResponse.json(
+        createErrorResponse(404, 'Blog post not found'),
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const profile = (await Profile.findOne({
+      user: blog.author._id,
+    }).lean()) as ProfileDocument | null;
+
+    const formattedBlog: FormattedBlog = {
+      _id: blog._id.toString(),
+      title: blog.title,
+      content: blog.content,
+      blogImage: blog.blogImage,
+      category: blog.category,
+      tags: blog.tags || [],
+      readTime: blog.readTime,
+      author: {
+        name: profile
+          ? `${profile.firstName} ${profile.lastName}`
+          : blog.author.username || 'Anonymous',
+        avatar: profile?.image || '/default-avatar.jpg',
+      },
+      publishDate: new Date(blog.publishDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    };
 
     return NextResponse.json(
       createSuccessResponse(200, {
-        message: 'Blog updated successfully',
-        blog_id: blog._id,
+        message: 'Blog Fetch Successful',
+        blog: formattedBlog,
       }),
-      { status: 200 }
+      {
+        status: 200,
+      }
     );
   } catch (error) {
-    console.error('Server Error:', error);
     return NextResponse.json(
       createErrorResponse(500, 'Internal Server Error'),
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-export async function GET(
+export async function PATCH(
   req: NextRequest,
   { params }: { params: { slug: string } }
 ) {
@@ -157,24 +135,87 @@ export async function GET(
     });
 
     if (!blog) {
-      return NextResponse.json(createErrorResponse(401, 'Blog not found'), {
-        status: 401,
+      return NextResponse.json(createErrorResponse(404, 'Blog not found'), {
+        status: 404,
       });
     }
+
+    const formData = await req.formData();
+    const updateData: any = {};
+    let imageFile: any = null;
+
+    for (const [key, value] of formData.entries()) {
+      if (key === 'blogImage' && value instanceof Blob) {
+        const timestamp = Date.now();
+        imageFile = {
+          buffer: Buffer.from(await value.arrayBuffer()),
+          filename: `blog-${blog._id}-${timestamp}`,
+          mimetype: value.type,
+        };
+      } else {
+        updateData[key] = value;
+      }
+    }
+
+    if (imageFile) {
+      try {
+        if (blog.blogImage) {
+          const publicIdMatch = blog.blogImage.match(
+            /photos\/blog-images\/([^.]+)/
+          );
+          const oldPublicId = publicIdMatch ? publicIdMatch[1] : null;
+
+          if (oldPublicId) {
+            try {
+              await deleteFromCloudinary(`photos/blog-images/${oldPublicId}`);
+            } catch (deleteError) {
+              console.error('Error deleting old image:', deleteError);
+            }
+          }
+        }
+
+        const newImageUrl = await uploadToCloudinary({
+          fileBuffer: imageFile.buffer,
+          folder: 'photos/blog-images',
+          filename: imageFile.filename,
+          mimetype: imageFile.mimetype,
+        });
+
+        updateData.blogImage = newImageUrl;
+      } catch (uploadError) {
+        console.error('Image upload error:', uploadError);
+        return NextResponse.json(
+          createErrorResponse(400, 'Failed to upload image'),
+          { status: 400 }
+        );
+      }
+    }
+
+    const updatedBlog = await Blog.findByIdAndUpdate(
+      blog._id,
+      { $set: { ...updateData, updatedAt: new Date() } },
+      { new: true, runValidators: true }
+    ).exec();
+
+    if (!updatedBlog) {
+      return NextResponse.json(
+        createErrorResponse(404, 'Failed to update blog'),
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      createSuccessResponse(201, {
-        message: 'Blog Fetch Successful',
-        selectedBlog: blog,
+      createSuccessResponse(200, {
+        message: 'Blog updated successfully',
+        blog: updatedBlog,
       }),
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error) {
-    console.error('Failed to fetch blog:', error);
+    console.error('Server Error:', error);
     return NextResponse.json(
       createErrorResponse(500, 'Internal Server Error'),
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

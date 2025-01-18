@@ -25,6 +25,7 @@ interface SetUser {
   firstName: string | null;
   lastName: string | null;
   profileImage: string | null;
+  isAuthenticated?: boolean;
 }
 
 interface UserStore extends User {
@@ -37,7 +38,6 @@ interface UserStore extends User {
 export const useUserStore = create(
   persist<UserStore>(
     set => ({
-      // Initial state
       id: null,
       email: null,
       role: null,
@@ -48,36 +48,36 @@ export const useUserStore = create(
       lastName: null,
       profileImage: null,
 
-      // Set all user data
       setUser: user =>
         set({
           id: user.id,
           email: user.email,
           role: user.role,
-          isAuthenticated: true,
+          isAuthenticated: user.isAuthenticated ?? true,
           isVerified: user.isVerified,
           profileComplete: user.profileComplete,
           firstName: user.firstName,
           lastName: user.lastName,
-          profileImage: user.profileImage,
+          profileImage: user.profileImage || null,
         }),
 
-      // Update profile completion status
       setProfileComplete: complete =>
         set(state => ({
           ...state,
           profileComplete: complete,
         })),
 
-      // Update specific profile fields
       updateProfile: profile =>
         set(state => ({
           ...state,
           ...profile,
           profileComplete: true,
+          isAuthenticated: true,
+          firstName: profile.firstName ?? state.firstName,
+          lastName: profile.lastName ?? state.lastName,
+          profileImage: profile.profileImage ?? state.profileImage,
         })),
 
-      // Logout functionality
       logout: async () => {
         try {
           const response = await fetch('/api/logout', {

@@ -18,9 +18,11 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import SpinnerLoader from '@/components/SpinnerLoader';
+import { useUserStore } from '@/store/userStore';
 
-const ProfileCompletion = ({ onComplete }) => {
+const ProfileCompletion = () => {
   const router = useRouter();
+  const { updateProfile } = useUserStore();
   interface FormData {
     firstName: string;
     lastName: string;
@@ -176,6 +178,12 @@ const ProfileCompletion = ({ onComplete }) => {
         if (!response.ok) {
           throw new Error(data.message || 'Failed to complete profile');
         }
+
+        updateProfile({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          profileImage: data.Result?.profileImage || null,
+        });
 
         toast.success('Profile completed successfully!');
         setTimeout(() => {

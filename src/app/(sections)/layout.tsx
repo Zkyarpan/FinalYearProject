@@ -41,14 +41,70 @@ const RootLayout = ({ children }) => {
   const router = useRouter();
   const { isAuthenticated, profileImage } = useUserStore();
   const currentYear = new Date().getFullYear();
-  const isAccountPage = pathname === '/account' || '/settings/profile';
+  const isAccountPage =
+    pathname === '/account' || pathname === '/settings/profile';
   const title = routeTitles[pathname];
 
   const showRightSidebar =
     Object.keys(routeTitles).includes(pathname) ||
     pathname === '/dashboard' ||
     pathname === '/settings/profile' ||
-    (pathname === '/account' && isAuthenticated);
+    pathname === '/account';
+
+  const renderSidebarContent = () => {
+    if (isAccountPage && isAuthenticated) {
+      return <UserSidebar />;
+    }
+
+    return (
+      <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
+        <div className="h-full flex flex-col space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-center text-foreground">
+              Your Journey to Better Mental Health Starts Here
+            </h2>
+            <div className="space-y-2">
+              <p className="text-sm text-center text-muted-foreground">
+                Feeling overwhelmed, anxious, or just need someone to talk to?
+                Our professional psychologists are here to provide the support
+                you need.
+              </p>
+              <p className="text-sm text-center text-muted-foreground">
+                Connect with licensed therapists, join supportive communities,
+                and access personalized mental wellness resources - all in one
+                place.
+              </p>
+            </div>
+          </div>
+          <div className="mt-auto space-y-3">
+            {isAuthenticated ? (
+              <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
+                Start Your Wellness Journey
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={() => router.push('/login')}
+                  className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full"
+                >
+                  Log in to Start
+                </button>
+                <button
+                  onClick={() => router.push('/signup')}
+                  className="bg-secondary text-secondary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-secondary/90 transition-colors w-full"
+                >
+                  Create an Account
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-center italic text-muted-foreground">
+              Take the first step towards better mental health today
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -116,7 +172,7 @@ const RootLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Right Sidebar - Only show on main routes */}
+      {/* Right Sidebar - Show on main routes regardless of authentication status */}
       {showRightSidebar && (
         <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col">
           <div className="h-16 border-b dark:border-[#333333] flex items-center px-7 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
@@ -128,47 +184,7 @@ const RootLayout = ({ children }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
-            <div className="p-6">
-              <div
-                className={`${
-                  !isAccountPage
-                    ? 'rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background'
-                    : ''
-                }`}
-              >
-                {pathname === '/account' || '/settings/profile' ? (
-                  <UserSidebar />
-                ) : (
-                  <div className="h-full flex flex-col space-y-6">
-                    <div className="space-y-4">
-                      <h2 className="text-2xl font-semibold text-center text-foreground">
-                        Your Journey to Better Mental Health Starts Here
-                      </h2>
-                      <div className="space-y-2">
-                        <p className="text-sm text-center text-muted-foreground">
-                          Feeling overwhelmed, anxious, or just need someone to
-                          talk to? Our professional psychologists are here to
-                          provide the support you need.
-                        </p>
-                        <p className="text-sm text-center text-muted-foreground">
-                          Connect with licensed therapists, join supportive
-                          communities, and access personalized mental wellness
-                          resources - all in one place.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-auto space-y-3">
-                      <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
-                        Start Your Wellness Journey
-                      </button>
-                      <p className="text-xs text-center italic text-muted-foreground">
-                        Take the first step towards better mental health today
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <div className="p-6">{renderSidebarContent()}</div>
           </div>
         </div>
       )}

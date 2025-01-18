@@ -128,6 +128,33 @@ const RootLayout = ({ children }) => {
 
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
             <div className="p-6">
+              <div className="h-full flex flex-col space-y-6">
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-semibold text-center text-foreground">
+                    Your Journey to Better Mental Health Starts Here
+                  </h2>
+                  <div className="space-y-2">
+                    <p className="text-sm text-center text-muted-foreground">
+                      Feeling overwhelmed, anxious, or just need someone to talk
+                      to? Our professional psychologists are here to provide the
+                      support you need.
+                    </p>
+                    <p className="text-sm text-center text-muted-foreground">
+                      Connect with licensed therapists, join supportive
+                      communities, and access personalized mental wellness
+                      resources - all in one place.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-auto space-y-3">
+                  <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
+                    Start Your Wellness Journey
+                  </button>
+                  <p className="text-xs text-center italic text-muted-foreground">
+                    Take the first step towards better mental health today
+                  </p>
+                </div>
+              </div>
               <div
                 className={`${
                   !isAccountPage

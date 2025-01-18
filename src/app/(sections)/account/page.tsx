@@ -6,6 +6,7 @@ import Video from '@/icons/Video';
 import Emergency from '@/icons/Emergency';
 import Clock from '@/icons/Clock';
 import Location from '@/icons/Location';
+import { useUserStore } from '@/store/userStore';
 
 interface Profile {
   id: string;
@@ -31,6 +32,7 @@ const AccountPage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { updateProfile } = useUserStore();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,6 +45,12 @@ const AccountPage = () => {
 
         if (data.IsSuccess && data.Result?.profile) {
           setProfile(data.Result.profile);
+          // Update the global state with the profile image
+          updateProfile({
+            firstName: data.Result.profile.firstName,
+            lastName: data.Result.profile.lastName,
+            profileImage: data.Result.profile.image, // Update the profileImage in the store
+          });
         } else {
           throw new Error(data.ErrorMessage[0] || 'Profile data not found');
         }
@@ -54,7 +62,7 @@ const AccountPage = () => {
     };
 
     fetchProfile();
-  }, []);
+  }, [updateProfile]);
 
   if (loading) {
     return (

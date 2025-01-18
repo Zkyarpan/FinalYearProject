@@ -154,7 +154,7 @@ const RootLayout = ({ children }) => {
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2">
             <Link
-              href={isAuthenticated ? '/dashboard' : '/'}
+              href={'/dashboard'}
               onClick={handleLogoClick}
               className="flex items-center"
             >

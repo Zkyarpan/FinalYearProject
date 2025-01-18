@@ -27,10 +27,10 @@ export async function uploadToCloudinary({
         },
         (error, result) => {
           if (error) {
-            // console.error("Cloudinary Upload Error:", error);
+            console.error("Cloudinary Upload Error:", error);
             reject(error);
           } else if (result) {
-            // console.info("Cloudinary Upload Success:", result);
+            console.info("Cloudinary Upload Success:", result);
             resolve(result.secure_url);
           } else {
             reject(new Error('Upload failed, result is undefined'));

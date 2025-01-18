@@ -5,9 +5,8 @@ import Phone from '@/icons/Call';
 import Video from '@/icons/Video';
 import Emergency from '@/icons/Emergency';
 import Upload from '@/icons/Upload';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import LoadingContent from '../../LoadingContent';
 import {
   Select,
   SelectContent,
@@ -124,47 +123,44 @@ const EditProfile = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const formDataToSend = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (key === 'struggles') {
-          formDataToSend.append(key, JSON.stringify(value));
-        } else if (value instanceof File) {
-          formDataToSend.append(key, value, value.name);
-        } else {
-          formDataToSend.append(key, value.toString());
-        }
-      }
-    });
-
     try {
+      const formDataToSend = new FormData();
+
+      // Add each form field to FormData
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          if (key === 'struggles' && Array.isArray(value)) {
+            formDataToSend.append(key, JSON.stringify(value));
+          } else if (value instanceof File) {
+            formDataToSend.append(key, value);
+          } else {
+            formDataToSend.append(key, value.toString());
+          }
+        }
+      });
+
       const response = await fetch('/api/profile', {
         method: 'PUT',
-        body: formDataToSend,
+        body: formDataToSend, // Don't set Content-Type header - browser will set it with boundary
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
       }
 
+      await response.json();
       toast.success('Profile updated successfully');
-      router.push('/profile');
+      router.push('/account');
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to update profile'
       );
+      console.error('Update profile error:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -175,86 +171,182 @@ const EditProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Profile Header */}
-          <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Profile Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                      <Video />
-                    </div>
-                  )}
+    <LoadingContent>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                    {imagePreview ? (
+                      <img
+                        src={imagePreview}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                        <Video />
+                      </div>
+                    )}
+                  </div>
+                  <label
+                    htmlFor="image-upload"
+                    className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full cursor-pointer transform translate-x-1/4 translate-y-1/4"
+                  >
+                    <Upload />
+                  </label>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
                 </div>
-                <label
-                  htmlFor="image-upload"
-                  className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full cursor-pointer transform translate-x-1/4 translate-y-1/4"
-                >
-                  <Upload />
-                </label>
-                <input
-                  id="image-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
+
+                <div className="text-center sm:text-left flex-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      placeholder="First Name"
+                      value={formData.firstName}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          firstName: e.target.value,
+                        }))
+                      }
+                      required
+                      className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                    />
+                    <input
+                      placeholder="Last Name"
+                      value={formData.lastName}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          lastName: e.target.value,
+                        }))
+                      }
+                      required
+                      className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <input
+                      type="number"
+                      placeholder="Age"
+                      value={formData.age}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          age: parseInt(e.target.value),
+                        }))
+                      }
+                      required
+                      className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                    />
+                    <Select
+                      value={formData.gender}
+                      onValueChange={value =>
+                        setFormData(prev => ({ ...prev, gender: value }))
+                      }
+                    >
+                      <SelectTrigger
+                        className="w-full h-8 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                      >
+                        <SelectValue placeholder="Select Gender" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:bg-input">
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Phone />
+                  Contact Information
+                </h2>
+                <div className="space-y-4">
+                  <input
+                    placeholder="Phone Number"
+                    value={formData.phone}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, phone: e.target.value }))
+                    }
+                    required
+                    className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                  />
+                  <input
+                    placeholder="Address"
+                    value={formData.address}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                  />
+                </div>
               </div>
 
-              <div className="text-center sm:text-left flex-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Emergency />
+                  Emergency Contact
+                </h2>
+                <div className="space-y-4">
                   <input
-                    placeholder="First Name"
-                    value={formData.firstName}
+                    placeholder="Emergency Contact Name"
+                    value={formData.emergencyContact}
                     onChange={e =>
                       setFormData(prev => ({
                         ...prev,
-                        firstName: e.target.value,
+                        emergencyContact: e.target.value,
                       }))
                     }
                     required
                     className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                   />
                   <input
-                    placeholder="Last Name"
-                    value={formData.lastName}
+                    placeholder="Emergency Contact Phone"
+                    value={formData.emergencyPhone}
                     onChange={e =>
                       setFormData(prev => ({
                         ...prev,
-                        lastName: e.target.value,
+                        emergencyPhone: e.target.value,
                       }))
                     }
                     required
                     className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                  <input
-                    type="number"
-                    placeholder="Age"
-                    value={formData.age}
-                    onChange={e =>
+              </div>
+
+              <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Video />
+                  Therapy Preferences
+                </h2>
+                <div className="space-y-4">
+                  <Select
+                    value={formData.preferredCommunication}
+                    onValueChange={value =>
                       setFormData(prev => ({
                         ...prev,
-                        age: parseInt(e.target.value),
+                        preferredCommunication: value,
                       }))
-                    }
-                    required
-                    className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                  />
-                  <Select
-                    value={formData.gender}
-                    onValueChange={value =>
-                      setFormData(prev => ({ ...prev, gender: value }))
                     }
                   >
                     <SelectTrigger
@@ -262,214 +354,115 @@ const EditProfile = () => {
         focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
         data-[state=open]:border-input dark:border-foreground/30"
                     >
-                      <SelectValue placeholder="Select Gender" />
+                      <SelectValue placeholder="Preferred Communication" />
                     </SelectTrigger>
                     <SelectContent className="dark:bg-input">
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="video">Video Call</SelectItem>
+                      <SelectItem value="audio">Audio Call</SelectItem>
+                      <SelectItem value="chat">Chat</SelectItem>
+                      <SelectItem value="in-person">In-Person</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Profile Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Contact Information */}
-            <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Phone />
-                Contact Information
-              </h2>
-              <div className="space-y-4">
-                <input
-                  placeholder="Phone Number"
-                  value={formData.phone}
-                  onChange={e =>
-                    setFormData(prev => ({ ...prev, phone: e.target.value }))
-                  }
-                  required
-                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                />
-                <input
-                  placeholder="Address"
-                  value={formData.address}
-                  onChange={e =>
-                    setFormData(prev => ({ ...prev, address: e.target.value }))
-                  }
-                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                />
-              </div>
-            </div>
-
-            {/* Emergency Contact */}
-            <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Emergency />
-                Emergency Contact
-              </h2>
-              <div className="space-y-4">
-                <input
-                  placeholder="Emergency Contact Name"
-                  value={formData.emergencyContact}
-                  onChange={e =>
-                    setFormData(prev => ({
-                      ...prev,
-                      emergencyContact: e.target.value,
-                    }))
-                  }
-                  required
-                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                />
-                <input
-                  placeholder="Emergency Contact Phone"
-                  value={formData.emergencyPhone}
-                  onChange={e =>
-                    setFormData(prev => ({
-                      ...prev,
-                      emergencyPhone: e.target.value,
-                    }))
-                  }
-                  required
-                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                />
-              </div>
-            </div>
-
-            {/* Therapy Preferences */}
-            <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Video />
-                Therapy Preferences
-              </h2>
-              <div className="space-y-4">
-                <Select
-                  value={formData.preferredCommunication}
-                  onValueChange={value =>
-                    setFormData(prev => ({
-                      ...prev,
-                      preferredCommunication: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger
-                    className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                  >
-                    <SelectValue placeholder="Preferred Communication" />
-                  </SelectTrigger>
-                  <SelectContent className="dark:bg-input">
-                    <SelectItem value="video">Video Call</SelectItem>
-                    <SelectItem value="audio">Audio Call</SelectItem>
-                    <SelectItem value="chat">Chat</SelectItem>
-                    <SelectItem value="in-person">In-Person</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Previous Therapy Experience
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        name="therapyHistory"
-                        value="yes"
-                        checked={formData.therapyHistory === 'yes'}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            therapyHistory: e.target.value,
-                          }))
-                        }
-                        className="text-primary cursor-pointer"
-                      />
-                      <span>Yes</span>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Previous Therapy Experience
                     </label>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        name="therapyHistory"
-                        value="no"
-                        checked={formData.therapyHistory === 'no'}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            therapyHistory: e.target.value,
-                          }))
-                        }
-                        className="text-primary cursor-pointer"
-                      />
-                      <span>No</span>
-                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="therapyHistory"
+                          value="yes"
+                          checked={formData.therapyHistory === 'yes'}
+                          onChange={e =>
+                            setFormData(prev => ({
+                              ...prev,
+                              therapyHistory: e.target.value,
+                            }))
+                          }
+                          className="text-primary cursor-pointer"
+                        />
+                        <span>Yes</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="therapyHistory"
+                          value="no"
+                          checked={formData.therapyHistory === 'no'}
+                          onChange={e =>
+                            setFormData(prev => ({
+                              ...prev,
+                              therapyHistory: e.target.value,
+                            }))
+                          }
+                          className="text-primary cursor-pointer"
+                        />
+                        <span>No</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
+                <h2 className="text-lg font-semibold mb-4">About Me</h2>
+                <textarea
+                  placeholder="Tell us about yourself..."
+                  value={formData.briefBio}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, briefBio: e.target.value }))
+                  }
+                  rows={4}
+                  required
+                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                />
+              </div>
             </div>
 
-            {/* Bio */}
             <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-              <h2 className="text-lg font-semibold mb-4">About Me</h2>
-              <textarea
-                placeholder="Tell us about yourself..."
-                value={formData.briefBio}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, briefBio: e.target.value }))
-                }
-                rows={4}
-                required
-                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-              />
+              <h2 className="text-lg font-semibold mb-4">Areas of Focus</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {struggleOptions.map(struggle => (
+                  <label
+                    key={struggle}
+                    className={`inline-flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                      formData.struggles.includes(struggle)
+                        ? 'block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input'
+                        : 'block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.struggles.includes(struggle)}
+                      onChange={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          struggles: prev.struggles.includes(struggle)
+                            ? prev.struggles.filter(s => s !== struggle)
+                            : [...prev.struggles, struggle],
+                        }));
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-xs">{struggle}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Areas of Focus */}
-          <div className="border dark:border-[#333333] rounded-xl shadow-sm p-6 text-card-foreground">
-            <h2 className="text-lg font-semibold mb-4">Areas of Focus</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {struggleOptions.map(struggle => (
-                <label
-                  key={struggle}
-                  className={`inline-flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                    formData.struggles.includes(struggle)
-                      ? 'block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input'
-                      : 'block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={formData.struggles.includes(struggle)}
-                    onChange={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        struggles: prev.struggles.includes(struggle)
-                          ? prev.struggles.filter(s => s !== struggle)
-                          : [...prev.struggles, struggle],
-                      }));
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">{struggle}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-primary hover:bg-primary text-primary-foreground py-2 px-4 rounded-lg transition-colors"
-          >
-            {isSubmitting ? 'Saving Changes...' : 'Save Changes'}
-          </Button>
-        </form>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-primary hover:bg-primary text-primary-foreground py-2 px-4 rounded-lg transition-colors"
+            >
+              {isSubmitting ? 'Saving Changes...' : 'Save Changes'}
+            </Button>
+          </form>
+        </div>
       </div>
-    </div>
+    </LoadingContent>
   );
 };
 

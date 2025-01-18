@@ -5,6 +5,7 @@ import Profile from '@/models/Profile';
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/middleware/authMiddleware';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
+import { uploadToCloudinary, deleteFromCloudinary } from '@/utils/fileUpload';
 
 export async function GET(req: NextRequest) {
   return withAuth(async (req: NextRequest, user: any) => {
@@ -66,11 +67,53 @@ export async function PUT(req: NextRequest) {
     try {
       await connectDB();
 
-      // Parse the request body
-      const updateData = await req.json();
-      console.log(updateData);
+      const formData = await req.formData();
+      const updateData: any = {};
 
-      // Find the existing profile
+      for (const [key, value] of formData.entries()) {
+        if (key === 'image' && value instanceof Blob) {
+          try {
+            const buffer = Buffer.from(await value.arrayBuffer());
+
+            const filename = `updatedprofile-${user.id}-${Date.now()}`;
+
+            const imageUrl = await uploadToCloudinary({
+              fileBuffer: buffer,
+              folder: 'profile-images',
+              filename: filename,
+              mimetype: value.type,
+            });
+
+            updateData[key] = imageUrl;
+
+            const existingProfile = await Profile.findOne({
+              user: user.id,
+            }).exec();
+            if (existingProfile?.image) {
+              const publicId = existingProfile.image
+                .split('/')
+                .slice(-1)[0]
+                .split('.')[0];
+              try {
+                await deleteFromCloudinary(`profile-images/${publicId}`);
+              } catch (deleteError) {
+                console.error('Error deleting old image:', deleteError);
+              }
+            }
+          } catch (uploadError) {
+            console.error('Image upload error:', uploadError);
+            return NextResponse.json(
+              createErrorResponse(400, 'Failed to upload image'),
+              { status: 400 }
+            );
+          }
+        } else if (key === 'struggles') {
+          updateData[key] = JSON.parse(value as string);
+        } else {
+          updateData[key] = value;
+        }
+      }
+
       const existingProfile = await Profile.findOne({ user: user.id }).exec();
 
       if (!existingProfile) {
@@ -80,7 +123,6 @@ export async function PUT(req: NextRequest) {
         );
       }
 
-      // Fields that are allowed to be updated
       const allowedFields = [
         'firstName',
         'lastName',
@@ -98,7 +140,6 @@ export async function PUT(req: NextRequest) {
         'profileCompleted',
       ];
 
-      // Filter out any fields that aren't in the allowed list
       const sanitizedUpdateData = Object.keys(updateData)
         .filter(key => allowedFields.includes(key))
         .reduce((obj, key) => {
@@ -106,14 +147,13 @@ export async function PUT(req: NextRequest) {
           return obj;
         }, {} as any);
 
-      // Update the profile with the sanitized data
       const updatedProfile = await Profile.findOneAndUpdate(
         { user: user.id },
         {
           $set: sanitizedUpdateData,
           updatedAt: new Date(),
         },
-        { new: true } // Return the updated document
+        { new: true }
       ).exec();
 
       return NextResponse.json(

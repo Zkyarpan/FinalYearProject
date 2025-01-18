@@ -117,7 +117,7 @@ const RootLayout = ({ children }) => {
       >
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <Link href="/" className="flex items-center">
+            <Link href="/dashboard" className="flex items-center">
               <Image
                 alt="Mentality"
                 width={40}

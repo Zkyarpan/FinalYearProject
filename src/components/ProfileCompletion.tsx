@@ -20,7 +20,13 @@ import { useRouter } from 'next/navigation';
 import SpinnerLoader from '@/components/SpinnerLoader';
 import { useUserStore } from '@/store/userStore';
 
-const ProfileCompletion = () => {
+interface ProfileCompletionProps {
+  onComplete?: () => void;
+}
+
+const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
+  onComplete,
+}) => {
   const router = useRouter();
   const { updateProfile } = useUserStore();
   interface FormData {
@@ -186,6 +192,9 @@ const ProfileCompletion = () => {
         });
 
         toast.success('Profile completed successfully!');
+        if (onComplete) {
+          onComplete();
+        }
         setTimeout(() => {
           router.push('/account');
         }, 500);

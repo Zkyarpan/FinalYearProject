@@ -22,11 +22,20 @@ function UserSidebar() {
     return pathname === path;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      logout();
-      router.push('/login');
-      toast.success('Logged out successfully!');
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        logout();
+        router.push('/login');
+        toast.success('Logged out successfully!');
+      } else {
+        throw new Error('Failed to log out');
+      }
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out');

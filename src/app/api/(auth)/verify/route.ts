@@ -84,13 +84,15 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    const accessTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     response.cookies.set('accessToken', sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 1000,
+      path: '/',
+      expires: accessTokenExpires,
     });
-
     return response;
   } catch (error) {
     console.error('Verification Error:', error);

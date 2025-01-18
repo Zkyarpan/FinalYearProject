@@ -16,6 +16,9 @@ import Account from '@/icons/Account';
 import UserActions from '@/components/UserActions';
 import NavItem from '@/components/NavItem';
 
+const LEFT_SIDEBAR_WIDTH = 212;
+const RIGHT_SIDEBAR_WIDTH = 420;
+
 const NAV_ITEMS = [
   { icon: <StoriesIcon />, text: 'Stories', href: '/stories' },
   { icon: <ServicesIcon />, text: 'Services', href: '/services' },
@@ -108,8 +111,10 @@ const RootLayout = ({ children }) => {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Left Sidebar - Always visible */}
-      <div className="w-[212px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto">
+      {/* Left Sidebar */}
+      <div
+        className={`w-[${LEFT_SIDEBAR_WIDTH}px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto bg-background`}
+      >
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <Link href="/" className="flex items-center">
@@ -149,9 +154,10 @@ const RootLayout = ({ children }) => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div
-        className={`flex-1 ml-[212px] ${
-          showRightSidebar ? 'mr-[348px]' : 'mr-0'
+        className={`flex-1 ml-[${LEFT_SIDEBAR_WIDTH}px] ${
+          showRightSidebar ? `mr-[${RIGHT_SIDEBAR_WIDTH}px]` : 'mr-0'
         } h-screen flex flex-col`}
       >
         <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] mt-2">
@@ -172,10 +178,12 @@ const RootLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Right Sidebar - Show on main routes regardless of authentication status */}
+      {/* Right Sidebar */}
       {showRightSidebar && (
-        <div className="w-[348px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col">
-          <div className="h-16 border-b dark:border-[#333333] flex items-center px-7 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
+        <div
+          className={`w-[${RIGHT_SIDEBAR_WIDTH}px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col`}
+        >
+          <div className="h-16 border-b dark:border-[#333333] flex items-center px-8 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20">
             <UserActions
               isAuthenticated={isAuthenticated}
               profileImage={profileImage}
@@ -184,7 +192,7 @@ const RootLayout = ({ children }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
-            <div className="p-6">{renderSidebarContent()}</div>
+            <div className="p-8">{renderSidebarContent()}</div>
           </div>
         </div>
       )}

@@ -143,24 +143,26 @@ const AccountPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-center">Struggles</h3>
-                  <div className="flex flex-wrap gap-2.5 justify-center">
-                    {profile.struggles.map(struggle => (
-                      <span
-                        key={struggle}
-                        className="px-4 py-2 rounded-full text-sm font-medium
-                        bg-gradient-to-r from-gray-50 to-gray-100
-                        text-gray-700 border border-gray-200
-                        hover:from-blue-50 hover:to-indigo-50 
-                        hover:text-blue-700 hover:border-blue-200
-                        transition-all duration-300 ease-out
-                        shadow-sm hover:shadow
-                        cursor-default
-                        focus:outline-none focus:ring-0"
-                      >
-                        {struggle}
-                      </span>
-                    ))}
+                  <h3 className="text-lg font-medium text-center">
+                    Areas of Focus
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {profile.struggles
+                      .toString()
+                      .split(',')
+                      .map(struggle => (
+                        <div
+                          key={struggle}
+                          className="bg-white  px-4 py-2 rounded-xl text-sm
+            dark:bg-[#171717] border dark:border-[#333333]
+            hover:border-primary/30
+            transition-all duration-300
+            shadow-sm hover:shadow-md
+            cursor-default text-center"
+                        >
+                          {struggle.trim()}
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>

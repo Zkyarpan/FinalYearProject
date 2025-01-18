@@ -79,29 +79,17 @@ export const useUserStore = create(
         })),
 
       logout: async () => {
-        try {
-          const response = await fetch('/api/logout', {
-            method: 'POST',
-            credentials: 'include',
-          });
-          if (response.ok) {
-            set({
-              id: null,
-              email: null,
-              role: null,
-              isAuthenticated: false,
-              isVerified: false,
-              profileComplete: false,
-              firstName: null,
-              lastName: null,
-              profileImage: null,
-            });
-          } else {
-            console.error('Failed to logout.');
-          }
-        } catch (error) {
-          console.error('Logout error:', error);
-        }
+        set({
+          id: null,
+          email: null,
+          role: null,
+          isAuthenticated: false,
+          isVerified: false,
+          profileComplete: false,
+          firstName: null,
+          lastName: null,
+          profileImage: null,
+        });
       },
     }),
     {

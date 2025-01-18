@@ -6,11 +6,11 @@ const Search = () => {
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        width={24}
-        height={24}
+        width={15}
+        height={15}
         color={'#000000'}
         fill={'none'}
-           className="text-black dark:text-white"
+        className="text-black dark:text-white"
       >
         <path
           d="M17.5 17.5L22 22"

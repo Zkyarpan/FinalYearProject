@@ -3,7 +3,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
+import Skeleton from '@/components/common/Skeleton';
+import generateSlug from '@/helpers/generateSlug';
+import BlogActions from '@/components/BlogActions';
+import { useUserStore } from '@/store/userStore';
+
+interface Author {
+  _id: string;
+  name: string;
+  avatar: string;
+}
 
 interface Blog {
   _id: string;
@@ -12,22 +21,31 @@ interface Blog {
   blogImage: string;
   category: string;
   tags: string[];
-  readTime: number;
-  author: {
-    name: string;
-    avatar: string;
-  };
+  readTime: number | string;
+  author: Author;
   publishDate: string;
 }
 
 interface ApiResponse {
-  blogs: Blog[];
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    blogs: Blog[];
+  };
 }
+
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
 
 const BlogPage = () => {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const userId = useUserStore(state => state._id);
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
 
   const defaultImage = '/default-image.jpg';
   const defaultAvatar = '/default-avatar.jpg';
@@ -42,13 +60,16 @@ const BlogPage = () => {
         }
         const data: ApiResponse = await res.json();
 
-        if (data.blogs && data.blogs.length > 0) {
-          setBlogs(data.blogs);
+        if (data.Result && data.Result.blogs.length > 0) {
+          const blogsWithOwnership = data.Result.blogs.map(blog => ({
+            ...blog,
+            isOwner: isAuthenticated && userId === blog.author?._id,
+          }));
+          setBlogs(data.Result.blogs);
         } else {
           setBlogs([]);
         }
       } catch (error) {
-        console.error('Failed to fetch blogs:', error);
         setError('Failed to load blogs');
       } finally {
         setIsLoading(false);
@@ -57,54 +78,8 @@ const BlogPage = () => {
     fetchBlogs();
   }, []);
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/ /g, '-')
-      .replace(/[^\w-]+/g, '');
-  };
   if (isLoading) {
-    return (
-      <main className="min-h-screen">
-        <div className="container mx-auto px-4 py-8">
-          {/* Featured Post Skeleton */}
-          <div className="mb-8">
-            <Skeleton className="h-[400px] w-full rounded-2xl" />
-            <div className="mt-4 space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-20 w-full" />
-              <div className="flex justify-between">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-                <Skeleton className="h-4 w-20" />
-              </div>
-            </div>
-          </div>
-
-          {/* Grid Skeletons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="space-y-4">
-                <Skeleton className="h-[200px] w-full rounded-2xl" />
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-16 w-full" />
-                  <div className="flex justify-between">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-6 w-6 rounded-full" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    );
+    return <Skeleton />;
   }
 
   if (error) {
@@ -126,13 +101,19 @@ const BlogPage = () => {
         <div className="space-y-6">
           {blogs.length > 0 ? (
             <>
-              {/* Featured Blog Post */}
               <div className="mb-8">
                 <Link
                   href={`/blogs/${generateSlug(blogs[0].title)}`}
-                  className="group block overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all hover:shadow-lg"
+                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
                 >
-                  <article className="h-full">
+                  <article className="h-full relative">
+                    {' '}
+                    <BlogActions
+                      slug={blogs[0]._id}
+                      title={blogs[0].title}
+                      authorId={blogs[0].author._id}
+                      className="z-20"
+                    />
                     <div className="relative h-[400px] w-full">
                       <Image
                         src={blogs[0].blogImage || defaultImage}
@@ -145,19 +126,18 @@ const BlogPage = () => {
                         priority
                       />
                     </div>
-
                     <div className="p-6">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                      <div className="flex items-center gap-2 text-xs mb-3">
                         <span>{blogs[0].category}</span>
                         <span>•</span>
                         <span>{blogs[0].readTime} min read</span>
                       </div>
 
-                      <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                      <h2 className="text-xl font-bold mb-3">
                         {blogs[0].title}
                       </h2>
-                      <p className="text-gray-600 text-lg mb-4">
-                        {blogs[0].content}
+                      <p className="text-sm mb-4 line-clamp-3">
+                        {truncateText(blogs[0].content, 200)}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -170,29 +150,32 @@ const BlogPage = () => {
                               sizes="32px"
                             />
                           </div>
-                          <span className="text-gray-600 text-sm font-semibold">
+                          <span className="text-sm font-semibold">
                             {blogs[0].author.name}
                           </span>
                         </div>
-                        <span className="text-gray-500 text-sm">
-                          {blogs[0].publishDate}
-                        </span>
+                        <span className="text-xs">{blogs[0].publishDate}</span>
                       </div>
                     </div>
                   </article>
                 </Link>
               </div>
 
-              {/* Grid of Remaining Blog Posts */}
               {blogs.length > 1 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {blogs.slice(1).map(blog => (
                     <Link
                       key={blog._id}
                       href={`/blogs/${generateSlug(blog.title)}`}
-                      className="group block overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all hover:shadow-lg"
+                      className="group block overflow-hidden rounded-2xl border  bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
                     >
-                      <article className="h-full">
+                      <article className="h-full relative">
+                        {' '}
+                        <BlogActions
+                          slug={blog._id}
+                          title={blog.title}
+                          authorId={blog.author._id}
+                        />
                         <div className="relative h-[200px] w-full">
                           <Image
                             src={blog.blogImage || defaultImage}
@@ -204,19 +187,18 @@ const BlogPage = () => {
                             sizes="(max-width: 768px) 100vw, 50vw"
                           />
                         </div>
-
                         <div className="p-4">
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+                          <div className="flex items-center gap-2 text-xs  mb-2">
                             <span>{blog.category}</span>
                             <span>•</span>
                             <span>{blog.readTime} min read</span>
                           </div>
 
-                          <h2 className="text-gray-900 font-semibold text-lg mb-2">
+                          <h2 className="font-semibold text-lg mb-2">
                             {blog.title}
                           </h2>
-                          <p className="text-gray-500 text-sm line-clamp-2 mb-4">
-                            {blog.content}
+                          <p className="text-sm line-clamp-2 mb-4">
+                            {truncateText(blog.content, 120)}
                           </p>
 
                           <div className="flex items-center justify-between">
@@ -230,13 +212,11 @@ const BlogPage = () => {
                                   sizes="24px"
                                 />
                               </div>
-                              <span className="text-gray-600 text-xs font-semibold">
+                              <span className="text-xs font-semibold">
                                 {blog.author.name}
                               </span>
                             </div>
-                            <span className="text-gray-500 text-xs">
-                              {blog.publishDate}
-                            </span>
+                            <span className="text-xs">{blog.publishDate}</span>
                           </div>
                         </div>
                       </article>
@@ -247,12 +227,8 @@ const BlogPage = () => {
             </>
           ) : (
             <div className="text-center py-12">
-              <h2 className="text-xl font-semibold text-gray-900">
-                No blogs found
-              </h2>
-              <p className="text-gray-600 mt-2">
-                Check back later for new content
-              </p>
+              <h2 className="text-xl font-semibold">No blogs found</h2>
+              <p className="mt-2">Check back later for new content</p>
             </div>
           )}
         </div>

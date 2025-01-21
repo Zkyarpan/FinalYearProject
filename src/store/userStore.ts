@@ -8,7 +8,7 @@ interface UserProfile {
 }
 
 interface User extends UserProfile {
-  id: string | null;
+  _id: string | null;
   email: string | null;
   role: string | null;
   isAuthenticated: boolean;
@@ -17,7 +17,7 @@ interface User extends UserProfile {
 }
 
 interface SetUser {
-  id: string;
+  _id: string;
   email: string;
   role: string;
   isVerified: boolean;
@@ -29,6 +29,7 @@ interface SetUser {
 }
 
 interface UserStore extends User {
+  user: User | null;
   setUser: (user: SetUser) => void;
   setProfileComplete: (complete: boolean) => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
@@ -38,7 +39,7 @@ interface UserStore extends User {
 export const useUserStore = create(
   persist<UserStore>(
     set => ({
-      id: null,
+      _id: null,
       email: null,
       role: null,
       isAuthenticated: false,
@@ -47,10 +48,11 @@ export const useUserStore = create(
       firstName: null,
       lastName: null,
       profileImage: null,
+      user: null,
 
       setUser: user =>
         set({
-          id: user.id,
+          _id: user._id,
           email: user.email,
           role: user.role,
           isAuthenticated: user.isAuthenticated ?? true,
@@ -59,6 +61,17 @@ export const useUserStore = create(
           firstName: user.firstName,
           lastName: user.lastName,
           profileImage: user.profileImage || null,
+          user: {
+            _id: user._id,
+            email: user.email,
+            role: user.role,
+            isAuthenticated: user.isAuthenticated ?? true,
+            isVerified: user.isVerified,
+            profileComplete: user.profileComplete,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            profileImage: user.profileImage || null,
+          },
         }),
 
       setProfileComplete: complete =>
@@ -80,7 +93,7 @@ export const useUserStore = create(
 
       logout: async () => {
         set({
-          id: null,
+          _id: null,
           email: null,
           role: null,
           isAuthenticated: false,

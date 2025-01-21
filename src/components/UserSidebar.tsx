@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 function UserSidebar() {
   const { firstName, lastName, profileImage, isAuthenticated, logout } =
     useUserStore();
+  const [isLoading, setIsLoading] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -24,21 +25,27 @@ function UserSidebar() {
 
   const handleLogout = async () => {
     try {
+      if (isLoading) return;
+
       const response = await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {
         logout();
-        router.push('/login');
         toast.success('Logged out successfully!');
+        router.push('/login');
       } else {
-        throw new Error('Failed to log out');
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to log out');
       }
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('Failed to log out');
+      toast.error('Failed to log out. Please try again.');
     }
   };
 
@@ -85,7 +92,6 @@ function UserSidebar() {
               icon={<Logout />}
               title="Logout"
               description="Sign out of your account"
-              link="/api/logout"
               onClick={handleLogout}
               customClass="group"
             />

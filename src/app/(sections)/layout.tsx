@@ -15,6 +15,13 @@ import StoriesIcon from '@/icons/Stories';
 import Account from '@/icons/Account';
 import UserActions from '@/components/UserActions';
 import NavItem from '@/components/NavItem';
+import { useState } from 'react';
+import BlogRightSection from '@/components/BlogRightSection';
+import PsychologistSection from '@/components/PsychologistSection';
+import StoriesSection from '@/components/StoriesSection';
+import ServicesSection from '@/components/ServicesSection';
+import ArticlesSection from '@/components/ArticlesSection';
+import ResourcesSection from '@/components/ResourcesSection';
 
 const LEFT_SIDEBAR_WIDTH = 212;
 const RIGHT_SIDEBAR_WIDTH = 420;
@@ -42,11 +49,18 @@ const routeTitles = {
 const RootLayout = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated, profileImage } = useUserStore();
   const currentYear = new Date().getFullYear();
   const isAccountPage =
     pathname === '/account' || pathname === '/settings/profile';
-  const title = routeTitles[pathname];
+
+  const pathParts = pathname.split('/').filter(Boolean);
+  const isNestedRoute = pathParts.length > 1;
+  const baseRoute = `/${pathParts[0]}`;
+
+  const currentSection = pathParts[0];
+  const title = routeTitles[baseRoute];
 
   const showRightSidebar =
     Object.keys(routeTitles).includes(pathname) ||
@@ -54,70 +68,98 @@ const RootLayout = ({ children }) => {
     pathname === '/settings/profile' ||
     pathname === '/account';
 
+  const handleNavigation = path => {
+    setIsLoading(true);
+    router.push(path);
+  };
+
+  const handleLogoClick = e => {
+    e.preventDefault();
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    } else {
+      router.push('/');
+    }
+  };
+
   const renderSidebarContent = () => {
     if (isAccountPage && isAuthenticated) {
       return <UserSidebar />;
     }
 
-    return (
-      <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
-        <div className="h-full flex flex-col space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-center text-foreground">
-              Your Journey to Better Mental Health Starts Here
-            </h2>
-            <div className="space-y-2">
-              <p className="text-sm text-center text-muted-foreground">
-                Feeling overwhelmed, anxious, or just need someone to talk to?
-                Our professional psychologists are here to provide the support
-                you need.
-              </p>
-              <p className="text-sm text-center text-muted-foreground">
-                Connect with licensed therapists, join supportive communities,
-                and access personalized mental wellness resources - all in one
-                place.
-              </p>
-            </div>
-          </div>
-          <div className="mt-auto space-y-3">
-            {isAuthenticated ? (
-              <button className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
-                Start Your Wellness Journey
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <button
-                  onClick={() => router.push('/login')}
-                  className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full"
-                >
-                  Log in to Start
-                </button>
-                <button
-                  onClick={() => router.push('/signup')}
-                  className="bg-secondary text-secondary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-secondary/90 transition-colors w-full"
-                >
-                  Create an Account
-                </button>
-              </div>
-            )}
-            <p className="text-xs text-center italic text-muted-foreground">
-              Take the first step towards better mental health today
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    if (pathname === '/blogs') {
+      return (
+        <BlogRightSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
+
+    if (pathname === '/psychologists') {
+      return (
+        <PsychologistSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
+
+    if (pathname === '/stories') {
+      return (
+        <StoriesSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
+
+    if (pathname === '/services') {
+      return (
+        <ServicesSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
+
+    if (pathname === '/articles') {
+      return (
+        <ArticlesSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
+
+    if (pathname === '/resources') {
+      return (
+        <ResourcesSection
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          handleNavigation={handleNavigation}
+        />
+      );
+    }
   };
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Left Sidebar */}
       <div
         className={`w-[${LEFT_SIDEBAR_WIDTH}px] border-r border-border fixed h-screen flex flex-col justify-between py-4 dark:border-[#333333] overflow-auto bg-background`}
       >
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <Link href="/dashboard" className="flex items-center">
+            <Link
+              href={isAuthenticated ? '/dashboard' : '/'}
+              onClick={handleLogoClick}
+              className="flex items-center"
+            >
               <Image
                 alt="Mentality"
                 width={40}
@@ -154,7 +196,6 @@ const RootLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div
         className={`flex-1 ml-[${LEFT_SIDEBAR_WIDTH}px] ${
           showRightSidebar ? `mr-[${RIGHT_SIDEBAR_WIDTH}px]` : 'mr-0'
@@ -162,7 +203,39 @@ const RootLayout = ({ children }) => {
       >
         <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] mt-2">
           <div className="h-full px-6 flex items-center justify-between">
-            <h1 className="text-base font-semibold">{title}</h1>
+            <div className="flex items-center gap-x-3">
+              {isNestedRoute && currentSection === 'blogs' && (
+                <div className="flex items-center gap-x-2">
+                  <button
+                    onClick={() => router.push('/blogs')}
+                    type="button"
+                    className="mr-2 justify-center shrink-0 flex items-center font-semibold  transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-1k bg-gray-00  bg-gray-100 hover:bg-gray-200 
+        border border-[hsl(var(--border))] dark:bg-input hover:dark:bg-[#505050] dark:disabled:bg-gray-00 dark:disabled:hover:bg-gray-00 shadow-5 hover:shadow-sm"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M19.5833 12H5M5 12L12 5M5 12L12 19"
+                        stroke="currentColor"
+                        strokeWidth="1.46"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </svg>
+                  </button>
+                  <span className="font-bold">Blogs</span>
+                </div>
+              )}
+              {!isNestedRoute && title && (
+                <h1 className="text-base font-semibold">{title}</h1>
+              )}
+            </div>
             {!showRightSidebar && (
               <UserActions
                 isAuthenticated={isAuthenticated}
@@ -178,7 +251,6 @@ const RootLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Right Sidebar */}
       {showRightSidebar && (
         <div
           className={`w-[${RIGHT_SIDEBAR_WIDTH}px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex flex-col`}

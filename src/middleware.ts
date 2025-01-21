@@ -15,8 +15,6 @@ const publicRoutes = [
   '/blogs',
 ];
 
-const adminRoutes = ['/admin', '/admin/dashboard'];
-const psychologistRoutes = ['/psychologist/dashboard', '/psychologist/profile'];
 const authFlowRoutes = {
   verification: '/verify',
   forgotPassword: '/forgot-password',
@@ -51,24 +49,25 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow public access to certain routes
-  if (publicRoutes.some(route => path.startsWith(route)) || path === '/') {
-    return NextResponse.next();
-  }
-
-  // Authenticated user handling
   if (session?.id) {
-    // Role-based route protection
-    if (psychologistRoutes.some(route => path.startsWith(route))) {
-      if (session.role !== 'psychologist') {
+    // Redirect from landing page and auth pages when logged in
+    if (
+      path === '/' ||
+      path === '/login' ||
+      path === '/signup' ||
+      path === '/forgot-password'
+    ) {
+      // Check if user is verified and profile is complete
+      if (session.isVerified && session.profileComplete) {
         return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+      } else if (!session.isVerified) {
+        return NextResponse.redirect(new URL('/verify', req.nextUrl));
       }
     }
 
-    if (adminRoutes.some(route => path.startsWith(route))) {
-      if (session.role !== 'admin') {
-        return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
-      }
+    // Allow access to other public routes
+    if (publicRoutes.some(route => path.startsWith(route))) {
+      return NextResponse.next();
     }
 
     return NextResponse.next();
@@ -87,11 +86,7 @@ export default async function middleware(req: NextRequest) {
 }
 
 function isProtectedRoute(path: string): boolean {
-  return (
-    protectedRoutes.some(route => path.startsWith(route)) ||
-    adminRoutes.some(route => path.startsWith(route)) ||
-    psychologistRoutes.some(route => path.startsWith(route))
-  );
+  return protectedRoutes.some(route => path.startsWith(route));
 }
 
 export const config = {
@@ -102,8 +97,6 @@ export const config = {
     '/dashboard',
     '/account',
     '/verify',
-    '/admin/:path*',
-    '/psychologist/:path*',
     '/forgot-password',
     '/forgot-password/confirmation',
     '/settings/profile',

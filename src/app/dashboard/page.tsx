@@ -78,9 +78,11 @@ const RootLayout = ({ children }) => {
   }, [isAuthenticated, pathname, router]);
 
   const handleLogoClick = e => {
+    e.preventDefault();
     if (isAuthenticated) {
-      e.preventDefault();
       router.push('/dashboard');
+    } else {
+      router.push('/stories');
     }
   };
 
@@ -154,7 +156,7 @@ const RootLayout = ({ children }) => {
         <div className="flex flex-col h-full">
           <div className="px-4 -py-2">
             <Link
-              href={'/dashboard'}
+              href={isAuthenticated ? '/dashboard' : '/stories'}
               onClick={handleLogoClick}
               className="flex items-center"
             >

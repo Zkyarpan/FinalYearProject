@@ -27,15 +27,7 @@ const publicRoutes = [
   '/articles',
 ];
 
-const validRoutes = [
-  ...publicRoutes,
-  '/admin',
-  '/admin/dashboard',
-  '/psychologist/dashboard',
-  '/dashboard',
-  '/verify',
-  '/',
-];
+const validRoutes = [...publicRoutes, '/dashboard', '/verify', '/'];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -60,13 +52,47 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Allow access to public routes without token
-        if (publicRoutes.includes(currentPath)) {
+        // Allow access to public routes regardless of authentication
+        if (publicRoutes.includes(currentPath) || currentPath === '/') {
           setIsChecking(false);
           return;
         }
 
-        // If no token, redirect to login
+        // For auth pages, redirect if logged in
+        if (
+          token &&
+          (currentPath === '/login' ||
+            currentPath === '/signup' ||
+            currentPath === '/forgot-password')
+        ) {
+          const response = await fetch('/api/auth/validate', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: 'include',
+          });
+
+          if (response.ok) {
+            const userData: TokenPayload = await response.json();
+
+            setUser({
+              _id: userData.id!,
+              email: userData.email!,
+              role: userData.role!,
+              isVerified: userData.isVerified!,
+              profileComplete: userData.profileComplete || false,
+              firstName: null,
+              lastName: null,
+              profileImage: null,
+              isAuthenticated: true,
+            });
+
+            router.push('/dashboard');
+            return;
+          }
+        }
+
+        // For protected routes, check authentication
         if (!token) {
           router.push('/login');
           return;
@@ -77,7 +103,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          credentials: 'include', // Important for cookie handling
+          credentials: 'include',
         });
 
         if (!response.ok) {
@@ -86,9 +112,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         const userData: TokenPayload = await response.json();
 
-        // Update global state with user data
         setUser({
-          id: userData.id!,
+          _id: userData.id!,
           email: userData.email!,
           role: userData.role!,
           isVerified: userData.isVerified!,
@@ -105,24 +130,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Handle role-based routing
+        // Handle routing for authenticated users
         if (userData.isVerified && userData.profileComplete) {
-          switch (userData.role) {
-            case 'admin':
-              if (!currentPath.startsWith('/admin')) {
-                router.push('/admin/dashboard');
-              }
-              break;
-            case 'psychologist':
-              if (!currentPath.startsWith('/psychologist')) {
-                router.push('/psychologist/dashboard');
-              }
-              break;
-            default:
-              if (currentPath === '/login' || currentPath === '/signup') {
-                router.push('/dashboard');
-              }
-              break;
+          if (currentPath === '/login' || currentPath === '/signup') {
+            router.push('/dashboard');
           }
         }
       } catch (error) {

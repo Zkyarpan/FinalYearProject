@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
-import Account from '@/models/Account';
+import Account from '@/models/User';
 import Psychologist from '@/models/Psychologist';
 import Profile from '@/models/Profile';
 import bcrypt from 'bcryptjs';
@@ -62,8 +62,6 @@ export async function POST(req: NextRequest) {
       profileComplete,
     });
 
-    const accessTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
     const response = NextResponse.json(
       createSuccessResponse(200, {
         message: 'Login successful',
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      expires: accessTokenExpires,
+      maxAge: 60 * 60 * 24, // 1 day
     });
 
     return response;

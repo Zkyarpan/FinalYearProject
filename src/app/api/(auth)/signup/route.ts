@@ -4,7 +4,7 @@ import { encrypt } from '@/lib/token';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
 import TemporaryToken from '@/models/TemporaryToken';
-import Account from '@/models/Account';
+import Account from '@/models/User';
 import connectDB from '@/db/db';
 import bcrypt from 'bcryptjs';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';

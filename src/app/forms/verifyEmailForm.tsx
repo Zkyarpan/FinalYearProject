@@ -58,7 +58,7 @@ const VerifyEmail = () => {
       }
 
       setUser({
-        id: data.Result.user.id,
+        _id: data.Result.user.id,
         email: storedEmail,
         role: 'user',
         isVerified: true,

@@ -21,9 +21,7 @@ const Notification = () => {
         leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-1k
         bg-gray-100 hover:bg-gray-200 
         border border-[hsl(var(--border))]
-        active:bg-gray-300 active:scale-95
         dark:bg-input dark:hover:bg-[#505050]
-        dark:active:bg-gray-600
         shadow-sm hover:shadow-md
            text-gray-700 dark:text-gray-200
         transform motion-safe:hover:scale-105

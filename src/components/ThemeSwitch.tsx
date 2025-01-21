@@ -44,7 +44,7 @@ export default function ThemeSwitch() {
         motion"
         aria-label="Toggle theme"
       >
-        {resolvedTheme === 'light' ? <Moon /> : <Sun />}
+        {resolvedTheme === 'light' ? <Sun /> : <Moon />}
       </button>
     </div>
   );

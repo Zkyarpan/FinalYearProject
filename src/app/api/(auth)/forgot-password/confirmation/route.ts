@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import TemporaryToken from '@/models/TemporaryToken';
-import Account from '@/models/Account';
+import Account from '@/models/User';
 import connectDB from '@/db/db';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 

@@ -1,9 +1,9 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document, Types } from 'mongoose';
 
 interface IBlog extends Document {
   title: string;
   content: string;
-  author: Schema.Types.ObjectId;
+  author: Types.ObjectId;
   category: string;
   tags?: string[];
   createdAt: Date;
@@ -11,7 +11,7 @@ interface IBlog extends Document {
   isPublished: boolean;
   publishDate: Date;
   readTime: number;
-  blogImage: string;
+  blogImage?: string;
 }
 
 const blogSchema = new Schema<IBlog>(

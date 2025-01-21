@@ -7,6 +7,7 @@ import { uploadToCloudinary } from '@/utils/fileUpload';
 import Busboy from 'busboy';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { withAuth } from '@/middleware/authMiddleware';
+import calculateReadTime from '@/helpers/calculateReadTime';
 
 interface ParsedForm {
   fields: { [key: string]: string };
@@ -22,18 +23,20 @@ async function parseForm(req: NextRequest): Promise<ParsedForm> {
     const busboy = Busboy({
       headers: Object.fromEntries(req.headers.entries()),
     });
-    const fields = {};
+
+    let fields = {};
     let blogImageFile;
 
     busboy.on('field', (fieldname, val) => {
-      fields[fieldname] = val;
+      if (fieldname === 'fields') {
+        try {
+          fields = JSON.parse(val);
+        } catch (error) {
+          console.error('Error parsing fields JSON:', error);
+          reject(error);
+        }
+      }
     });
-
-    interface BlogImageFile {
-      buffer: Buffer;
-      filename: string;
-      mimetype: string;
-    }
 
     busboy.on(
       'file',
@@ -44,7 +47,7 @@ async function parseForm(req: NextRequest): Promise<ParsedForm> {
         encoding: string,
         mimetype: string
       ) => {
-        if (fieldname === 'blogImage') {
+        if (fieldname === 'blogImageFile') {
           const chunks: Buffer[] = [];
           file.on('data', (chunk: Buffer) => chunks.push(chunk));
           file.on('end', () => {
@@ -52,17 +55,22 @@ async function parseForm(req: NextRequest): Promise<ParsedForm> {
               buffer: Buffer.concat(chunks),
               filename,
               mimetype,
-            } as BlogImageFile;
+            };
           });
         }
       }
     );
 
     busboy.on('finish', () => {
+      console.log('Parsed fields:', fields);
+      console.log('Got image file:', !!blogImageFile);
       resolve({ fields, blogImageFile });
     });
 
-    busboy.on('error', error => reject(error));
+    busboy.on('error', error => {
+      console.error('Busboy error:', error);
+      reject(error);
+    });
 
     if (req.body) {
       const reader = req.body.getReader();
@@ -96,12 +104,22 @@ export async function POST(req: NextRequest) {
       await connectDB();
 
       const { fields, blogImageFile } = await parseForm(req);
-      const requiredFields = ['title', 'content', 'category', 'readTime'];
+      const requiredFields = ['title', 'content', 'category'];
+
+      if (!fields || typeof fields !== 'object') {
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid fields data'),
+          { status: 400 }
+        );
+      }
 
       const missingFields = requiredFields.filter(field => !fields[field]);
       if (missingFields.length > 0) {
         return NextResponse.json(
-          createErrorResponse(400, `All fields are required}`),
+          createErrorResponse(
+            400,
+            `Missing required fields: ${missingFields.join(', ')}`
+          ),
           { status: 400 }
         );
       }
@@ -130,12 +148,10 @@ export async function POST(req: NextRequest) {
             mimetype: blogImageFile.mimetype,
           });
 
-          // Since uploadResult can be a string or an object, handle both cases
           if (typeof uploadResult === 'string') {
             blogImageUrl = uploadResult;
             publicId = `photos/blog-images/${uploadResult.split('/').pop()?.split('.')[0]}`;
           } else {
-            // Cast uploadResult to any to handle the Cloudinary response type
             const cloudinaryResult = uploadResult as any;
             blogImageUrl = cloudinaryResult.secure_url || cloudinaryResult.url;
             publicId =
@@ -155,6 +171,7 @@ export async function POST(req: NextRequest) {
         author: user.id,
         blogImage: blogImageUrl,
         imagePublicId: publicId,
+        readTime: calculateReadTime(fields.content),
         isPublished: true,
       });
 
@@ -166,6 +183,7 @@ export async function POST(req: NextRequest) {
           blog: {
             id: newBlog._id,
             title: newBlog.title,
+            readTime: `${calculateReadTime(fields.content)}`,
           },
         }),
         { status: 201 }

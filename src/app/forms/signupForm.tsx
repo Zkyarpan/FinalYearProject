@@ -78,7 +78,6 @@ const SignupForm = () => {
     }
   };
 
-
   return (
     <>
       {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}

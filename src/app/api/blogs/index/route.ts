@@ -14,7 +14,6 @@ export async function GET() {
       .select(
         'title content blogImage author category tags publishDate readTime'
       )
-      .populate('author', 'username')
       .sort({ publishDate: -1 })
       .lean();
 
@@ -22,39 +21,46 @@ export async function GET() {
       return NextResponse.json(createSuccessResponse(200, { blogs: [] }));
     }
 
-    const authorIds = blogs.map(blog => blog.author?._id).filter(Boolean);
+    const authorIds = blogs
+      .map(blog => blog.author)
+      .filter((id): id is string => !!id);
 
     const profiles = await Profile.find({
       user: { $in: authorIds },
-    }).lean();
+    })
+      .select('user firstName lastName image')
+      .lean();
 
     const profileMap = new Map(
       profiles.map(profile => [profile.user.toString(), profile])
     );
 
     const formattedBlogs = blogs.map((blog: any) => {
-      const authorId = blog.author?._id.toString();
-      const authorProfile = profileMap.get(authorId);
+      const authorId = blog.author?.toString();
+      const authorProfile = authorId ? profileMap.get(authorId) : null;
 
       return {
         _id: blog._id.toString(),
-        title: blog.title,
-        content: blog.content,
-        blogImage: blog.blogImage,
-        category: blog.category,
-        tags: blog.tags,
-        readTime: blog.readTime,
+        title: blog.title || 'Untitled',
+        content: blog.content || '',
+        blogImage: blog.blogImage || '/default-blog-image.jpg',
+        category: blog.category || 'Uncategorized',
+        tags: Array.isArray(blog.tags) ? blog.tags : [],
+        readTime: blog.readTime || '1 min read',
         author: {
+          _id: authorId || '',
           name: authorProfile
             ? `${authorProfile.firstName} ${authorProfile.lastName}`
-            : blog.author.username || 'Anonymous',
+            : 'Anonymous Author',
           avatar: authorProfile?.image || '/default-avatar.jpg',
         },
-        publishDate: new Date(blog.publishDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
+        publishDate: blog.publishDate
+          ? new Date(blog.publishDate).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
+          : 'Date not available',
       };
     });
 

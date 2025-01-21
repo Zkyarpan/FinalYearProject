@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendPasswordResetEmail } from '@/helpers/sendPasswordResetEmail';
 import TemporaryToken from '@/models/TemporaryToken';
-import Account from '@/models/Account';
+import Account from '@/models/User';
 import { v4 as uuidv4 } from 'uuid';
 import connectDB from '@/db/db';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';

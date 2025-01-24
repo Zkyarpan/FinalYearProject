@@ -12,6 +12,7 @@ interface Author {
   _id: string;
   name: string;
   avatar: string;
+  isOwner?: boolean;
 }
 
 interface Blog {
@@ -24,6 +25,7 @@ interface Blog {
   readTime: number | string;
   author: Author;
   publishDate: string;
+  isOwner?: boolean;
 }
 
 interface ApiResponse {
@@ -38,6 +40,31 @@ interface ApiResponse {
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
+};
+
+const BlogOwnershipTag = ({
+  isOwner,
+  size = 'default',
+}: {
+  isOwner: boolean;
+  size?: 'small' | 'default';
+}) => {
+  if (!isOwner) return null;
+
+  // Base classes for all sizes
+  const baseClasses =
+    'inline-flex items-center font-medium shadow rounded-full';
+
+  // Dynamic classes based on size prop
+  const styles = {
+    small: 'px-2 py-0.5 text-xs bg-blue-600 text-white',
+    default: 'px-3 py-1 text-sm bg-blue-600 text-white',
+  };
+
+  // Choose style based on size
+  const style = styles[size];
+
+  return <span className={`${baseClasses} ${style}`}>Your Blog</span>;
 };
 
 const BlogPage = () => {
@@ -65,7 +92,7 @@ const BlogPage = () => {
             ...blog,
             isOwner: isAuthenticated && userId === blog.author?._id,
           }));
-          setBlogs(data.Result.blogs);
+          setBlogs(blogsWithOwnership);
         } else {
           setBlogs([]);
         }
@@ -76,12 +103,9 @@ const BlogPage = () => {
       }
     };
     fetchBlogs();
-  }, []);
+  }, [userId, isAuthenticated]);
 
-  if (isLoading) {
-    return <Skeleton />;
-  }
-
+  if (isLoading) return <Skeleton />;
   if (error) {
     return (
       <main className="min-h-screen">
@@ -107,13 +131,6 @@ const BlogPage = () => {
                   className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
                 >
                   <article className="h-full relative">
-                    {' '}
-                    <BlogActions
-                      slug={blogs[0]._id}
-                      title={blogs[0].title}
-                      authorId={blogs[0].author._id}
-                      className="z-20"
-                    />
                     <div className="relative h-[400px] w-full">
                       <Image
                         src={blogs[0].blogImage || defaultImage}
@@ -131,6 +148,7 @@ const BlogPage = () => {
                         <span>{blogs[0].category}</span>
                         <span>•</span>
                         <span>{blogs[0].readTime} min read</span>
+                        <BlogOwnershipTag isOwner={blogs[0].isOwner ?? false} />
                       </div>
 
                       <h2 className="text-xl font-bold mb-3">
@@ -167,15 +185,9 @@ const BlogPage = () => {
                     <Link
                       key={blog._id}
                       href={`/blogs/${generateSlug(blog.title)}`}
-                      className="group block overflow-hidden rounded-2xl border  bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
+                      className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
                     >
                       <article className="h-full relative">
-                        {' '}
-                        <BlogActions
-                          slug={blog._id}
-                          title={blog.title}
-                          authorId={blog.author._id}
-                        />
                         <div className="relative h-[200px] w-full">
                           <Image
                             src={blog.blogImage || defaultImage}
@@ -188,10 +200,16 @@ const BlogPage = () => {
                           />
                         </div>
                         <div className="p-4">
-                          <div className="flex items-center gap-2 text-xs  mb-2">
-                            <span>{blog.category}</span>
-                            <span>•</span>
-                            <span>{blog.readTime} min read</span>
+                          <div className="flex items-center justify-between mb-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span>{blog.category}</span>
+                              <span>•</span>
+                              <span>{blog.readTime} min read</span>
+                            </div>
+                            <BlogOwnershipTag
+                              isOwner={blog.isOwner ?? false}
+                              size="small"
+                            />
                           </div>
 
                           <h2 className="font-semibold text-lg mb-2">

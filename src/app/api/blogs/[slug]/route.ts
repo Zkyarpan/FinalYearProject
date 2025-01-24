@@ -8,6 +8,7 @@ import Profile from '@/models/Profile';
 import User from '@/models/User';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { deleteFromCloudinary, uploadToCloudinary } from '@/utils/fileUpload';
+import { cleanContent } from '@/utils/contentCleaner';
 
 interface BlogDocument {
   _id: Types.ObjectId;
@@ -40,51 +41,75 @@ interface FormattedBlog {
   publishDate: string;
   isOwner: boolean;
 }
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    const slug = req.nextUrl.pathname.split('/').pop();
-    if (!slug) {
+    const blogId = req.nextUrl.pathname.split('/').pop();
+    console.log('Attempting to fetch blog with ID/slug:', blogId);
+
+    if (!blogId) {
       return NextResponse.json(
-        createErrorResponse(400, 'Blog slug is required'),
+        createErrorResponse(400, 'Blog identifier is required'),
         { status: 400 }
       );
     }
 
-    const normalizedSearchString = decodeURIComponent(slug)
-      .replace(/-/g, ' ')
-      .trim()
-      .toLowerCase();
+    let blog: BlogDocument | null = null;
 
-    const searchQueries = [
-      {
-        title: new RegExp(`^${normalizedSearchString}$`, 'i'),
-      },
-      {
-        $and: normalizedSearchString.split(' ').map(word => ({
-          title: new RegExp(word, 'i'),
-        })),
-      },
-    ];
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(blogId);
 
-    const blog = (await Blog.findOne({
-      $or: searchQueries,
-      isPublished: true,
-    })
-      .populate({
-        path: 'author',
-        model: User,
-        select: '_id email role',
-      })
-      .lean()) as BlogDocument | null;
+    if (isValidObjectId) {
+      blog = (await Blog.findById(blogId)
+        .populate({
+          path: 'author',
+          model: User,
+          select: '_id email role',
+        })
+        .lean()) as BlogDocument | null;
+    }
 
     if (!blog) {
+      const normalizedSearchString = decodeURIComponent(blogId)
+        .replace(/-/g, ' ')
+        .trim()
+        .toLowerCase();
+
+      console.log('Searching by title:', normalizedSearchString);
+
+      const searchQueries = [
+        {
+          title: new RegExp(`^${normalizedSearchString}$`, 'i'),
+        },
+        {
+          $and: normalizedSearchString.split(' ').map(word => ({
+            title: new RegExp(word, 'i'),
+          })),
+        },
+      ];
+
+      blog = (await Blog.findOne({
+        $or: searchQueries,
+        isPublished: true,
+      })
+        .populate({
+          path: 'author',
+          model: User,
+          select: '_id email role',
+        })
+        .lean()) as BlogDocument | null;
+    }
+
+    if (!blog) {
+      console.log('Blog not found for identifier:', blogId);
       return NextResponse.json(
         createErrorResponse(404, 'Blog post not found'),
         { status: 404 }
       );
     }
+
+    console.log('Found blog:', blog._id);
 
     const profile = await Profile.findOne({
       user: blog.author._id,
@@ -132,6 +157,14 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error('Server error:', error);
+
+    if (error instanceof Error && error.name === 'CastError') {
+      return NextResponse.json(
+        createErrorResponse(400, 'Invalid blog identifier format'),
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       createErrorResponse(500, 'Internal Server Error'),
       { status: 500 }
@@ -145,13 +178,12 @@ export async function PATCH(
 ) {
   try {
     await connectDB();
+    console.log('PATCH request for blog ID:', params.slug);
 
-    const titleFromSlug = await params.slug.replace(/-/g, ' ');
-    const blog = await Blog.findOne({
-      title: { $regex: new RegExp(`^${titleFromSlug}$`, 'i') },
-    });
+    const blog = await Blog.findById(params.slug);
 
     if (!blog) {
+      console.log('Blog not found with ID:', params.slug);
       return NextResponse.json(createErrorResponse(404, 'Blog not found'), {
         status: 404,
       });
@@ -161,17 +193,25 @@ export async function PATCH(
     const updateData: any = {};
     let imageFile: any = null;
 
-    for (const [key, value] of formData.entries()) {
-      if (key === 'blogImage' && value instanceof Blob) {
-        const timestamp = Date.now();
-        imageFile = {
-          buffer: Buffer.from(await value.arrayBuffer()),
-          filename: `blog-${blog._id}-${timestamp}`,
-          mimetype: value.type,
-        };
-      } else {
-        updateData[key] = value;
+    const fieldsStr = formData.get('fields');
+    if (fieldsStr) {
+      const fields = JSON.parse(String(fieldsStr));
+
+      if (fields.content) {
+        fields.content = cleanContent(fields.content);
       }
+
+      Object.assign(updateData, fields);
+    }
+
+    const blogImage = formData.get('blogImage');
+    if (blogImage instanceof Blob) {
+      const timestamp = Date.now();
+      imageFile = {
+        buffer: Buffer.from(await blogImage.arrayBuffer()),
+        filename: `blog-${blog._id}-${timestamp}`,
+        mimetype: blogImage.type,
+      };
     }
 
     if (imageFile) {
@@ -208,9 +248,19 @@ export async function PATCH(
       }
     }
 
+    console.log('Updating blog with cleaned data:', {
+      blogId: blog._id,
+      updateFields: Object.keys(updateData),
+    });
+
     const updatedBlog = await Blog.findByIdAndUpdate(
       blog._id,
-      { $set: { ...updateData, updatedAt: new Date() } },
+      {
+        $set: {
+          ...updateData,
+          updatedAt: new Date(),
+        },
+      },
       { new: true, runValidators: true }
     ).exec();
 
@@ -220,6 +270,8 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    console.log('Blog updated successfully:', updatedBlog._id);
 
     return NextResponse.json(
       createSuccessResponse(200, {
@@ -236,3 +288,46 @@ export async function PATCH(
     );
   }
 }
+
+// export async function DELETE(
+//   req: NextRequest,
+//   { params }: { params: { slug: string } }
+// ) {
+//   try {
+//     await connectDB();
+//     console.log('Delete request for:', params.slug);
+
+//     const blog = await Blog.findById(params.slug);
+//     if (!blog) {
+//       return NextResponse.json(createErrorResponse(404, 'Blog not found'), {
+//         status: 404,
+//       });
+//     }
+
+//     // Delete blog image if exists
+//     if (blog.blogImage) {
+//       try {
+//         const publicIdMatch = blog.blogImage.match(
+//           /photos\/blog-images\/([^.]+)/
+//         );
+//         if (publicIdMatch?.[1]) {
+//           await deleteFromCloudinary(`photos/blog-images/${publicIdMatch[1]}`);
+//         }
+//       } catch (error) {
+//         console.error('Failed to delete image:', error);
+//       }
+//     }
+
+//     await Blog.findByIdAndDelete(params.slug);
+
+//     return NextResponse.json(
+//       createSuccessResponse(200, 'Blog deleted successfully')
+//     );
+//   } catch (error) {
+//     console.error('Delete error:', error);
+//     return NextResponse.json(
+//       createErrorResponse(500, 'Failed to delete blog'),
+//       { status: 500 }
+//     );
+//   }
+// }

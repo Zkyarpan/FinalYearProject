@@ -277,25 +277,26 @@ const BlogCreatePage = () => {
 
         <div className="grid gap-8">
           <div className="space-y-6">
-            <div className="space-y-4 bg-card p-6 rounded-lg border shadow-sm">
+            <div className="space-y-4 dark:bg-input bg-card p-6 rounded-lg border shadow-sm">
               <div className="relative">
-                <Input
+                <input
                   type="text"
                   placeholder="Your Blog Title"
                   value={formData.title}
                   onChange={e =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  className="text-4xl border-none bg-transparent placeholder:text-muted-foreground/50 focus-visible:ring-0"
+                  className="block w-full rounded-none px-3 py-2 text-1xl bg-transparent placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none border-none border-b-2 border-gray-300 focus:border-blue-500"
                   maxLength={100}
                 />
+
                 <span className="absolute bottom-2 right-2 text-xs text-muted-foreground">
                   {formData.title.length}/100
                 </span>
               </div>
             </div>
 
-            <div className="bg-card p-6 rounded-lg border shadow-sm space-y-4">
+            <div className="bg-card dark:bg-input p-6 rounded-lg border shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Featured Image</h2>
                 <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition-colors">
@@ -328,7 +329,7 @@ const BlogCreatePage = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-white border-white hover:text-white"
+                        className="text-black dark:text-white border-white"
                         onClick={() => fileInputRef.current?.click()}
                       >
                         Change Image
@@ -338,7 +339,7 @@ const BlogCreatePage = () => {
                       variant="outline"
                       size="sm"
                       onClick={handleRemoveImage}
-                      className="text-white border-white  hover:border-red-400 hover:text-red-400"
+                      className="text-red border-white"
                     >
                       Remove
                     </Button>
@@ -363,11 +364,11 @@ const BlogCreatePage = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-card p-6 rounded-lg border shadow-sm space-y-4">
+              <div className="bg-card dark:bg-input p-6 rounded-lg border shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Categories</h2>
                   <Select onValueChange={handleCategorySelect}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px] border dark:border-white">
                       <SelectValue placeholder="Add category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -406,7 +407,7 @@ const BlogCreatePage = () => {
                 </div>
               </div>
 
-              <div className="bg-card p-6 rounded-lg border shadow-sm space-y-4">
+              <div className="bg-card dark:bg-input p-6 rounded-lg border shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Tags</h2>
                   <div className="flex items-center gap-2">
@@ -414,7 +415,7 @@ const BlogCreatePage = () => {
                     <Input
                       placeholder="Add tag and press Enter"
                       onKeyDown={handleTagInput}
-                      className="w-[180px]"
+                      className="w-[180px] border dark:border-white"
                     />
                   </div>
                 </div>
@@ -443,7 +444,7 @@ const BlogCreatePage = () => {
               </div>
             </div>
 
-            <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
+            <div className="dark:bg-input rounded-lg border shadow-sm overflow-hidden">
               <div className="border-b p-2 flex items-center gap-2 bg-muted/50">
                 <Button
                   variant="ghost"

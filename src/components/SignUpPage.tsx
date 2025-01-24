@@ -1,6 +1,6 @@
 'use client';
 
-import SignupForm from '@/app/forms/SignupForm';
+import SignupForm from '@/app/forms/signupForm';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -98,14 +98,14 @@ const SignUpPage = () => {
             By signing up, you agree to our{' '}
             <Link
               href="/terms"
-              className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "
+              className="text-gray-600 dark:text-white/80 hover:underline font-semibold hover:text-black dark:hover:text-gray-50"
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
               href="/privacy"
-              className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "
+              className="text-gray-600 dark:text-white/80 hover:underline font-semibold hover:text-black dark:hover:text-gray-50"
             >
               Privacy Policy
             </Link>
@@ -115,7 +115,7 @@ const SignUpPage = () => {
             Already have an account?{' '}
             <Link
               href="/login"
-              className="underline text-primary dark:text-white hover:text-primary/80 dark:hover:text-gray-300 transition-colors font-semibold "
+              className="text-gray-600 dark:text-white/80 hover:underline font-semibold hover:text-black dark:hover:text-gray-50"
             >
               Log in here
             </Link>

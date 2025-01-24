@@ -125,6 +125,14 @@ select:-webkit-autofill:focus {
   --radius: 0.5rem;
 }
 
+:root {
+  --background-component: hsl(210 0% 100%); /* light mode */
+}
+
+.dark {
+  --background-component: hsl(0 0% 15%); /* dark mode */
+}
+
 @layer base {
   * {
     @apply border-border;

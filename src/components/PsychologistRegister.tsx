@@ -190,7 +190,7 @@ const PsychologistRegister = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="space-y-12 pt-14">
+      <div className="space-y-12">
         <div className="border-b border-[hsl(var(--border))] pb-12">
           <div className="flex items-center gap-2">
             <h2 className="text-2xl main-font font-bold text-[hsl(var(--foreground))] mt-10">
@@ -211,7 +211,7 @@ const PsychologistRegister = () => {
                 Username
               </label>
               <div className="mt-2">
-                <div className="flex items-center rounded-md  pl-3 outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] outline-none focus-visible:ring-transparent sm:text-sm">
+                <div className="flex items-center rounded-md  pl-3 outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input">
                   <div className="shrink-0 select-none text-base text-[hsl(var(--muted-foreground))] sm:text-sm">
                     mentality.com/
                   </div>
@@ -283,7 +283,7 @@ const PsychologistRegister = () => {
                   rows={3}
                   value={formData.about}
                   onChange={handleChange}
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 />
               </div>
               <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">
@@ -298,7 +298,7 @@ const PsychologistRegister = () => {
               >
                 Certificate or License
               </label>
-              <div className="mt-2 flex justify-center rounded-lg border border-dashed border-[hsl(var(--border))] px-6 py-10">
+              <div className="mt-2 flex justify-center rounded-lg border border-dashed border-[hsl(var(--border))] px-6 py-10 dark:bg-input">
                 <div className="text-center">
                   {formData.certificateOrLicensePreview ? (
                     <img
@@ -363,7 +363,7 @@ const PsychologistRegister = () => {
                   value={formData.firstName}
                   onChange={handleChange}
                   autoComplete="given-name"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -383,7 +383,7 @@ const PsychologistRegister = () => {
                   value={formData.lastName}
                   onChange={handleChange}
                   autoComplete="family-name"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -403,7 +403,7 @@ const PsychologistRegister = () => {
                   value={formData.email}
                   onChange={handleChange}
                   autoComplete="email"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -423,13 +423,13 @@ const PsychologistRegister = () => {
                   value={formData.password}
                   onChange={handleChange}
                   autoComplete="current-password"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-2 top-0 h-8 w-8 text-foreground hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
+                  className="absolute right-2 top-0 h-8 w-8 text-foreground/50 hover:text-foreground/70 hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -492,7 +492,7 @@ const PsychologistRegister = () => {
                   value={formData.streetAddress}
                   onChange={handleChange}
                   autoComplete="street-address"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -512,7 +512,7 @@ const PsychologistRegister = () => {
                   value={formData.city}
                   onChange={handleChange}
                   autoComplete="address-level2"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -532,7 +532,7 @@ const PsychologistRegister = () => {
                   value={formData.stateOrProvince}
                   onChange={handleChange}
                   autoComplete="address-level1"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -552,7 +552,7 @@ const PsychologistRegister = () => {
                   value={formData.postalCode}
                   onChange={handleChange}
                   autoComplete="postal-code"
-                  className="block w-full rounded-md dark:bg-transparent px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
+                  className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                 />
               </div>
             </div>
@@ -562,7 +562,7 @@ const PsychologistRegister = () => {
         <div className="mt-6 flex items-center justify-end gap-x-6 pb-10">
           <Link
             href={`/signup`}
-            className="rounded-md bg-[hsl(var(--secondary))] px-3 py-2 text-sm font-semibold text-[hsl(var(--secondary-foreground))] shadow-sm hover:bg-[hsl(var(--secondary))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--secondary))]"
+            className="rounded-md bg-[hsl(var(--secondary))] px-3 py-2 text-sm font-semibold text-[hsl(var(--secondary-foreground))] shadow-sm hover:bg-[hsl(var(--secondary))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--secondary))] dark:bg-input"
           >
             Go Back
           </Link>

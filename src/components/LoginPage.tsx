@@ -25,7 +25,7 @@ const LoginPage = () => {
           Don’t have a Mentality profile?{' '}
           <Link
             href="/signup"
-            className="text-gray-600 dark:text-white/50 hover:underline font-semibold hover:text-black dark:hover:text-gray-100"
+            className="text-gray-600 dark:text-white/80 hover:underline font-semibold hover:text-black dark:hover:text-gray-100"
           >
             Create One!
           </Link>

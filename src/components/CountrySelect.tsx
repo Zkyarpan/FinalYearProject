@@ -1,5 +1,4 @@
-'use client';
-
+import React from 'react';
 import ReactSelect from 'react-select';
 import type { StylesConfig } from 'react-select';
 
@@ -10,12 +9,21 @@ type CountryOption = {
 
 const StyledCountrySelect = ({ formData, handleChange, countries }) => {
   const customStyles: StylesConfig<CountryOption, false> = {
-    control: (provided, state) => ({
+    control: provided => ({
       ...provided,
-      backgroundColor: 'hsl(var(--background))',
-      borderRadius: '0.5rem',
-      padding: '2px',
+      backgroundColor: 'transparent',
+      border: '0',
+      boxShadow: 'none',
       minHeight: '40px',
+      '&:hover': {
+        border: '0',
+      },
+    }),
+    container: provided => ({
+      ...provided,
+      backgroundColor: 'var(--background-component)',
+      border: '1px solid hsl(var(--border))',
+      borderRadius: '0.5rem',
     }),
     menu: provided => ({
       ...provided,
@@ -64,10 +72,7 @@ const StyledCountrySelect = ({ formData, handleChange, countries }) => {
 
   return (
     <div className="col-span-full">
-      <label
-        htmlFor="country"
-        className="block text-sm font-medium text-foreground"
-      >
+      <label htmlFor="country" className="block text-sm font-medium mb-2">
         Country
       </label>
       <div className="mt-2">

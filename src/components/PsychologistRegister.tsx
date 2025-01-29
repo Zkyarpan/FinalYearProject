@@ -9,6 +9,17 @@ import Loader from '@/components/common/Loader';
 import { ArrowRight } from 'lucide-react';
 import StyledCountrySelect from './CountrySelect';
 import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const PsychologistRegister = () => {
   const router = useRouter();
@@ -17,6 +28,7 @@ const PsychologistRegister = () => {
   const [countries, setCountries] = useState<
     { label: string; value: string }[]
   >([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     username: '',

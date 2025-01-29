@@ -15,6 +15,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'dqy38fnwh4fqs.cloudfront.net',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.ctfassets.net',
+      },
     ],
   },
   async headers() {

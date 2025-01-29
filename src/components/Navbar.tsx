@@ -30,7 +30,7 @@ const Navbar = () => {
                 src="/Logo1.png?v=1"
                 priority
               />
-              <span className=" text-2xl  logo-font">Mentality</span>
+              <span className="text-2xl logo-font">Mentality</span>
             </Link>
 
             <div className="hidden sm:flex items-center space-x-2">
@@ -57,7 +57,7 @@ const Navbar = () => {
             <div className="flex items-center gap-x-4">
               <Link
                 href="/login"
-                className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]"
+                className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-[hsl(var(--border))] hover:shadow-md bg-white dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]"
               >
                 Log in
               </Link>

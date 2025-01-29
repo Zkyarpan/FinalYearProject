@@ -5,7 +5,7 @@ interface VerificationEmailProps {
   otp: string;
 }
 
-export default function VerificationEmail({
+export default function EmailVerfication({
   email,
   otp,
 }: VerificationEmailProps) {

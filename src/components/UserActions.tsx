@@ -5,7 +5,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const UserActions = ({ isAuthenticated, profileImage, router }) => {
+interface UserActionsProps {
+  isAuthenticated: boolean;
+
+  profileImage: string | null;
+
+  router: any;
+
+  onLoginClick?: () => void;
+}
+
+const UserActions = ({
+  isAuthenticated,
+  profileImage,
+  router,
+}: UserActionsProps) => {
   const pathname = usePathname();
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';

@@ -1,12 +1,11 @@
 import nodemailer from 'nodemailer';
-import VerificationEmail from '@/emails/emailVerfication';
+import EmailVerfication from '@/emails/EmailVerfication';
 import { render } from '@react-email/render';
 
 export async function sendVerificationEmail(
   email: string,
   verifyCode: string
 ): Promise<{ success: boolean; message: string }> {
-  console.log('Verification Code:', verifyCode);
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -17,7 +16,7 @@ export async function sendVerificationEmail(
     });
 
     const emailHTML = await render(
-      VerificationEmail({ email, otp: verifyCode })
+      EmailVerfication({ email, otp: verifyCode })
     );
 
     const mailOptions = {

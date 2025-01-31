@@ -12,7 +12,6 @@ export default function Home() {
   return (
     <div>
       <main className="container w-full mx-auto px-4 pt-16">
-        {' '}
         <HeroSection />
         <div className="mx-auto w-20 border-2 box-content border-gray-200 mb-10"></div>
         <SupportSection />

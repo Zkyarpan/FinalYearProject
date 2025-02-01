@@ -340,12 +340,11 @@ const PsychologistRegister = () => {
 
     const missingFields = allRequiredFields.filter(field => !formData[field]);
     if (missingFields.length > 0) {
-      toast.error(`Please fill in ${missingFields.join(', ')} fields`);
+      toast.error(`Please fill in all fields !`);
       setIsLoading(false);
       return;
     }
 
-    // Validation checks
     if (formData.specializations.length === 0) {
       toast.error('Please select at least one specialization');
       setIsLoading(false);
@@ -403,10 +402,8 @@ const PsychologistRegister = () => {
       }
 
       if (data.StatusCode === 200 && data.Result?.token) {
-        // Store the verification token
         localStorage.setItem('verificationToken', data.Result.token);
 
-        // Show verification dialog
         setVerificationEmail(formData.email);
         setShowVerificationDialog(true);
 

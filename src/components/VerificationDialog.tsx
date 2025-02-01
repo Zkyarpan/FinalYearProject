@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogOverlay,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Loader2 } from 'lucide-react';
@@ -134,17 +135,18 @@ const VerificationDialog = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-[380px] rounded-xl border bg-background p-6 shadow-md z-50">
-          <div className="mb-6 text-center">
-            <DialogTitle className="text-lg font-semibold text-foreground mb-2">
+        <DialogOverlay className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50" />
+        <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-[380px] border bg-background p-6 shadow-md z-[51]">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-lg font-semibold text-foreground text-center">
               Verify your email
             </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
+            <DialogDescription className="text-sm text-muted-foreground text-center">
               A verification code was sent to{' '}
               <span className="font-semibold">{email}</span>. If you don't see
               it, check your spam folder.
             </DialogDescription>
-          </div>
+          </DialogHeader>
 
           <form onSubmit={handleVerification} className="space-y-4">
             <div className="flex flex-col gap-1">
@@ -162,6 +164,7 @@ const VerificationDialog = ({
                 maxLength={6}
                 className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 placeholder="Enter 6-digit code"
+                required
               />
             </div>
 

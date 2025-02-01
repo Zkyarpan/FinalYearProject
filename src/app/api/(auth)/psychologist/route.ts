@@ -8,7 +8,8 @@ import { uploadToCloudinary } from '@/utils/fileUpload';
 import Busboy from 'busboy';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { encrypt } from '@/lib/token';
-import { sendVerificationEmail } from '@/helpers/sendMagicLinkEmail';
+import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
+import TemporaryToken from '@/models/TemporaryToken';
 
 async function parseForm(
   req: NextRequest
@@ -93,97 +94,94 @@ async function parseForm(
 //     const { fields, files } = await parseForm(req);
 //     const { profilePhoto, certificateOrLicense } = files;
 
-//     const requiredFields = [
-//       'username',
-//       'firstName',
-//       'lastName',
-//       'email',
-//       'country',
-//       'streetAddress',
-//       'city',
-//       'stateOrProvince',
-//       'postalCode',
-//       'about',
-//       'password',
-//     ];
-
-//     const {
-//       username,
-//       firstName,
-//       lastName,
-//       email,
-//       country,
-//       streetAddress,
-//       city,
-//       stateOrProvince,
-//       postalCode,
-//       about,
-//       password,
-//     } = fields;
-
-//     const missingFieldError = validateFields(fields, requiredFields);
-//     if (missingFieldError) {
-//       return NextResponse.json(createErrorResponse(400, missingFieldError), {
-//         status: 400,
-//       });
-//     }
-
-//     if (password.length < 8) {
+//     const existingUser = await Psychologist.findOne({ email: fields.email });
+//     if (existingUser) {
 //       return NextResponse.json(
-//         createErrorResponse(400, 'Password must be at least 8 characters long'),
+//         createErrorResponse(400, 'Email already registered.'),
 //         { status: 400 }
 //       );
 //     }
 
-//     const existingPsychologist = await Psychologist.findOne({
-//       $or: [{ email }, { username }],
+//     const tempToken = await TemporaryToken.findOne({
+//       email: fields.email,
+//       verificationCodeExpiry: { $gt: new Date() },
 //     });
 
-//     if (existingPsychologist) {
+//     if (!tempToken) {
+//       const verificationCode = Math.floor(
+//         100000 + Math.random() * 900000
+//       ).toString();
+//       await TemporaryToken.findOneAndUpdate(
+//         { email: fields.email },
+//         {
+//           email: fields.email,
+//           verificationCode: verificationCode,
+//           verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
+//         },
+//         { upsert: true, new: true }
+//       );
+
+//       const emailSent = await sendVerificationEmail(
+//         fields.email,
+//         verificationCode
+//       );
+//       if (!emailSent) {
+//         return NextResponse.json(
+//           createErrorResponse(500, 'Failed to send verification email.'),
+//           { status: 500 }
+//         );
+//       }
 //       return NextResponse.json(
-//         createErrorResponse(400, 'Username or email already exists'),
+//         createErrorResponse(
+//           400,
+//           'Please verify your email to complete registration.'
+//         ),
 //         { status: 400 }
 //       );
 //     }
 
-//     let profilePhotoUrl = '';
-//     let certificateOrLicenseUrl = '';
+//     const hashedPassword = await bcrypt.hash(fields.password, 10);
+//     const profilePhotoUrl = await uploadToCloudinary({
+//       fileBuffer: profilePhoto.buffer,
+//       folder: 'photos/profile-images',
+//       filename: profilePhoto.originalFilename,
+//       mimetype: profilePhoto.mimetype,
+//     });
 
-//     if (profilePhoto) {
-//       profilePhotoUrl = (await uploadToCloudinary({
-//         fileBuffer: profilePhoto.buffer,
-//         folder: 'photos/profile-images',
-//         filename: profilePhoto.originalFilename,
-//         mimetype: profilePhoto.mimetype,
-//       })) as string;
-//     }
-
-//     if (certificateOrLicense) {
-//       certificateOrLicenseUrl = (await uploadToCloudinary({
-//         fileBuffer: certificateOrLicense.buffer,
-//         folder: 'photos/certificates',
-//         filename: certificateOrLicense.originalFilename,
-//         mimetype: certificateOrLicense.mimetype,
-//       })) as string;
-//     }
-
-//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const certificateOrLicenseUrl = await uploadToCloudinary({
+//       fileBuffer: certificateOrLicense.buffer,
+//       folder: 'photos/certificates',
+//       filename: certificateOrLicense.originalFilename,
+//       mimetype: certificateOrLicense.mimetype,
+//     });
 
 //     const psychologist = new Psychologist({
-//       username,
-//       firstName,
-//       lastName,
-//       email,
-//       country,
-//       streetAddress,
-//       city,
-//       stateOrProvince,
-//       postalCode,
-//       about,
+//       firstName: fields.firstName,
+//       lastName: fields.lastName,
+//       email: fields.email.toLowerCase(),
+//       password: hashedPassword,
+//       country: fields.country,
+//       streetAddress: fields.streetAddress,
+//       city: fields.city,
+//       about: fields.about,
 //       profilePhotoUrl,
 //       certificateOrLicenseUrl,
-//       password: hashedPassword,
+//       licenseNumber: fields.licenseNumber,
+//       licenseType: fields.licenseType,
+//       yearsOfExperience: fields.yearsOfExperience,
+//       education: JSON.parse(fields.education),
+//       specializations: JSON.parse(fields.specializations),
+//       languages: JSON.parse(fields.languages),
+//       sessionDuration: parseInt(fields.sessionDuration),
+//       sessionFee: parseFloat(fields.sessionFee),
+//       sessionFormats: JSON.parse(fields.sessionFormats),
+//       acceptsInsurance: Boolean(fields.acceptsInsurance),
+//       insuranceProviders: JSON.parse(fields.insuranceProviders),
+//       availability: JSON.parse(fields.availability),
+//       acceptingNewClients: Boolean(fields.acceptingNewClients),
+//       ageGroups: JSON.parse(fields.ageGroups),
 //       isVerified: true,
+//       role: 'psychologist',
 //     });
 
 //     await psychologist.save();
@@ -197,10 +195,9 @@ async function parseForm(
 
 //     const response = NextResponse.json(
 //       createSuccessResponse(201, {
-//         message: 'Account created successfully',
+//         message: 'Account created successfully. Please log in.',
 //         user_data: {
 //           id: psychologist._id,
-//           username: psychologist.username,
 //           email: psychologist.email,
 //           role: 'psychologist',
 //         },
@@ -232,86 +229,114 @@ export async function POST(req: NextRequest) {
 
     const { fields, files } = await parseForm(req);
     const { profilePhoto, certificateOrLicense } = files;
+    const { email, password } = fields;
 
-    const requiredFields = [
-      'username',
-      'firstName',
-      'lastName',
-      'email',
-      'country',
-      'streetAddress',
-      'city',
-      'stateOrProvince',
-      'postalCode',
-      'about',
-      'password',
-    ];
-
-    const missingFields = requiredFields.filter(field => !fields[field]);
-    if (missingFields.length > 0) {
+    if (!email || !password) {
       return NextResponse.json(
-        createErrorResponse(400, `Missing fields: ${missingFields.join(', ')}`),
+        createErrorResponse(400, 'All fields are required.'),
         { status: 400 }
       );
     }
 
-    if (fields.password.length < 8) {
-      return NextResponse.json(
-        createErrorResponse(400, 'Password must be at least 8 characters long'),
-        { status: 400 }
-      );
-    }
-
-    const existingPsychologist = await Psychologist.findOne({
-      $or: [{ email: fields.email }, { username: fields.username }],
+    const existingUser = await Psychologist.findOne({
+      email: email.toLowerCase(),
     });
-    if (existingPsychologist) {
+    if (existingUser) {
       return NextResponse.json(
-        createErrorResponse(400, 'Username or email already exists'),
+        createErrorResponse(400, 'Email already registered.'),
         { status: 400 }
       );
     }
 
-    let profilePhotoUrl = '',
-      certificateOrLicenseUrl = '';
-    if (profilePhoto) {
-      profilePhotoUrl = await uploadToCloudinary(profilePhoto);
-    }
-    if (certificateOrLicense) {
-      certificateOrLicenseUrl = await uploadToCloudinary(certificateOrLicense);
-    }
+    // Upload files to Cloudinary first
+    const profilePhotoUrl = await uploadToCloudinary({
+      fileBuffer: profilePhoto.buffer,
+      folder: 'photos/profile-images',
+      filename: profilePhoto.originalFilename,
+      mimetype: profilePhoto.mimetype,
+    });
 
-    const hashedPassword = await bcrypt.hash(fields.password, 10);
-    const newPsychologist = new Psychologist({
-      ...fields,
+    const certificateOrLicenseUrl = await uploadToCloudinary({
+      fileBuffer: certificateOrLicense.buffer,
+      folder: 'photos/certificates',
+      filename: certificateOrLicense.originalFilename,
+      mimetype: certificateOrLicense.mimetype,
+    });
+
+    // Generate verification code
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create temporary token with all psychologist data
+    const psychologistData = {
+      firstName: fields.firstName,
+      lastName: fields.lastName,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      country: fields.country,
+      streetAddress: fields.streetAddress,
+      city: fields.city,
+      about: fields.about,
       profilePhotoUrl,
       certificateOrLicenseUrl,
-      password: hashedPassword,
+      licenseNumber: fields.licenseNumber,
+      licenseType: fields.licenseType,
+      yearsOfExperience: fields.yearsOfExperience,
+      education: JSON.parse(fields.education),
+      specializations: JSON.parse(fields.specializations),
+      languages: JSON.parse(fields.languages),
+      sessionDuration: parseInt(fields.sessionDuration),
+      sessionFee: parseFloat(fields.sessionFee),
+      sessionFormats: JSON.parse(fields.sessionFormats),
+      acceptsInsurance: Boolean(fields.acceptsInsurance),
+      insuranceProviders: JSON.parse(fields.insuranceProviders),
+      availability: JSON.parse(fields.availability),
+      acceptingNewClients: Boolean(fields.acceptingNewClients),
+      ageGroups: JSON.parse(fields.ageGroups),
       isVerified: false,
-    });
+      role: 'psychologist',
+    };
 
-    await newPsychologist.save();
+    const token = await encrypt({ ...psychologistData });
 
-    const magicLinkToken = await encrypt({
-      id: newPsychologist._id,
-      email: newPsychologist.email,
-    });
-    const magicLink = `http://localhost:3000/verify?token=${magicLinkToken}`;
-    await sendVerificationEmail(newPsychologist.email, magicLink);
+    // Save verification data
+    await TemporaryToken.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      {
+        email: email.toLowerCase(),
+        token,
+        verificationCode,
+        verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      { upsert: true, new: true }
+    );
+
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, verificationCode);
+    if (!emailResult.success) {
+      return NextResponse.json(
+        createErrorResponse(500, 'Failed to send verification email.'),
+        { status: 500 }
+      );
+    }
 
     const response = NextResponse.json(
-      createSuccessResponse(201, {
-        message:
-          'Account registered successfully. Please check your email to activate your account.',
-        user_data: {
-          id: newPsychologist._id,
-          username: newPsychologist.username,
-          email: newPsychologist.email,
-          role: 'psychologist',
-        },
+      createSuccessResponse(200, {
+        message: 'Please verify your email to complete registration.',
+        token: token,
       }),
-      { status: 201 }
+      { status: 200 }
     );
+
+    response.cookies.set('tempToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(Date.now() + 15 * 60 * 1000),
+    });
 
     return response;
   } catch (error) {

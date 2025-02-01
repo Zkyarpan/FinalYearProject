@@ -1,15 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, ChevronDown } from 'lucide-react';
 
-import ServicesIcon from '@/icons/ServicesIcon';
-import PsychologistIcon from '@/icons/Psychologist';
-import ArticlesIcon from '@/icons/Atricles';
-import ResourcesIcon from '@/icons/ResourceIcon';
-import BlogIcon from '@/icons/BlogIcon';
-import StoriesIcon from '@/icons/Stories';
-import Account from '@/icons/Account';
 import BlogRightSection from '@/components/BlogRightSection';
 import PsychologistSection from '@/components/PsychologistSection';
 import StoriesSection from '@/components/StoriesSection';
@@ -33,35 +26,8 @@ import UserActions from '@/components/UserActions';
 import Image from 'next/image';
 import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
-
-const NAV_ITEMS = [
-  {
-    icon: <StoriesIcon />,
-    text: 'Stories',
-    href: '/stories',
-  },
-  {
-    icon: <ServicesIcon />,
-    text: 'Services',
-    href: '/services',
-  },
-  {
-    icon: <PsychologistIcon />,
-    text: 'Psychologist',
-    href: '/psychologists',
-  },
-  {
-    icon: <ArticlesIcon />,
-    text: 'Articles',
-    href: '/articles',
-  },
-  {
-    icon: <ResourcesIcon />,
-    text: 'Resources',
-    href: '/resources',
-  },
-  { icon: <BlogIcon />, text: 'Blogs', href: '/blogs' },
-];
+import Account from '@/icons/Account';
+import NAV_ITEMS from '@/components/Icons';
 
 const routeTitles = {
   '/stories': 'Our Stories',

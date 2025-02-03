@@ -1,30 +1,64 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface Education {
+  degree: string;
+  university: string;
+  graduationYear: number;
+}
+
+interface Availability {
+  [key: string]: {
+    available: boolean;
+    startTime?: string;
+    endTime?: string;
+  };
+}
+
 interface UserProfile {
   firstName: string | null;
   lastName: string | null;
+  email: string | null;
   profileImage: string | null;
+  country?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  about?: string | null;
+  certificateOrLicense?: string | null;
+  licenseNumber?: string | null;
+  licenseType?:
+    | 'clinical_psychologist'
+    | 'counseling_psychologist'
+    | 'psychiatrist'
+    | 'mental_health_counselor'
+    | null;
+  education?: Education[];
+  specializations?: string[];
+  yearsOfExperience?: number | null;
+  languages?: string[];
+  sessionDuration?: 30 | 50 | 80 | null;
+  sessionFee?: number | null;
+  sessionFormats?: ('in-person' | 'video' | 'phone')[];
+  acceptsInsurance?: boolean;
+  insuranceProviders?: string[];
+  availability?: Availability;
+  acceptingNewClients?: boolean;
+  ageGroups?: ('children' | 'teenagers' | 'adults' | 'seniors')[];
 }
 
 interface User extends UserProfile {
   _id: string | null;
-  email: string | null;
   role: string | null;
   isAuthenticated: boolean;
   isVerified: boolean;
   profileComplete: boolean;
 }
 
-interface SetUser {
+interface SetUser extends UserProfile {
   _id: string;
-  email: string;
   role: string;
   isVerified: boolean;
   profileComplete: boolean;
-  firstName: string | null;
-  lastName: string | null;
-  profileImage: string | null;
   isAuthenticated?: boolean;
 }
 
@@ -48,6 +82,25 @@ export const useUserStore = create(
       firstName: null,
       lastName: null,
       profileImage: null,
+      country: null,
+      streetAddress: null,
+      city: null,
+      about: null,
+      certificateOrLicense: null,
+      licenseNumber: null,
+      licenseType: null,
+      education: [],
+      specializations: [],
+      yearsOfExperience: null,
+      languages: [],
+      sessionDuration: null,
+      sessionFee: null,
+      sessionFormats: [],
+      acceptsInsurance: false,
+      insuranceProviders: [],
+      availability: {},
+      acceptingNewClients: false,
+      ageGroups: [],
       user: null,
 
       setUser: user =>
@@ -60,18 +113,27 @@ export const useUserStore = create(
           profileComplete: user.profileComplete,
           firstName: user.firstName,
           lastName: user.lastName,
-          profileImage: user.profileImage || null,
-          user: {
-            _id: user._id,
-            email: user.email,
-            role: user.role,
-            isAuthenticated: user.isAuthenticated ?? true,
-            isVerified: user.isVerified,
-            profileComplete: user.profileComplete,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            profileImage: user.profileImage || null,
-          },
+          profileImage: user.profileImage,
+          country: user.country,
+          streetAddress: user.streetAddress,
+          city: user.city,
+          about: user.about,
+          certificateOrLicense: user.certificateOrLicense,
+          licenseNumber: user.licenseNumber,
+          licenseType: user.licenseType,
+          education: user.education || [],
+          specializations: user.specializations || [],
+          yearsOfExperience: user.yearsOfExperience,
+          languages: user.languages || [],
+          sessionDuration: user.sessionDuration,
+          sessionFee: user.sessionFee,
+          sessionFormats: user.sessionFormats || [],
+          acceptsInsurance: user.acceptsInsurance || false,
+          insuranceProviders: user.insuranceProviders || [],
+          availability: user.availability || {},
+          acceptingNewClients: user.acceptingNewClients || false,
+          ageGroups: user.ageGroups || [],
+          user: { ...user, isAuthenticated: user.isAuthenticated ?? true },
         }),
 
       setProfileComplete: complete =>
@@ -86,9 +148,6 @@ export const useUserStore = create(
           ...profile,
           profileComplete: true,
           isAuthenticated: true,
-          firstName: profile.firstName ?? state.firstName,
-          lastName: profile.lastName ?? state.lastName,
-          profileImage: profile.profileImage ?? state.profileImage,
         })),
 
       logout: async () => {
@@ -102,6 +161,26 @@ export const useUserStore = create(
           firstName: null,
           lastName: null,
           profileImage: null,
+          country: null,
+          streetAddress: null,
+          city: null,
+          about: null,
+          certificateOrLicense: null,
+          licenseNumber: null,
+          licenseType: null,
+          education: [],
+          specializations: [],
+          yearsOfExperience: null,
+          languages: [],
+          sessionDuration: null,
+          sessionFee: null,
+          sessionFormats: [],
+          acceptsInsurance: false,
+          insuranceProviders: [],
+          availability: {},
+          acceptingNewClients: false,
+          ageGroups: [],
+          user: null,
         });
       },
     }),

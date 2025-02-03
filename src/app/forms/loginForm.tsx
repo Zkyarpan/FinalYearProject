@@ -77,10 +77,10 @@ const LoginForm = () => {
         setTimeout(() => {
           switch (userData.role) {
             case 'admin':
-              router.push('/admin/dashboard');
+              router.push('/dashboard/admin');
               break;
             case 'psychologist':
-              router.push('/psychologist/dashboard');
+              router.push('/dashboard/psychologist');
               break;
             default:
               router.push('/dashboard');

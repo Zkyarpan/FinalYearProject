@@ -19,7 +19,7 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
     <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
       <div className="h-full flex flex-col max-w-sm mx-auto space-y-6">
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-center text-foreground ">
+          <h2 className="text-2xl font-normal italic text-center text-foreground font-instrument">
             Hey, do you write?
           </h2>
           <div className="space-y-2">

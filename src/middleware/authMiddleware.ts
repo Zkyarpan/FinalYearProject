@@ -1,5 +1,3 @@
-'use server';
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
@@ -20,7 +18,7 @@ export const getTokenFromRequest = (req: NextRequest) => {
 export async function withAuth(
   handler: Function,
   req: NextRequest,
-  allowedRoles?: string[]
+  allowedRoles: string[] = ['user', 'psychologist', 'admin']
 ) {
   try {
     const token = getTokenFromRequest(req);
@@ -32,19 +30,25 @@ export async function withAuth(
       );
     }
 
-    // Check role if specified
-    if (
-      allowedRoles &&
-      typeof token !== 'string' &&
-      !allowedRoles.includes((token as jwt.JwtPayload).role)
-    ) {
+    const tokenPayload = token as jwt.JwtPayload;
+    const userRole = tokenPayload.role;
+
+    if (!allowedRoles.includes(userRole)) {
+      const roleMessages = {
+        user: 'This area is restricted to psychologists only',
+        psychologist: 'This area is restricted to users only',
+        admin: 'This area is restricted to administrators only',
+      };
+
       return NextResponse.json(
-        createErrorResponse(403, 'Not authorized for this operation'),
+        createErrorResponse(
+          403,
+          roleMessages[userRole as keyof typeof roleMessages] || 'Access denied'
+        ),
         { status: 403 }
       );
     }
 
-    // Add user to request for use in handler
     return handler(req, token);
   } catch (error) {
     return NextResponse.json(

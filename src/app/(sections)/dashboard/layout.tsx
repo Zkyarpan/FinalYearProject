@@ -10,17 +10,16 @@ const ProfileCompletion = dynamic(
 );
 
 export default function DashboardLayout({ children }) {
-  const { isAuthenticated, profileComplete } = useUserStore();
-
+  const { isAuthenticated, profileComplete, role } = useUserStore();
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && !profileComplete) {
+    if (isAuthenticated && !profileComplete && role === 'user') {
       setShowProfileCompletion(true);
     } else {
       setShowProfileCompletion(false);
     }
-  }, [isAuthenticated, profileComplete]);
+  }, [isAuthenticated, profileComplete, role]);
 
   return (
     <div className="relative min-h-screen">

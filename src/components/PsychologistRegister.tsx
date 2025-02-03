@@ -89,25 +89,21 @@ const PsychologistRegister = () => {
   }
 
   const [formData, setFormData] = useState<FormData>({
-    // Basic Information
     firstName: '',
     lastName: '',
     email: '',
     password: '',
 
-    // Location Details
     country: '',
     streetAddress: '',
     city: '',
 
-    // Profile & Documentation
     about: '',
     profilePhoto: null,
     certificateOrLicense: null,
     profilePhotoPreview: '',
     certificateOrLicensePreview: '',
 
-    // Professional Qualifications
     licenseType: '',
     licenseNumber: '',
     yearsOfExperience: '',
@@ -121,20 +117,16 @@ const PsychologistRegister = () => {
     languages: [],
     specializations: [],
 
-    // Session Details
-    sessionDuration: '50', // default to standard therapy hour
+    sessionDuration: '50',
     sessionFee: '',
-    sessionFormats: [] as string[], // ['in-person', 'video', 'phone']
+    sessionFormats: [] as string[],
 
-    // Insurance
     acceptsInsurance: false,
     insuranceProviders: [],
 
-    // Practice Details
     acceptingNewClients: true,
-    ageGroups: [] as string[], // ['children', 'teenagers', 'adults', 'seniors']
+    ageGroups: [] as string[],
 
-    // Availability
     availability: {
       monday: { available: false, startTime: '', endTime: '' },
       tuesday: { available: false, startTime: '', endTime: '' },

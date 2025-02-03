@@ -51,7 +51,7 @@ const BlogActions = ({
   if (!isAuthenticated || !isOwner) return null;
 
   const handleDelete = async () => {
-    setIsDeleting(true); // Start deleting
+    setIsDeleting(true);
     try {
       const response = await fetch(`/api/blogs/delete/${slug}`, {
         method: 'DELETE',
@@ -67,16 +67,15 @@ const BlogActions = ({
       }
 
       toast.success('Blog deleted successfully');
-      setShowDeleteDialog(false); // Close modal only after successful deletion
+      setShowDeleteDialog(false);
       router.push('/blogs');
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(
         error instanceof Error ? error.message : 'Failed to delete blog'
       );
-      // Keep the dialog open if there was an error
     } finally {
-      setIsDeleting(false); // Stop deleting regardless of the outcome
+      setIsDeleting(false);
     }
   };
 

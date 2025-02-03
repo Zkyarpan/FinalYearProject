@@ -44,7 +44,8 @@ const RootLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const { isAuthenticated, profileImage } = useUserStore();
+  const { isAuthenticated, profileImage, role, firstName, lastName, logout } =
+    useUserStore();
   const currentYear = new Date().getFullYear();
   const pathname = usePathname();
   const router = useRouter();
@@ -188,11 +189,15 @@ const RootLayout = ({ children }) => {
                   <span className="ml-2 text-xl logo-font">Mentality</span>
                 </Link>
               </div>
+
               <UserActions
                 isAuthenticated={isAuthenticated}
                 profileImage={profileImage}
+                role={role}
+                firstName={firstName}
+                lastName={lastName}
                 router={router}
-                onLoginClick={() => setShowLoginModal(true)}
+                logout={logout}
               />
             </div>
           </div>
@@ -280,8 +285,12 @@ const RootLayout = ({ children }) => {
                 <UserActions
                   isAuthenticated={isAuthenticated}
                   profileImage={profileImage}
+                  role={role}
+                  firstName={firstName}
+                  lastName={lastName}
                   router={router}
                   onLoginClick={() => setShowLoginModal(true)}
+                  logout={logout}
                 />
               )}
             </div>
@@ -300,8 +309,12 @@ const RootLayout = ({ children }) => {
               <UserActions
                 isAuthenticated={isAuthenticated}
                 profileImage={profileImage}
+                role={role}
+                firstName={firstName}
+                lastName={lastName}
                 router={router}
                 onLoginClick={() => setShowLoginModal(true)}
+                logout={logout}
               />
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">

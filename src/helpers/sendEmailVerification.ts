@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import EmailVerfication from '@/emails/EmailVerfication';
+import EmailVerfication from '@/emails/emailVerfication';
 import { render } from '@react-email/render';
 
 export async function sendVerificationEmail(

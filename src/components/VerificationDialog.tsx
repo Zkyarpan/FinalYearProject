@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Loader from '@/components/common/Loader';
+import SpinnerLoader from '@/components/SpinnerLoader';
 import { useUserStore } from '@/store/userStore';
 import { useRouter } from 'next/navigation';
 
@@ -84,10 +85,11 @@ const VerificationDialog = ({
       localStorage.removeItem('email');
       setIsRedirecting(true);
 
+      // Add a delay before redirecting to show the loading state
       setTimeout(() => {
         onVerificationComplete();
-        router.push('/pscyhologist/dashboard');
-      }, 500);
+        router.push('/psychologist/dashboard');
+      }, 1500); // Increased delay to ensure loading state is visible
     } catch (error) {
       toast.error(
         error.message || 'Invalid verification code. Please try again.'
@@ -132,6 +134,16 @@ const VerificationDialog = ({
     }
   };
 
+  if (isRedirecting) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50">
+        <div className="text-center">
+          <SpinnerLoader isLoading={isRedirecting} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -162,7 +174,7 @@ const VerificationDialog = ({
                 value={verificationCode}
                 onChange={e => setVerificationCode(e.target.value)}
                 maxLength={6}
-                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 placeholder="Enter 6-digit code"
                 required
               />

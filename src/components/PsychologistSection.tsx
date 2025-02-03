@@ -49,7 +49,6 @@ const PsychologistSection = ({
           </div>
         </div>
 
-        {/* Stats */}
         <div className="flex justify-center items-center gap-6 text-xs">
           <span className="flex items-center gap-2">
             <Certified /> 500+ Therapists

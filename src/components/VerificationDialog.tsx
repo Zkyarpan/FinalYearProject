@@ -86,7 +86,7 @@ const VerificationDialog = ({
 
       setTimeout(() => {
         onVerificationComplete();
-        router.push('/dashboard');
+        router.push('/pscyhologist/dashboard');
       }, 500);
     } catch (error) {
       toast.error(

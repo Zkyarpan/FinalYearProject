@@ -792,10 +792,14 @@ const PsychologistRegister = () => {
                       handleChange({ target: { name: 'licenseType', value } })
                     }
                   >
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger
+                      className="mt-3 w-full h-9 dark:bg-input border rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                    >
                       <SelectValue placeholder="Select license type" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-input">
                       <SelectItem value="clinical_psychologist">
                         Clinical Psychologist
                       </SelectItem>
@@ -818,10 +822,14 @@ const PsychologistRegister = () => {
                   <Select
                     onValueChange={value => handleSpecializationSelect(value)}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      className="w-full h-9 dark:bg-input border rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                    >
                       <SelectValue placeholder="Select your specialization" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-input">
                       {specializations.map(spec => (
                         <SelectItem key={spec.value} value={spec.value}>
                           {spec.label}
@@ -839,12 +847,12 @@ const PsychologistRegister = () => {
                     License Number
                   </label>
                   <div className="mt-2">
-                    <Input
+                    <input
                       id="licenseNumber"
                       name="licenseNumber"
                       value={formData.licenseNumber}
                       onChange={handleChange}
-                      className="block w-full"
+                      className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                     />
                   </div>
                 </div>
@@ -857,14 +865,14 @@ const PsychologistRegister = () => {
                     Years of Experience
                   </label>
                   <div className="mt-2">
-                    <Input
+                    <input
                       id="yearsOfExperience"
                       name="yearsOfExperience"
                       type="number"
                       min="0"
                       value={formData.yearsOfExperience}
                       onChange={handleChange}
-                      className="block w-full"
+                      className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                     />
                   </div>
                 </div>
@@ -877,13 +885,13 @@ const PsychologistRegister = () => {
                     Languages Spoken
                   </label>
                   <div className="mt-2">
-                    <Input
+                    <input
                       id="languages"
                       name="languages"
                       value={formData.languages.join(', ')}
                       onChange={e => handleArrayInput(e, 'languages')}
                       placeholder="Enter languages (comma-separated)"
-                      className="block w-full"
+                      className="block w-full h-9 rounded-md dark:bg-input px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                     />
                   </div>
                 </div>
@@ -919,10 +927,14 @@ const PsychologistRegister = () => {
                       })
                     }
                   >
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger
+                      className="mt-2 w-full h-9 dark:bg-input border rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                    >
                       <SelectValue placeholder="Select duration" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-input">
                       <SelectItem value="30">30 minutes</SelectItem>
                       <SelectItem value="50">50 minutes</SelectItem>
                       <SelectItem value="80">80 minutes</SelectItem>
@@ -938,14 +950,14 @@ const PsychologistRegister = () => {
                     Session Fee (USD)
                   </label>
                   <div className="mt-2">
-                    <Input
+                    <input
                       id="sessionFee"
                       name="sessionFee"
                       type="number"
                       min="0"
                       value={formData.sessionFee}
                       onChange={handleChange}
-                      className="block w-full"
+                      className="block w-full rounded-md dark:bg-input px-3 py-1.5 text-base h-9 text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm"
                     />
                   </div>
                 </div>
@@ -1086,12 +1098,12 @@ const PsychologistRegister = () => {
                   <Label htmlFor="insuranceProviders">
                     Insurance Providers
                   </Label>
-                  <Textarea
+                  <textarea
                     id="insuranceProviders"
                     placeholder="Enter insurance providers (comma-separated)"
                     value={formData.insuranceProviders.join(', ')}
                     onChange={e => handleArrayInput(e, 'insuranceProviders')}
-                    className="min-h-[100px]"
+                    className="min-h-[100px] block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                   />
                 </div>
               )}
@@ -1128,10 +1140,14 @@ const PsychologistRegister = () => {
                               handleTimeChange(day, 'startTime', value)
                             }
                           >
-                            <SelectTrigger className="w-32">
+                            <SelectTrigger
+                              className="h-10 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30 w-32"
+                            >
                               <SelectValue placeholder="Start time" />
                             </SelectTrigger>
-                            <SelectContent className="h-48">
+                            <SelectContent className="h-48 dark:bg-input">
                               {timeSlots.map(time => (
                                 <SelectItem key={`start-${time}`} value={time}>
                                   {time}
@@ -1140,7 +1156,7 @@ const PsychologistRegister = () => {
                             </SelectContent>
                           </Select>
 
-                          <span className="text-sm text-gray-500">to</span>
+                          <span className="text-sm">to</span>
 
                           <Select
                             value={endTime}
@@ -1148,10 +1164,14 @@ const PsychologistRegister = () => {
                               handleTimeChange(day, 'endTime', value)
                             }
                           >
-                            <SelectTrigger className="w-32">
+                            <SelectTrigger
+                              className="w-32 h-10 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                            >
                               <SelectValue placeholder="End time" />
                             </SelectTrigger>
-                            <SelectContent className="h-48">
+                            <SelectContent className="h-48 dark:bg-input">
                               {timeSlots.map(time => (
                                 <SelectItem key={`end-${time}`} value={time}>
                                   {time}

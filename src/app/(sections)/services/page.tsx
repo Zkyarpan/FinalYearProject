@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+
 import {
   Brain,
   Users,
@@ -33,7 +33,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ServicesPage = () => {
   const services = [
@@ -150,7 +149,6 @@ const ServicesPage = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl">
         <div className="max-w-6xl mx-auto px-4 py-16">
           <div className="text-center">

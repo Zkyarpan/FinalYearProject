@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Skeleton from '@/components/common/Skeleton';
 import generateSlug from '@/helpers/generateSlug';
-import BlogActions from '@/components/BlogActions';
 import { useUserStore } from '@/store/userStore';
 
 interface Author {

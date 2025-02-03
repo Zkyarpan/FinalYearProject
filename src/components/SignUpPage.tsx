@@ -2,7 +2,7 @@
 
 import SignupForm from '@/app/forms/signupForm';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
+import { CardContent } from '@/components/ui/card';
 import {
   BookOpen,
   Calendar,

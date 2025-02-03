@@ -16,12 +16,10 @@ import {
   SelectValue,
   SelectItem,
 } from './ui/select';
-import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Switch } from './ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
 import Clock from '@/icons/Clock';
 import VerificationDialog from './VerificationDialog';
 

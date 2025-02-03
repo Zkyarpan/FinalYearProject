@@ -44,7 +44,7 @@ function UserSidebar() {
         toast.success('Logged out successfully!');
         setTimeout(() => {
           router.push('/login');
-        }, 500); // Delay for better user experience
+        }, 500);
       } else {
         const data = await response.json();
         throw new Error(data.message || 'Failed to log out');

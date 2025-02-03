@@ -1,4 +1,5 @@
-// app/(sections)/blogs/edit/[slug]/page.tsx
+'use client';
+
 import { Suspense } from 'react';
 import BlogEditPage from '@/components/BlogEditPage';
 import { Loader2 } from 'lucide-react';
@@ -10,7 +11,6 @@ interface PageProps {
 }
 
 export default async function Page({ params }: PageProps) {
-  // Use the resolved params
   const slug = params.slug;
   console.log('Blog edit page slug:', slug);
 

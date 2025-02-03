@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import ReactSelect from 'react-select';
 import type { StylesConfig } from 'react-select';

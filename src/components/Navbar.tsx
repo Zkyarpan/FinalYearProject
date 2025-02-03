@@ -4,7 +4,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Button } from './ui/button';
-// import ThemeSwitch from './ThemeSwitch';
 
 import dynamic from 'next/dynamic';
 const ThemeSwitch = dynamic(() => import('./ThemeSwitch'));

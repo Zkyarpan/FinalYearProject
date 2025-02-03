@@ -40,7 +40,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         const currentPath = window.location.pathname;
         const token = Cookies.get('accessToken');
 
-        // Check if the current path is valid
         const isValidPath = validRoutes.some(
           route =>
             currentPath === route ||
@@ -52,13 +51,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Allow access to public routes regardless of authentication
         if (publicRoutes.includes(currentPath) || currentPath === '/') {
           setIsChecking(false);
           return;
         }
 
-        // For auth pages, redirect if logged in
         if (
           token &&
           (currentPath === '/login' ||
@@ -92,13 +89,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // For protected routes, check authentication
         if (!token) {
           router.push('/login');
           return;
         }
 
-        // Validate token with backend
         const response = await fetch('/api/auth/validate', {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -124,13 +119,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           isAuthenticated: true,
         });
 
-        // Handle routing based on verification status
         if (!userData.isVerified && currentPath !== '/verify') {
           router.push('/verify');
           return;
         }
 
-        // Handle routing for authenticated users
         if (userData.isVerified && userData.profileComplete) {
           if (currentPath === '/login' || currentPath === '/signup') {
             router.push('/dashboard');
@@ -148,7 +141,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [router, setUser]);
 
-  // Show nothing while checking authentication
   if (isChecking) {
     return null;
   }

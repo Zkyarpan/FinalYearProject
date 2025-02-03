@@ -1,3 +1,5 @@
+'use server';
+
 import nodemailer from 'nodemailer';
 import ResetPasswordEmail from '@/emails/ResetPasswordEmail';
 import { render } from '@react-email/render';

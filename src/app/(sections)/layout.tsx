@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Menu, ChevronDown } from 'lucide-react';
 
 import BlogRightSection from '@/components/BlogRightSection';
@@ -113,7 +113,7 @@ const RootLayout = ({ children }) => {
   return (
     <>
       <div className="flex min-h-screen bg-background text-foreground">
-        {/* Mobile Header - Fixed position with proper z-index */}
+        {/* Mobile Header  */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
@@ -251,13 +251,11 @@ const RootLayout = ({ children }) => {
           </div>
         </div>
 
-        {/* Main Content Area - Responsive margins and padding */}
         <div
           className={`flex-1 ${
             showRightSidebar ? 'lg:mr-[420px]' : ''
           } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
         >
-          {/* Top Header Bar - Fixed position with proper border alignment */}
           <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-30">
             <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between">
               <div className="flex items-center gap-x-3">
@@ -289,7 +287,6 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          {/* Main Content - Scrollable area with max-width constraint */}
           <div className="flex-1 overflow-auto hide-scrollbar">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
@@ -297,10 +294,8 @@ const RootLayout = ({ children }) => {
           </div>
         </div>
 
-        {/* Right Sidebar - Fixed position with proper border and alignment */}
         {showRightSidebar && (
           <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-40">
-            {/* Right Sidebar Header */}
             <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <UserActions
                 isAuthenticated={isAuthenticated}
@@ -309,7 +304,6 @@ const RootLayout = ({ children }) => {
                 onLoginClick={() => setShowLoginModal(true)}
               />
             </div>
-            {/* Right Sidebar Content */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
               <div className="p-8">{renderSidebarContent()}</div>
             </div>

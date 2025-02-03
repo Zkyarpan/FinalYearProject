@@ -18,9 +18,7 @@ const NavbarWrapper = () => {
     '/articles',
     '/account',
     '/notifications',
-    '/settings'
-
-
+    '/settings',
   ];
 
   const shouldHideNavbar = pathname => {

@@ -1,3 +1,5 @@
+'use server';
+
 const generateSlug = (title: string) => {
   return title
     .toLowerCase()

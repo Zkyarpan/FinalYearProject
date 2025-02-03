@@ -1,3 +1,5 @@
+'use client';
+
 const SpinnerLoader = ({ isLoading }) => {
   if (!isLoading) return null;
 

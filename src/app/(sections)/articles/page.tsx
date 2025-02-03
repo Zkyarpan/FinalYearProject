@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import {
   Search,
@@ -7,9 +9,6 @@ import {
   ArrowRight,
   Tag,
   TrendingUp,
-  Heart,
-  Share2,
-  Bookmark,
   Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -1,3 +1,5 @@
+'use server';
+
 import nodemailer from 'nodemailer';
 import EmailVerfication from '@/emails/emailVerfication';
 import { render } from '@react-email/render';

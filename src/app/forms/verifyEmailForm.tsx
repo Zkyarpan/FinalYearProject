@@ -10,7 +10,7 @@ import SpinnerLoader from '@/components/SpinnerLoader';
 import { useUserStore } from '@/store/userStore';
 
 const VerifyEmail = () => {
-  const { setUser, isAuthenticated } = useUserStore();
+  const { setUser } = useUserStore();
   const router = useRouter();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);

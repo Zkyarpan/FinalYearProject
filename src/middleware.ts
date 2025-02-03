@@ -1,3 +1,5 @@
+'use server';
+
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { decrypt } from './lib/token';
@@ -24,17 +26,14 @@ const authFlowRoutes = {
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Authentication token handling
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('accessToken')?.value;
   const resetToken = cookieStore.get('resetToken')?.value;
   const tempToken = cookieStore.get('tempToken')?.value;
 
-  // Session management
   const session = sessionCookie ? await decrypt(sessionCookie) : null;
   const resetSession = resetToken ? await decrypt(resetToken) : null;
 
-  // Handle authentication flow routes
   if (path === authFlowRoutes.passwordConfirmation && !resetSession) {
     return NextResponse.redirect(
       new URL(authFlowRoutes.forgotPassword, req.nextUrl)
@@ -50,14 +49,12 @@ export default async function middleware(req: NextRequest) {
   }
 
   if (session?.id) {
-    // Redirect from landing page and auth pages when logged in
     if (
       path === '/' ||
       path === '/login' ||
       path === '/signup' ||
       path === '/forgot-password'
     ) {
-      // Check if user is verified and profile is complete
       if (session.isVerified && session.profileComplete) {
         return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
       } else if (!session.isVerified) {
@@ -65,7 +62,6 @@ export default async function middleware(req: NextRequest) {
       }
     }
 
-    // Allow access to other public routes
     if (publicRoutes.some(route => path.startsWith(route))) {
       return NextResponse.next();
     }
@@ -73,7 +69,6 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check if attempting to access protected route
   if (isProtectedRoute(path)) {
     const searchParams = new URLSearchParams();
     searchParams.set('from', path);

@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Add cache control headers to prevent caching
     const headers = new Headers();
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     headers.set('Pragma', 'no-cache');

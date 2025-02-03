@@ -14,7 +14,6 @@ export async function DELETE(
   try {
     await connectDB();
 
-    // Validate the blog ID format
     if (!Types.ObjectId.isValid(params.id)) {
       return NextResponse.json(
         createErrorResponse(400, 'Invalid blog ID format'),
@@ -22,7 +21,6 @@ export async function DELETE(
       );
     }
 
-    // Get the authorization header
     const authHeader = req.headers.get('authorization');
     const userId = authHeader ? authHeader.split(' ')[1] : null;
 
@@ -33,7 +31,6 @@ export async function DELETE(
       );
     }
 
-    // Find the blog and verify ownership
     const blog = await Blog.findById(params.id).select('blogImage author');
 
     if (!blog) {
@@ -42,7 +39,6 @@ export async function DELETE(
       });
     }
 
-    // Verify blog ownership
     if (blog.author.toString() !== userId) {
       return NextResponse.json(
         createErrorResponse(403, 'Not authorized to delete this blog'),
@@ -50,7 +46,6 @@ export async function DELETE(
       );
     }
 
-    // Handle image deletion if exists
     if (blog.blogImage) {
       const publicIdMatch = blog.blogImage.match(
         /photos\/blog-images\/([^.]+)/
@@ -61,12 +56,10 @@ export async function DELETE(
           console.log('Blog image deleted from Cloudinary');
         } catch (error) {
           console.error('Failed to delete image from Cloudinary:', error);
-          // Continue with blog deletion even if image deletion fails
         }
       }
     }
 
-    // Delete the blog
     await Blog.findByIdAndDelete(params.id);
 
     return NextResponse.json(

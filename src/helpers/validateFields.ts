@@ -7,5 +7,4 @@ function validateFields(fields: any, requiredFields: any) {
   return null;
 }
 
-
 export default validateFields;

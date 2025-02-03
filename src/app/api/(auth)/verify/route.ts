@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Decrypt and verify token data
     const payload = await decrypt(record.token);
     if (!payload || !payload.email) {
       await TemporaryToken.deleteOne({ _id: record._id });
@@ -60,10 +59,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if this is a psychologist registration
     const isPsychologist = payload.role === 'psychologist';
 
-    // Check for existing accounts
     const existingAccount = isPsychologist
       ? await Psychologist.findOne({
           email: { $regex: new RegExp(`^${payload.email}$`, 'i') },
@@ -82,7 +79,6 @@ export async function POST(req: NextRequest) {
 
     let newAccount;
     if (isPsychologist) {
-      // Create new psychologist account with all the fields
       newAccount = new Psychologist({
         ...payload,
         email: payload.email.toLowerCase(),
@@ -90,7 +86,6 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(),
       });
     } else {
-      // Create new regular user account
       newAccount = new Account({
         email: payload.email.toLowerCase(),
         password: payload.hashedPassword,

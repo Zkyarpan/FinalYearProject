@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+
 import {
   Moon,
   Brain,
@@ -8,7 +8,6 @@ import {
   BookOpen,
   Sparkles,
   Search,
-  Filter,
   BookMarked,
   Clock,
   TrendingUp,
@@ -143,7 +142,6 @@ const ResourcesPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="text-center">
@@ -181,7 +179,6 @@ const ResourcesPage = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Tabs defaultValue="featured" className="mb-16">
           <TabsList className="mb-8">
@@ -246,7 +243,6 @@ const ResourcesPage = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Resource Categories */}
         <section className="mb-16">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-foreground">
@@ -291,7 +287,6 @@ const ResourcesPage = () => {
           </div>
         </section>
 
-        {/* Additional Categories */}
         <section>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0">

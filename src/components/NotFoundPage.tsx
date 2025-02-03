@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import React from 'react';
 import Image from 'next/image';
@@ -7,7 +7,7 @@ import Link from 'next/link';
 const NotFoundPage = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-white text-black dark:bg-[hsl(210,10%,10%)] dark:text-white">
-          <Image
+      <Image
         src="https://dqy38fnwh4fqs.cloudfront.net/website/404-doodle.webp"
         alt="404 not found"
         width={200}

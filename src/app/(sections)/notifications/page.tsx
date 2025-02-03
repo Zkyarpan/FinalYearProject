@@ -1,12 +1,9 @@
-import React from 'react';
+'use client';
 
 const NotificationsPage = () => {
   return (
-    // Main container with full height and centering
     <div className="flex items-center justify-center w-full h-[calc(100vh-4rem)]">
-      {/* Content container with max width */}
       <div className="w-full max-w-md flex items-center justify-center">
-        {/* Notification component */}
         <div className="flex flex-col items-center text-center">
           <div className="rounded-full bg-gray-100 dark:bg-gray-800 p-4 mb-4">
             <svg

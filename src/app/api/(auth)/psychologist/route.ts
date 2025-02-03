@@ -87,142 +87,6 @@ async function parseForm(
   });
 }
 
-// export async function POST(req: NextRequest) {
-//   try {
-//     await connectDB();
-
-//     const { fields, files } = await parseForm(req);
-//     const { profilePhoto, certificateOrLicense } = files;
-
-//     const existingUser = await Psychologist.findOne({ email: fields.email });
-//     if (existingUser) {
-//       return NextResponse.json(
-//         createErrorResponse(400, 'Email already registered.'),
-//         { status: 400 }
-//       );
-//     }
-
-//     const tempToken = await TemporaryToken.findOne({
-//       email: fields.email,
-//       verificationCodeExpiry: { $gt: new Date() },
-//     });
-
-//     if (!tempToken) {
-//       const verificationCode = Math.floor(
-//         100000 + Math.random() * 900000
-//       ).toString();
-//       await TemporaryToken.findOneAndUpdate(
-//         { email: fields.email },
-//         {
-//           email: fields.email,
-//           verificationCode: verificationCode,
-//           verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
-//         },
-//         { upsert: true, new: true }
-//       );
-
-//       const emailSent = await sendVerificationEmail(
-//         fields.email,
-//         verificationCode
-//       );
-//       if (!emailSent) {
-//         return NextResponse.json(
-//           createErrorResponse(500, 'Failed to send verification email.'),
-//           { status: 500 }
-//         );
-//       }
-//       return NextResponse.json(
-//         createErrorResponse(
-//           400,
-//           'Please verify your email to complete registration.'
-//         ),
-//         { status: 400 }
-//       );
-//     }
-
-//     const hashedPassword = await bcrypt.hash(fields.password, 10);
-//     const profilePhotoUrl = await uploadToCloudinary({
-//       fileBuffer: profilePhoto.buffer,
-//       folder: 'photos/profile-images',
-//       filename: profilePhoto.originalFilename,
-//       mimetype: profilePhoto.mimetype,
-//     });
-
-//     const certificateOrLicenseUrl = await uploadToCloudinary({
-//       fileBuffer: certificateOrLicense.buffer,
-//       folder: 'photos/certificates',
-//       filename: certificateOrLicense.originalFilename,
-//       mimetype: certificateOrLicense.mimetype,
-//     });
-
-//     const psychologist = new Psychologist({
-//       firstName: fields.firstName,
-//       lastName: fields.lastName,
-//       email: fields.email.toLowerCase(),
-//       password: hashedPassword,
-//       country: fields.country,
-//       streetAddress: fields.streetAddress,
-//       city: fields.city,
-//       about: fields.about,
-//       profilePhotoUrl,
-//       certificateOrLicenseUrl,
-//       licenseNumber: fields.licenseNumber,
-//       licenseType: fields.licenseType,
-//       yearsOfExperience: fields.yearsOfExperience,
-//       education: JSON.parse(fields.education),
-//       specializations: JSON.parse(fields.specializations),
-//       languages: JSON.parse(fields.languages),
-//       sessionDuration: parseInt(fields.sessionDuration),
-//       sessionFee: parseFloat(fields.sessionFee),
-//       sessionFormats: JSON.parse(fields.sessionFormats),
-//       acceptsInsurance: Boolean(fields.acceptsInsurance),
-//       insuranceProviders: JSON.parse(fields.insuranceProviders),
-//       availability: JSON.parse(fields.availability),
-//       acceptingNewClients: Boolean(fields.acceptingNewClients),
-//       ageGroups: JSON.parse(fields.ageGroups),
-//       isVerified: true,
-//       role: 'psychologist',
-//     });
-
-//     await psychologist.save();
-
-//     const accessToken = await encrypt({
-//       id: psychologist._id,
-//       role: 'psychologist',
-//       isVerified: true,
-//       email: psychologist.email,
-//     });
-
-//     const response = NextResponse.json(
-//       createSuccessResponse(201, {
-//         message: 'Account created successfully. Please log in.',
-//         user_data: {
-//           id: psychologist._id,
-//           email: psychologist.email,
-//           role: 'psychologist',
-//         },
-//       }),
-//       { status: 201 }
-//     );
-
-//     response.cookies.set('accessToken', accessToken, {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === 'production',
-//       sameSite: 'lax',
-//       path: '/',
-//       maxAge: 60 * 60 * 24,
-//     });
-
-//     return response;
-//   } catch (error) {
-//     console.error('Server Error:', error);
-//     return NextResponse.json(
-//       createErrorResponse(500, 'Internal Server Error'),
-//       { status: 500 }
-//     );
-//   }
-// }
-
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
@@ -248,7 +112,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upload files to Cloudinary first
     const profilePhotoUrl = await uploadToCloudinary({
       fileBuffer: profilePhoto.buffer,
       folder: 'photos/profile-images',
@@ -263,13 +126,11 @@ export async function POST(req: NextRequest) {
       mimetype: certificateOrLicense.mimetype,
     });
 
-    // Generate verification code
     const verificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create temporary token with all psychologist data
     const psychologistData = {
       firstName: fields.firstName,
       lastName: fields.lastName,
@@ -301,7 +162,6 @@ export async function POST(req: NextRequest) {
 
     const token = await encrypt({ ...psychologistData });
 
-    // Save verification data
     await TemporaryToken.findOneAndUpdate(
       { email: email.toLowerCase() },
       {
@@ -313,7 +173,6 @@ export async function POST(req: NextRequest) {
       { upsert: true, new: true }
     );
 
-    // Send verification email
     const emailResult = await sendVerificationEmail(email, verificationCode);
     if (!emailResult.success) {
       return NextResponse.json(

@@ -1,4 +1,5 @@
 'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationEmail } from '@/helpers/sendEmailVerification';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
@@ -9,13 +10,11 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    // Try to get token from Authorization header first
     const authHeader = req.headers.get('authorization');
     let token = authHeader?.startsWith('Bearer ')
       ? authHeader.substring(7)
       : null;
 
-    // If no token in header, try body
     if (!token) {
       try {
         const body = await req.json();
@@ -36,7 +35,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find the temporary token record
     const tempToken = await TemporaryToken.findOne({ token });
 
     if (!tempToken) {
@@ -46,10 +44,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate new verification code
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Update the temporary token with new code and expiry
     await TemporaryToken.updateOne(
       { _id: tempToken._id },
       {
@@ -60,7 +56,6 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // Send new verification email
     const emailResult = await sendVerificationEmail(tempToken.email, newCode);
 
     if (!emailResult.success) {

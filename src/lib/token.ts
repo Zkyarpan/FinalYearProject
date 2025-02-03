@@ -25,7 +25,6 @@ export async function encrypt(
   expiresIn: string = '24h'
 ): Promise<string> {
   try {
-    // Clean undefined values from payload
     const cleanPayload = Object.fromEntries(
       Object.entries(payload).filter(([_, v]) => v !== undefined)
     );
@@ -62,9 +61,9 @@ export async function setSessionCookie(token: string, expires: Date) {
     response.cookies.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed to 'lax' for better compatibility
+      sameSite: 'lax',
       expires,
-      path: '/', // Added path for consistency
+      path: '/',
     });
     return response;
   } catch (error) {
@@ -89,8 +88,6 @@ export async function clearSessionCookie() {
     throw new Error('Failed to clear session cookie');
   }
 }
-
-// Added utility functions that might be useful
 
 export async function validateToken(token: string): Promise<boolean> {
   try {
@@ -127,6 +124,6 @@ export async function getTokenExpirationDate(
     case 'm':
       return new Date(now.getTime() + value * 60 * 1000);
     default:
-      return new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default 24 hours
+      return new Date(now.getTime() + 24 * 60 * 60 * 1000);
   }
 }

@@ -131,8 +131,10 @@ const AccountPage = () => {
                     <div className="text-center">
                       <span className="block text-sm font-medium">Gender</span>
                       <span className="text-xs font-semibold">
-                        {profile.gender.charAt(0).toUpperCase() +
-                          profile.gender.slice(1)}
+                        {profile.gender
+                          ? profile.gender.charAt(0).toUpperCase() +
+                            profile.gender.slice(1)
+                          : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -142,22 +144,33 @@ const AccountPage = () => {
                       Areas of Focus
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
-                      {profile.struggles
-                        .toString()
-                        .split(',')
-                        .map(struggle => (
-                          <div
-                            key={struggle}
-                            className="bg-white  px-4 py-2 rounded-xl text-sm
+                      {profile.struggles && profile.struggles.length > 0 ? (
+                        profile.struggles
+                          .toString()
+                          .split(',')
+                          .map((struggle, index) => (
+                            <div
+                              key={index}
+                              className="bg-white px-4 py-2 rounded-xl text-sm
             dark:bg-[#171717] border dark:border-[#333333]
             hover:border-primary/30
             transition-all duration-300
             shadow-sm hover:shadow-md
             cursor-default text-center"
-                          >
-                            {struggle.trim()}
-                          </div>
-                        ))}
+                            >
+                              {struggle.trim()}
+                            </div>
+                          ))
+                      ) : (
+                        <div
+                          className="bg-white px-4 py-2 rounded-xl text-sm
+        dark:bg-[#171717] border dark:border-[#333333]
+        transition-all duration-300
+        shadow-sm cursor-default text-center"
+                        >
+                          No struggles listed
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -205,8 +218,10 @@ const AccountPage = () => {
                   <Video />
                   <span>
                     Preferred:{' '}
-                    {profile.preferredCommunication.charAt(0).toUpperCase() +
-                      profile.preferredCommunication.slice(1)}{' '}
+                    {profile.preferredCommunication
+                      ? profile.preferredCommunication.charAt(0).toUpperCase() +
+                        profile.preferredCommunication.slice(1)
+                      : 'Not set'}{' '}
                     Sessions
                   </span>
                 </div>

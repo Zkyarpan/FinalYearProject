@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Menu, ChevronDown } from 'lucide-react';
-
 import BlogRightSection from '@/components/BlogRightSection';
 import PsychologistSection from '@/components/PsychologistSection';
 import StoriesSection from '@/components/StoriesSection';
@@ -17,7 +16,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-
 import { useUserStore } from '@/store/userStore';
 import { usePathname, useRouter } from 'next/navigation';
 import UserSidebar from '@/components/UserSidebar';
@@ -27,9 +25,11 @@ import Image from 'next/image';
 import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
 import Account from '@/icons/Account';
-import NAV_ITEMS from '@/components/Icons';
+import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
+import AccountSection from '@/components/AccountSection';
 
 const routeTitles = {
+  // User routes
   '/stories': 'Our Stories',
   '/services': 'Services',
   '/psychologists': 'Psychologists',
@@ -38,6 +38,20 @@ const routeTitles = {
   '/blogs': 'Mentality Blogs',
   '/account': 'Your Account',
   '/notifications': 'Notifications',
+  // Psychologist routes
+  '/psychologist/dashboard': 'Dashboard',
+  '/psychologist/patients': 'My Patients',
+  '/psychologist/appointments': 'Appointments',
+  '/psychologist/messages': 'Messages',
+  '/psychologist/articles': 'My Articles',
+  '/psychologist/blogs': 'My Blogs',
+  // Admin routes
+  '/admin/dashboard': 'Dashboard',
+  '/admin/users': 'Users Management',
+  '/admin/psychologists': 'Psychologists Management',
+  '/admin/articles': 'Articles Management',
+  '/admin/blogs': 'Blogs Management',
+  '/admin/settings': 'System Settings',
 };
 
 const RootLayout = ({ children }) => {
@@ -50,20 +64,40 @@ const RootLayout = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
 
+  const NAV_ITEMS =
+    isAuthenticated && role ? getNavItemsByRole(role) : USER_NAV_ITEMS;
+
+  const accountPath =
+    role === 'psychologist'
+      ? '/psychologist/account'
+      : role === 'admin'
+        ? '/admin/account'
+        : '/account';
+
   const isAccountPage =
-    pathname === '/account' || pathname === '/settings/profile';
+    pathname === '/account' ||
+    pathname === '/psychologist/account' ||
+    pathname === '/admin/account' ||
+    pathname === '/settings/profile';
+
+  const isDashboardPage =
+    pathname === '/dashboard' ||
+    pathname === '/psychologist/dashboard' ||
+    pathname === '/admin/dashboard';
+
   const pathParts = pathname.split('/').filter(Boolean);
   const isNestedRoute = pathParts.length > 1;
   const baseRoute = `/${pathParts[0]}`;
   const currentSection = pathParts[0];
-  const title = routeTitles[baseRoute];
+  const title = routeTitles[pathname] || routeTitles[baseRoute];
 
   const showRightSidebar =
-    Object.keys(routeTitles).includes(pathname) &&
-    pathname !== '/resources' &&
-    pathname !== '/articles' &&
-    pathname !== '/services' &&
-    pathname !== '/psychologists';
+    ((!isAuthenticated && pathname !== '/dashboard') ||
+      (isAuthenticated && !isDashboardPage && role === 'user')) &&
+    (pathname === '/stories' ||
+      pathname === '/blogs' ||
+      pathname === '/' ||
+      isAccountPage);
 
   const handleNavigation = (path, requiresAuth = false) => {
     if (requiresAuth && !isAuthenticated) {
@@ -78,7 +112,13 @@ const RootLayout = ({ children }) => {
   const handleLogoClick = e => {
     e.preventDefault();
     if (isAuthenticated) {
-      router.push('/dashboard');
+      const dashboardPath =
+        role === 'psychologist'
+          ? '/psychologist/dashboard'
+          : role === 'admin'
+            ? '/admin/dashboard'
+            : '/dashboard';
+      router.push(dashboardPath);
     } else {
       router.push('/');
     }
@@ -89,6 +129,10 @@ const RootLayout = ({ children }) => {
       return <UserSidebar />;
     }
 
+    if (isDashboardPage && isAuthenticated) {
+      return null;
+    }
+
     const sections = {
       '/blogs': BlogRightSection,
       '/psychologists': PsychologistSection,
@@ -96,6 +140,7 @@ const RootLayout = ({ children }) => {
       '/services': ServicesSection,
       '/articles': ArticlesSection,
       '/resources': ResourcesSection,
+      '/': StoriesSection,
     };
 
     const SectionComponent = sections[pathname];
@@ -109,12 +154,14 @@ const RootLayout = ({ children }) => {
         />
       );
     }
+
+    return null;
   };
 
   return (
     <>
       <div className="flex min-h-screen bg-background text-foreground">
-        {/* Mobile Header  */}
+        {/* Mobile Header */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
@@ -158,19 +205,11 @@ const RootLayout = ({ children }) => {
                           <span>{item.text}</span>
                         </button>
                       ))}
-                      {isAuthenticated && (
-                        <button
-                          onClick={() => handleNavigation('/account')}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                            pathname === '/account'
-                              ? 'dark:text-white font-medium'
-                              : 'hover:transition-all lg:group-hover:translate-x-1'
-                          }`}
-                        >
-                          <Account />
-                          <span>Account</span>
-                        </button>
-                      )}
+                      <AccountSection
+                        firstName={firstName || 'Anonymous'}
+                        profileImage={profileImage || '/default-avatar.jpg'}
+                        onNavigate={handleNavigation}
+                      />
                     </nav>
                   </SheetContent>
                 </Sheet>
@@ -194,7 +233,7 @@ const RootLayout = ({ children }) => {
                 isAuthenticated={isAuthenticated}
                 profileImage={profileImage}
                 role={role}
-                firstName={firstName}
+                firstName={firstName || ''}
                 lastName={lastName}
                 router={router}
                 logout={logout}
@@ -203,12 +242,12 @@ const RootLayout = ({ children }) => {
           </div>
         </div>
 
-        {/* Desktop Sidebar - Fixed position */}
+        {/* Desktop Sidebar */}
         <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-40">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
-                href={isAuthenticated ? '/dashboard' : '/'}
+                href={isAuthenticated ? `/${role}/dashboard` : '/'}
                 onClick={handleLogoClick}
                 className="flex items-center"
               >
@@ -236,16 +275,13 @@ const RootLayout = ({ children }) => {
                 />
               ))}
               {isAuthenticated && (
-                <NavItem
-                  icon={<Account />}
-                  text="Account"
-                  href="/account"
-                  isActive={pathname === '/account'}
-                  onClick={e => {
-                    e.preventDefault();
-                    handleNavigation('/account');
-                  }}
-                />
+                <div className="mt-4">
+                  <AccountSection
+                    firstName={firstName || 'Anonymous'}
+                    profileImage={profileImage || '/default-avatar.jpg'}
+                    onNavigate={handleNavigation}
+                  />
+                </div>
               )}
             </nav>
           </div>
@@ -256,6 +292,7 @@ const RootLayout = ({ children }) => {
           </div>
         </div>
 
+        {/* Main Content Area */}
         <div
           className={`flex-1 ${
             showRightSidebar ? 'lg:mr-[420px]' : ''
@@ -277,9 +314,7 @@ const RootLayout = ({ children }) => {
                     <span className="font-bold">Blogs</span>
                   </div>
                 )}
-                {!isNestedRoute && title && (
-                  <h1 className="text-base font-semibold">{title}</h1>
-                )}
+                {title && <h1 className="text-base font-semibold">{title}</h1>}
               </div>
               {!showRightSidebar && (
                 <UserActions
@@ -303,6 +338,7 @@ const RootLayout = ({ children }) => {
           </div>
         </div>
 
+        {/* Right Sidebar */}
         {showRightSidebar && (
           <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-40">
             <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

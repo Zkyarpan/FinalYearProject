@@ -89,7 +89,7 @@ export const config = {
     '/',
     '/login',
     '/signup',
-    '/dashboard',
+    '/dashboard/:path*',
     '/account',
     '/verify',
     '/forgot-password',

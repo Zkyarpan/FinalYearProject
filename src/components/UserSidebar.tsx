@@ -61,7 +61,7 @@ function UserSidebar() {
   return (
     <>
       <div className="">
-        <nav className="border dark:border-neutral-800 p-4 rounded-xl bg-white dark:bg-neutral-900">
+        <nav className="border dark:border-[#333333] p-4 rounded-xl bg-white dark:bg-neutral-900">
           <div className="flex flex-col gap-2">
             <Link href="/account" passHref>
               <div

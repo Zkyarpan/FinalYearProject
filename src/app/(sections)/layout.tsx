@@ -24,7 +24,6 @@ import UserActions from '@/components/UserActions';
 import Image from 'next/image';
 import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
-import Account from '@/icons/Account';
 import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
 
@@ -35,7 +34,7 @@ const routeTitles = {
   '/psychologists': 'Psychologists',
   '/articles': 'Articles',
   '/resources': 'Resources',
-  '/blogs': 'Mentality Blogs',
+  '/blogs': 'Blogs',
   '/account': 'Your Account',
   '/notifications': 'Notifications',
   // Psychologist routes
@@ -311,7 +310,6 @@ const RootLayout = ({ children }) => {
                     >
                       <ChevronDown className="h-4 w-4 rotate-90" />
                     </Button>
-                    <span className="font-bold">Blogs</span>
                   </div>
                 )}
                 {title && <h1 className="text-base font-semibold">{title}</h1>}

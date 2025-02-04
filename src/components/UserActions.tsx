@@ -99,16 +99,11 @@ const UserActions = ({
   if (isAuthenticated) {
     return (
       <>
-        {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
-
         <div className="flex items-center justify-end w-full">
           <div className="flex items-center gap-x-3">
             <div className="flex items-center relative">
-              {isNestedBlogRoute && (
-                <div className="absolute -top-[20px] -bottom-[12px] w-[1px] bg-border dark:bg-[#333333] left-5" />
-              )}
               <div
-                className={`relative flex w-[220px] items-center rounded-xl border border-border dark:border-[#333333] bg-gray-100 dark:bg-input px-4 py-1.5 transition-all duration-200 shadow-sm ${
+                className={`relative flex w-[209px] items-center rounded-xl border  dark:border-[#333333] bg-gray-100 dark:bg-input px-4 py-1.5 transition-all duration-200 dark:shadow-sm shadow-sm ${
                   isNestedBlogRoute ? 'ml-8' : 'ml-3'
                 }`}
               >

@@ -1,9 +1,6 @@
-import PsychologistRegister from '@/components/PsychologistRegister';
-import { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Register to Mentallity',
-};
+import PsychologistRegister from '@/components/PsychologistRegister';
 
 const psychologists = () => {
   return (

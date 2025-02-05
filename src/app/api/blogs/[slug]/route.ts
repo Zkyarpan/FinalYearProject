@@ -47,7 +47,6 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     const blogId = req.nextUrl.pathname.split('/').pop();
-    console.log('Attempting to fetch blog with ID/slug:', blogId);
 
     if (!blogId) {
       return NextResponse.json(
@@ -75,8 +74,6 @@ export async function GET(req: NextRequest) {
         .replace(/-/g, ' ')
         .trim()
         .toLowerCase();
-
-      console.log('Searching by title:', normalizedSearchString);
 
       const searchQueries = [
         {
@@ -288,46 +285,3 @@ export async function PATCH(
     );
   }
 }
-
-// export async function DELETE(
-//   req: NextRequest,
-//   { params }: { params: { slug: string } }
-// ) {
-//   try {
-//     await connectDB();
-//     console.log('Delete request for:', params.slug);
-
-//     const blog = await Blog.findById(params.slug);
-//     if (!blog) {
-//       return NextResponse.json(createErrorResponse(404, 'Blog not found'), {
-//         status: 404,
-//       });
-//     }
-
-//     // Delete blog image if exists
-//     if (blog.blogImage) {
-//       try {
-//         const publicIdMatch = blog.blogImage.match(
-//           /photos\/blog-images\/([^.]+)/
-//         );
-//         if (publicIdMatch?.[1]) {
-//           await deleteFromCloudinary(`photos/blog-images/${publicIdMatch[1]}`);
-//         }
-//       } catch (error) {
-//         console.error('Failed to delete image:', error);
-//       }
-//     }
-
-//     await Blog.findByIdAndDelete(params.slug);
-
-//     return NextResponse.json(
-//       createSuccessResponse(200, 'Blog deleted successfully')
-//     );
-//   } catch (error) {
-//     console.error('Delete error:', error);
-//     return NextResponse.json(
-//       createErrorResponse(500, 'Failed to delete blog'),
-//       { status: 500 }
-//     );
-//   }
-// }

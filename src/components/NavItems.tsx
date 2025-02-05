@@ -12,9 +12,12 @@ import Settings from '@/icons/Settings';
 import Calendar from '@/icons/Calendar';
 import Messages from '@/icons/Messages';
 
-import { FileText, MessageSquare } from 'lucide-react';
-
 export const USER_NAV_ITEMS = [
+  {
+    icon: <Dashboard />,
+    text: 'Dashboard',
+    href: '/dashboard',
+  },
   {
     icon: <StoriesIcon />,
     text: 'Stories',
@@ -51,7 +54,7 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   {
     icon: <Dashboard />,
     text: 'Dashboard',
-    href: '/psychologist/dashboard',
+    href: '/dashboard/psychologist',
   },
   {
     icon: <Users />,
@@ -84,7 +87,7 @@ export const ADMIN_NAV_ITEMS = [
   {
     icon: <Dashboard />,
     text: 'Dashboard',
-    href: '/admin/dashboard',
+    href: '/dashboard/admin',
   },
   {
     icon: <Users />,

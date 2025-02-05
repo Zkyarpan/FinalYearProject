@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { useUserStore } from '@/store/userStore';
+import { getDashboardByRole } from '@/helpers/getDashboardByRole';
 
 interface TokenPayload {
   id?: string;
@@ -71,6 +72,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
           if (response.ok) {
             const userData: TokenPayload = await response.json();
+            const dashboardPath = getDashboardByRole(userData.role!);
 
             setUser({
               _id: userData.id!,
@@ -84,7 +86,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
               isAuthenticated: true,
             });
 
-            router.push('/dashboard');
+            router.push(dashboardPath);
             return;
           }
         }
@@ -106,6 +108,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
 
         const userData: TokenPayload = await response.json();
+        const dashboardPath = getDashboardByRole(userData.role!);
 
         setUser({
           _id: userData.id!,
@@ -126,7 +129,21 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         if (userData.isVerified && userData.profileComplete) {
           if (currentPath === '/login' || currentPath === '/signup') {
-            router.push('/dashboard');
+            router.push(dashboardPath);
+            return;
+          }
+
+          if (currentPath === '/dashboard') {
+            router.push(dashboardPath);
+            return;
+          }
+
+          if (currentPath.startsWith('/dashboard/')) {
+            const userDashboard = getDashboardByRole(userData.role!);
+            if (currentPath !== userDashboard) {
+              router.push(userDashboard);
+              return;
+            }
           }
         }
       } catch (error) {

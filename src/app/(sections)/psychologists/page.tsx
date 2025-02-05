@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-
+import { useState, useEffect } from 'react';
 import {
   Star,
   Search,
@@ -16,6 +15,8 @@ import {
   Mail,
   Phone,
   Video,
+  Loader2,
+  ArrowRight,
 } from 'lucide-react';
 
 import {
@@ -36,7 +37,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,205 +54,155 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
+
+interface Education {
+  degree: string;
+  university: string;
+  graduationYear: number;
+}
+
+interface Availability {
+  available: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+interface PsychologistProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  country: string;
+  city: string;
+  about: string;
+  profilePhoto: string;
+  licenseType: string;
+  yearsOfExperience: number;
+  education: Education[];
+  languages: string[];
+  specializations: string[];
+  sessionDuration: number;
+  sessionFee: number;
+  sessionFormats: string[];
+  acceptsInsurance: boolean;
+  insuranceProviders: string[];
+  acceptingNewClients: boolean;
+  ageGroups: string[];
+  availability: {
+    monday: Availability;
+    tuesday: Availability;
+    wednesday: Availability;
+    thursday: Availability;
+    friday: Availability;
+    saturday: Availability;
+    sunday: Availability;
+  };
+}
+
+interface ApiResponse {
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    message: string;
+    psychologists: PsychologistProfile[];
+  };
+}
+
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
 
 const PsychologistDirectory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('All');
   const [selectedLocation, setSelectedLocation] = useState('All');
+  const [psychologists, setPsychologists] = useState<PsychologistProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const psychologists = [
-    {
-      id: 1,
-      firstName: 'Sarah',
-      lastName: 'Smith',
-      role: 'Clinical Psychologist',
-      specializations: ['Anxiety', 'Depression', 'CBT'],
-      rating: 4.9,
-      reviewCount: 128,
-      city: 'Boston',
-      state: 'MA',
-      experience: '15+ years',
-      nextAvailable: 'Tomorrow',
-      photoUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
-      featured: true,
-      bio: 'Specialized in treating anxiety and depression using evidence-based approaches with over 15 years of experience helping individuals overcome life challenges.',
-      education: 'Ph.D. in Clinical Psychology, Harvard University',
-      certifications: [
-        'Licensed Clinical Psychologist',
-        'CBT Certified',
-        'EMDR Certified',
-      ],
-      languages: ['English', 'Spanish'],
-      insurances: ['Blue Cross', 'Aetna', 'United Healthcare'],
-      sessionTypes: ['In-person', 'Video', 'Phone'],
-      sessionFee: '$150-200',
-      availableSlots: [
-        { time: '9:00 AM', date: 'Mon, May 1' },
-        { time: '2:00 PM', date: 'Mon, May 1' },
-        { time: '4:30 PM', date: 'Tue, May 2' },
-        { time: '10:00 AM', date: 'Wed, May 3' },
-      ],
-    },
-    {
-      id: 3,
-      firstName: 'Sarah',
-      lastName: 'Smith',
-      role: 'Clinical Psychologist',
-      specializations: ['Anxiety', 'Depression', 'CBT'],
-      rating: 4.9,
-      reviewCount: 128,
-      city: 'Boston',
-      state: 'MA',
-      experience: '15+ years',
-      nextAvailable: 'Tomorrow',
-      photoUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
-      featured: true,
-      bio: 'Specialized in treating anxiety and depression using evidence-based approaches with over 15 years of experience helping individuals overcome life challenges.',
-      education: 'Ph.D. in Clinical Psychology, Harvard University',
-      certifications: [
-        'Licensed Clinical Psychologist',
-        'CBT Certified',
-        'EMDR Certified',
-      ],
-      languages: ['English', 'Spanish'],
-      insurances: ['Blue Cross', 'Aetna', 'United Healthcare'],
-      sessionTypes: ['In-person', 'Video', 'Phone'],
-      sessionFee: '$150-200',
-      availableSlots: [
-        { time: '9:00 AM', date: 'Mon, May 1' },
-        { time: '2:00 PM', date: 'Mon, May 1' },
-        { time: '4:30 PM', date: 'Tue, May 2' },
-        { time: '10:00 AM', date: 'Wed, May 3' },
-      ],
-    },
-    {
-      id: 4,
-      firstName: 'Sarah',
-      lastName: 'Smith',
-      role: 'Clinical Psychologist',
-      specializations: ['Anxiety', 'Depression', 'CBT'],
-      rating: 4.9,
-      reviewCount: 128,
-      city: 'Boston',
-      state: 'MA',
-      experience: '15+ years',
-      nextAvailable: 'Tomorrow',
-      photoUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
-      featured: true,
-      bio: 'Specialized in treating anxiety and depression using evidence-based approaches with over 15 years of experience helping individuals overcome life challenges.',
-      education: 'Ph.D. in Clinical Psychology, Harvard University',
-      certifications: [
-        'Licensed Clinical Psychologist',
-        'CBT Certified',
-        'EMDR Certified',
-      ],
-      languages: ['English', 'Spanish'],
-      insurances: ['Blue Cross', 'Aetna', 'United Healthcare'],
-      sessionTypes: ['In-person', 'Video', 'Phone'],
-      sessionFee: '$150-200',
-      availableSlots: [
-        { time: '9:00 AM', date: 'Mon, May 1' },
-        { time: '2:00 PM', date: 'Mon, May 1' },
-        { time: '4:30 PM', date: 'Tue, May 2' },
-        { time: '10:00 AM', date: 'Wed, May 3' },
-      ],
-    },
-    {
-      id: 5,
-      firstName: 'Sarah',
-      lastName: 'Smith',
-      role: 'Clinical Psychologist',
-      specializations: ['Anxiety', 'Depression', 'CBT'],
-      rating: 4.9,
-      reviewCount: 128,
-      city: 'Boston',
-      state: 'MA',
-      experience: '15+ years',
-      nextAvailable: 'Tomorrow',
-      photoUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
-      featured: true,
-      bio: 'Specialized in treating anxiety and depression using evidence-based approaches with over 15 years of experience helping individuals overcome life challenges.',
-      education: 'Ph.D. in Clinical Psychology, Harvard University',
-      certifications: [
-        'Licensed Clinical Psychologist',
-        'CBT Certified',
-        'EMDR Certified',
-      ],
-      languages: ['English', 'Spanish'],
-      insurances: ['Blue Cross', 'Aetna', 'United Healthcare'],
-      sessionTypes: ['In-person', 'Video', 'Phone'],
-      sessionFee: '$150-200',
-      availableSlots: [
-        { time: '9:00 AM', date: 'Mon, May 1' },
-        { time: '2:00 PM', date: 'Mon, May 1' },
-        { time: '4:30 PM', date: 'Tue, May 2' },
-        { time: '10:00 AM', date: 'Wed, May 3' },
-      ],
-    },
-    {
-      id: 6,
-      firstName: 'Sarah',
-      lastName: 'Smith',
-      role: 'Clinical Psychologist',
-      specializations: ['Anxiety', 'Depression', 'CBT'],
-      rating: 4.9,
-      reviewCount: 128,
-      city: 'Boston',
-      state: 'MA',
-      experience: '15+ years',
-      nextAvailable: 'Tomorrow',
-      photoUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
-      featured: true,
-      bio: 'Specialized in treating anxiety and depression using evidence-based approaches with over 15 years of experience helping individuals overcome life challenges.',
-      education: 'Ph.D. in Clinical Psychology, Harvard University',
-      certifications: [
-        'Licensed Clinical Psychologist',
-        'CBT Certified',
-        'EMDR Certified',
-      ],
-      languages: ['English', 'Spanish'],
-      insurances: ['Blue Cross', 'Aetna', 'United Healthcare'],
-      sessionTypes: ['In-person', 'Video', 'Phone'],
-      sessionFee: '$150-200',
-      availableSlots: [
-        { time: '9:00 AM', date: 'Mon, May 1' },
-        { time: '2:00 PM', date: 'Mon, May 1' },
-        { time: '4:30 PM', date: 'Tue, May 2' },
-        { time: '10:00 AM', date: 'Wed, May 3' },
-      ],
-    },
-  ];
+  useEffect(() => {
+    const fetchPsychologists = async () => {
+      try {
+        const response = await fetch('/api/psychologist/profile');
+        const data: ApiResponse = await response.json();
 
-  const specializations = [
-    'All',
-    'Anxiety',
-    'Depression',
-    'CBT',
-    'Trauma',
-    'Family Therapy',
-    'Child Therapy',
-    'Addiction',
-  ];
+        if (data.IsSuccess && data.Result.psychologists) {
+          setPsychologists(data.Result.psychologists);
+        } else {
+          setError(
+            Array.isArray(data.ErrorMessage)
+              ? data.ErrorMessage[0]
+              : 'Failed to fetch psychologist data'
+          );
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to fetch psychologist data'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const locations = [
-    'All',
-    'Boston, MA',
-    'New York, NY',
-    'Los Angeles, CA',
-    'Chicago, IL',
-    'Houston, TX',
-  ];
+    fetchPsychologists();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!psychologists || psychologists.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">No Data Available</h2>
+          <p className="text-gray-600">No psychologists found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const getAvailableTimeSlots = (
+    availability: PsychologistProfile['availability']
+  ) => {
+    const slots: { day: string; startTime: string; endTime: string }[] = [];
+    Object.entries(availability).forEach(([day, time]) => {
+      if (time.available && time.startTime && time.endTime) {
+        slots.push({
+          day,
+          startTime: time.startTime,
+          endTime: time.endTime,
+        });
+      }
+    });
+    return slots;
+  };
 
   const filteredPsychologists = psychologists.filter(psych => {
     const matchesSearch =
       psych.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       psych.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      psych.role.toLowerCase().includes(searchTerm.toLowerCase());
+      psych.licenseType.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesSpecialization =
       selectedSpecialization === 'All' ||
@@ -260,15 +210,23 @@ const PsychologistDirectory = () => {
 
     const matchesLocation =
       selectedLocation === 'All' ||
-      `${psych.city}, ${psych.state}` === selectedLocation;
+      `${psych.city}, ${psych.country}` === selectedLocation;
 
     return matchesSearch && matchesSpecialization && matchesLocation;
   });
 
+  const specializations = [
+    'All',
+    ...new Set(psychologists.flatMap(p => p.specializations)),
+  ];
+  const locations = [
+    'All',
+    ...new Set(psychologists.map(p => `${p.city}, ${p.country}`)),
+  ];
+
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white  py-16 rounded-2xl">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16 rounded-2xl">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">
             Find Your Perfect Mental Health Match
@@ -281,7 +239,6 @@ const PsychologistDirectory = () => {
         </div>
       </div>
 
-      {/* Search and Filter Section */}
       <div className="mx-auto px-4 -mt-8 mb-12">
         <Card className="shadow-lg">
           <CardContent className="p-6">
@@ -294,7 +251,7 @@ const PsychologistDirectory = () => {
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
-                <Search className="absolute left-3 top-3  w-4 h-4" />
+                <Search className="absolute left-3 top-3 w-4 h-4" />
               </div>
 
               <Select
@@ -331,83 +288,60 @@ const PsychologistDirectory = () => {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="default" className="w-full">
                     <ArrowUpDown className="mr-2 h-4 w-4" />
                     Sort by
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Highest Rated</DropdownMenuItem>
-                  <DropdownMenuItem>Most Reviews</DropdownMenuItem>
                   <DropdownMenuItem>Years of Experience</DropdownMenuItem>
-                  <DropdownMenuItem>Earliest Available</DropdownMenuItem>
+                  <DropdownMenuItem>Session Fee</DropdownMenuItem>
+                  <DropdownMenuItem>Availability</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </CardContent>
         </Card>
 
-        {/* Results Summary */}
-        <div className="flex justify-between items-center my-6">
-          <p className="">
-            Showing {filteredPsychologists.length} psychologists
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="w-4 h-4 mr-2" />
-              More Filters
-            </Button>
-          </div>
-        </div>
-
-        {/* Psychologists Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
           {filteredPsychologists.map(psych => (
-            <Card key={psych.id} className="relative cursor-pointer">
-              {psych.featured && (
-                <div className="absolute -top-3 -right-3 z-10">
-                  <Badge className="bg-blue-600 text-white">
-                    <Award className="w-4 h-4 mr-1" />
-                    Featured Expert
-                  </Badge>
-                </div>
-              )}
-
-              <CardHeader className="pb-4">
-                <div className="flex items-start space-x-4">
-                  <Avatar className="w-24 h-24 rounded-lg border-4 border-white shadow-lg">
-                    <AvatarImage
-                      src={psych.photoUrl}
-                      alt={`${psych.firstName} ${psych.lastName}`}
-                    />
-                    <AvatarFallback className="text-lg">
-                      {psych.firstName[0]}
-                      {psych.lastName[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl">
-                          Dr. {psych.firstName} {psych.lastName}
-                        </CardTitle>
-                        <CardDescription className="text-base">
-                          {psych.role}
-                        </CardDescription>
+            <Card key={psych.id} className="relative">
+              <Link
+                href={`/psychologists/${psych.firstName}-${psych.lastName}`}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-start space-x-4">
+                    <Avatar className="w-24 h-24 rounded-lg border-2 border-white shadow-lg">
+                      <AvatarImage
+                        src={psych.profilePhoto}
+                        alt={`${psych.firstName} ${psych.lastName}`}
+                      />
+                      <AvatarFallback>
+                        {psych.firstName[0]}
+                        {psych.lastName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xl">
+                            Dr. {psych.firstName} {psych.lastName}
+                          </CardTitle>
+                          <CardDescription className="text-base">
+                            {psych.licenseType.replace(/_/g, ' ').toUpperCase()}
+                          </CardDescription>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="icon">
-                        <Heart className="w-5 h-5" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center mt-2">
-                      <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                      <span className="ml-2 font-medium">{psych.rating}</span>
-                      <span className="mx-1">•</span>
-                      <span>{psych.reviewCount} reviews</span>
+                      <div className="flex items-center mt-2">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        <span>
+                          {psych.city}, {psych.country}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardHeader>
+                </CardHeader>
+              </Link>
 
               <CardContent>
                 <Tabs defaultValue="about">
@@ -417,31 +351,47 @@ const PsychologistDirectory = () => {
                     <TabsTrigger value="booking">Booking</TabsTrigger>
                   </TabsList>
                   <TabsContent value="about" className="space-y-4 mt-4">
-                    <p className="text-sm">{psych.bio}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {psych.specializations.map(spec => (
-                        <Badge key={spec} variant="secondary">
-                          {spec}
-                        </Badge>
-                      ))}
+                    <p className="text-sm text-justify leading-relaxed my-2 mx-0">
+                      {truncateText(psych.about, 200)}
+                    </p>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">
+                        Specializations
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {psych.specializations.map(spec => (
+                          <Badge key={spec} variant="default">
+                            {spec}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">Age Groups</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {psych.ageGroups.map(age => (
+                          <Badge key={age} variant="default">
+                            {age}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="experience" className="space-y-4 mt-4">
                     <div className="space-y-3">
-                      <div className="flex items-center">
-                        <GraduationCap className="w-5 h-5 mr-2" />
-                        <span className="text-sm">{psych.education}</span>
-                      </div>
+                      {psych.education.map((edu, index) => (
+                        <div key={index} className="flex items-center">
+                          <GraduationCap className="w-5 h-5 mr-2" />
+                          <span className="text-sm">
+                            {edu.degree} from {edu.university} (
+                            {edu.graduationYear})
+                          </span>
+                        </div>
+                      ))}
                       <div className="flex items-center">
                         <Clock className="w-5 h-5 mr-2" />
                         <span className="text-sm">
-                          {psych.experience} experience
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <MapPin className="w-5 h-5 mr-2" />
-                        <span className="text-sm">
-                          {psych.city}, {psych.state}
+                          {psych.yearsOfExperience} years of experience
                         </span>
                       </div>
                     </div>
@@ -449,19 +399,21 @@ const PsychologistDirectory = () => {
                   <TabsContent value="booking" className="space-y-4 mt-4">
                     <div className="flex items-center justify-between">
                       <div className="flex gap-2">
-                        {psych.sessionTypes.map((type, index) => (
-                          <Badge key={index} variant="outline">
-                            {type === 'Video' && (
+                        {psych.sessionFormats.map(format => (
+                          <Badge key={format} variant="outline">
+                            {format === 'video' && (
                               <Video className="w-3 h-3 mr-1" />
                             )}
-                            {type === 'Phone' && (
+                            {format === 'phone' && (
                               <Phone className="w-3 h-3 mr-1" />
                             )}
-                            {type}
+                            {format}
                           </Badge>
                         ))}
                       </div>
-                      <span className="text-sm">From {psych.sessionFee}</span>
+                      <span className="text-sm">
+                        ${psych.sessionFee}/session
+                      </span>
                     </div>
                     <Dialog>
                       <DialogTrigger asChild>
@@ -478,19 +430,35 @@ const PsychologistDirectory = () => {
                             {psych.firstName} {psych.lastName}
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="grid grid-cols-2 gap-4 py-4">
-                          {psych.availableSlots.map((slot, index) => (
-                            <Button
-                              key={index}
-                              variant="outline"
-                              className="w-full justify-start"
-                            >
-                              <div className="text-left">
-                                <div className="font-medium">{slot.time}</div>
-                                <div className="text-xs">{slot.date}</div>
-                              </div>
-                            </Button>
-                          ))}
+                        <div className="py-4">
+                          {getAvailableTimeSlots(psych.availability).length >
+                          0 ? (
+                            <div className="grid grid-cols-2 gap-4">
+                              {getAvailableTimeSlots(psych.availability).map(
+                                (slot, index) => (
+                                  <Button
+                                    key={index}
+                                    variant="outline"
+                                    className="w-full justify-start"
+                                  >
+                                    <div className="text-left">
+                                      <div className="font-medium capitalize">
+                                        {slot.day}
+                                      </div>
+                                      <div className="text-xs">
+                                        {slot.startTime} - {slot.endTime}
+                                      </div>
+                                    </div>
+                                  </Button>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-center text-muted-foreground">
+                              No available time slots. Please contact for custom
+                              scheduling.
+                            </p>
+                          )}
                         </div>
                         <DialogFooter>
                           <Button variant="outline" className="w-full">
@@ -506,8 +474,20 @@ const PsychologistDirectory = () => {
 
               <CardFooter className="border-t p-5">
                 <div className="flex items-center justify-between w-full text-xs">
-                  <span>Next available: {psych.nextAvailable}</span>
-                  <span>{psych.languages.join(' • ')}</span>
+                  <div className="flex items-center space-x-2">
+                    <div
+                      className={`w-2 h-2 rounded-full ${psych.acceptingNewClients ? 'bg-green-500' : 'bg-red-500'}`}
+                    />
+                    <span className="font-medium">
+                      {psych.acceptingNewClients
+                        ? 'Accepting new clients'
+                        : 'Not accepting new clients'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">Language:</span>
+                    <span>{psych.languages.join(' • ')}</span>
+                  </div>
                 </div>
               </CardFooter>
             </Card>

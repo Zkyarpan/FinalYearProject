@@ -1,4 +1,4 @@
-const generateSlug = (title: string) => {
+export const generateSlug = (title: string) => {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -8,4 +8,12 @@ const generateSlug = (title: string) => {
     .replace(/^-+|-+$/g, '');
 };
 
-export default generateSlug;
+export const generatePsychologistSlug = (
+  firstName: string,
+  lastName: string
+) => {
+  return `dr-${firstName}-${lastName}`
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
+};

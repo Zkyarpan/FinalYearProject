@@ -15,6 +15,7 @@ import {
   Award,
   Sparkles,
   BadgeCheck,
+  Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,61 +39,29 @@ const ServicesPage = () => {
   const services = [
     {
       title: 'Individual Therapy',
-      description:
-        'One-on-one sessions with licensed therapists tailored to your needs',
-      icon: <Users className="w-6 h-6" />,
+      description: 'One-on-one counseling sessions tailored to your needs',
+      icon: <MessageSquare className="w-6 h-6 text-blue-600" />,
       features: [
         'Personalized treatment plans',
         'Flexible scheduling options',
-        'Both in-person and virtual sessions',
-        'Progress tracking and goal setting',
+        'Progress tracking',
+        'Confidential sessions',
       ],
       duration: '50 minutes',
-      price: '$120',
-      availability: 'Same-week appointments available',
+      price: '$120/session',
     },
     {
       title: 'Group Therapy',
-      description: 'Supportive group sessions led by experienced facilitators',
-      icon: <MessageSquare className="w-6 h-6" />,
+      description: 'Supportive group sessions led by experienced therapists',
+      icon: <Users className="w-6 h-6 text-blue-600" />,
       features: [
-        'Small group sizes (6-8 people)',
-        'Topic-focused sessions',
-        'Peer support and shared experiences',
+        'Peer support network',
+        'Shared experiences',
+        'Skill-building exercises',
         'Weekly meetings',
       ],
       duration: '90 minutes',
-      price: '$60',
-      availability: 'Multiple groups throughout the week',
-    },
-    {
-      title: 'Virtual Counseling',
-      description:
-        'Secure online therapy sessions from the comfort of your home',
-      icon: <Video className="w-6 h-6" />,
-      features: [
-        'End-to-end encryption',
-        'Mobile app access',
-        'Chat support between sessions',
-        'Easy scheduling system',
-      ],
-      duration: '45 minutes',
-      price: '$90',
-      availability: 'Extended hours including evenings',
-    },
-    {
-      title: 'Crisis Support',
-      description: '24/7 emergency mental health support and intervention',
-      icon: <Phone className="w-6 h-6" />,
-      features: [
-        'Immediate assistance',
-        'Licensed crisis counselors',
-        'Referral services',
-        'Follow-up care',
-      ],
-      duration: 'As needed',
-      price: 'Covered by insurance',
-      availability: '24/7 support line',
+      price: '$60/session',
     },
   ];
 
@@ -100,41 +69,38 @@ const ServicesPage = () => {
     {
       name: 'Dr. Sarah Johnson',
       title: 'Clinical Psychologist',
-      image:
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200',
+      image: '/therapists/sarah.jpg',
+      rating: 4.9,
+      reviewCount: 124,
       specialties: ['Anxiety', 'Depression', 'Trauma'],
       experience: '15+ years',
       education: 'Ph.D. in Clinical Psychology',
-      rating: 4.9,
-      reviewCount: 127,
       nextAvailable: 'Tomorrow',
-      bio: 'Specializing in anxiety and depression treatment using evidence-based approaches including CBT and mindfulness techniques.',
+      bio: 'Dr. Johnson specializes in cognitive behavioral therapy with extensive experience in treating anxiety and depression.',
     },
     {
       name: 'Dr. Michael Chen',
       title: 'Licensed Therapist',
-      image:
-        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200',
-      specialties: ['Relationships', 'Stress', 'Life Transitions'],
-      experience: '12+ years',
-      education: 'Ph.D. in Counseling Psychology',
+      image: '/therapists/michael.jpg',
       rating: 4.8,
       reviewCount: 98,
+      specialties: ['Relationships', 'Stress', 'LGBTQ+'],
+      experience: '10+ years',
+      education: 'Psy.D. in Psychology',
       nextAvailable: 'This week',
-      bio: 'Helping individuals navigate life transitions and relationship challenges with compassion and practical strategies.',
+      bio: 'Dr. Chen focuses on relationship counseling and stress management using an integrative therapeutic approach.',
     },
     {
       name: 'Dr. Emily Martinez',
-      title: 'Mental Health Counselor',
-      image:
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200',
-      specialties: ['Youth Counseling', 'Family Therapy', 'ADHD'],
-      experience: '10+ years',
-      education: 'Ph.D. in Child Psychology',
+      title: 'Family Therapist',
+      image: '/therapists/emily.jpg',
       rating: 4.9,
-      reviewCount: 84,
+      reviewCount: 156,
+      specialties: ['Family', 'Couples', 'Children'],
+      experience: '12+ years',
+      education: 'Ph.D. in Family Therapy',
       nextAvailable: 'Next week',
-      bio: 'Dedicated to supporting young people and families through challenges with evidence-based interventions.',
+      bio: 'Dr. Martinez specializes in family dynamics and couples counseling with a focus on building healthy relationships.',
     },
   ];
 
@@ -143,58 +109,72 @@ const ServicesPage = () => {
     'Aetna',
     'UnitedHealthcare',
     'Cigna',
-    'Medicare',
-    'Medicaid',
+    'Kaiser Permanente',
+    'Humana',
   ];
 
   return (
     <div className="min-h-screen">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl">
-        <div className="max-w-6xl mx-auto px-4 py-16">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl">
+        <div className="absolute inset-0 " />
+        <div className="relative max-w-6xl mx-auto px-4 py-24">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">
+            <h1 className="text-5xl font-bold mb-6 tracking-tight">
               Professional Mental Health Services
             </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl dark:text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed">
               Expert care tailored to your needs with licensed professionals
               committed to your well-being
             </p>
             <div className="flex justify-center gap-4">
-              <Button size="lg" variant="secondary">
-                Book Consultation
-              </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="bg-transparent text-white hover:bg-white/10"
+                variant="secondary"
+                className="text-blue-600 hover:text-blue-700 font-semibold dark:text-white"
+              >
+                Book Consultation
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+
+              <Button
+                size="lg"
+                variant="secondary"
+                className="text-blue-600 hover:text-blue-700 font-semibold dark:text-white"
               >
                 View Therapists
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </div>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-20" />
       </div>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
+      <main className="max-w-6xl mx-auto px-4 py-16">
         {/* Why Choose Us */}
-        <section className="mb-16">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Why Choose Us</Badge>
-            <h2 className="text-3xl font-bold mb-4">
+        <section className="mb-24">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 px-4 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200">
+              Why Choose Us
+            </Badge>
+            <h2 className="text-4xl font-bold mb-6 gradient-text">
               Comprehensive Mental Health Care
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="max-w-2xl mx-auto text-lg dark:text-white/90">
               We provide evidence-based treatment with a personalized approach
               to mental health care
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="text-center">
+            <Card className="text-center service-card border shadow-lg">
               <CardHeader>
-                <Shield className="w-12 h-12 mx-auto text-blue-600 mb-4" />
-                <CardTitle>Licensed Experts</CardTitle>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Shield className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-xl mb-2">Licensed Experts</CardTitle>
                 <CardDescription>
                   All our therapists are licensed professionals with extensive
                   experience
@@ -202,20 +182,28 @@ const ServicesPage = () => {
               </CardHeader>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center service-card border shadow-lg">
               <CardHeader>
-                <Sparkles className="w-12 h-12 mx-auto text-blue-600 mb-4" />
-                <CardTitle>Personalized Care</CardTitle>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-indigo-600" />
+                </div>
+                <CardTitle className="text-xl mb-2">
+                  Personalized Care
+                </CardTitle>
                 <CardDescription>
                   Treatment plans tailored to your unique needs and goals
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center service-card border shadow-lg">
               <CardHeader>
-                <BadgeCheck className="w-12 h-12 mx-auto text-blue-600 mb-4" />
-                <CardTitle>Insurance Accepted</CardTitle>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+                  <BadgeCheck className="w-8 h-8 text-purple-600" />
+                </div>
+                <CardTitle className="text-xl mb-2">
+                  Insurance Accepted
+                </CardTitle>
                 <CardDescription>
                   We work with major insurance providers to make care accessible
                 </CardDescription>
@@ -225,11 +213,15 @@ const ServicesPage = () => {
         </section>
 
         {/* Services */}
-        <section className="mb-16">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Our Services</Badge>
-            <h2 className="text-3xl font-bold mb-4">Treatment Options</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+        <section className="mb-24">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 px-4 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200">
+              Our Services
+            </Badge>
+            <h2 className="text-4xl font-bold mb-6 gradient-text">
+              Treatment Options
+            </h2>
+            <p className=" max-w-2xl mx-auto text-lg">
               Choose from a variety of services designed to support your mental
               health journey
             </p>
@@ -239,41 +231,40 @@ const ServicesPage = () => {
             {services.map((service, index) => (
               <Card
                 key={index}
-                className="group hover:shadow-lg transition-all"
+                className="service-card border shadow-lg hover:shadow-xl"
               >
                 <CardHeader>
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                  <div className="flex items-center gap-6 mb-4">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100">
                       {service.icon}
                     </div>
                     <div>
-                      <CardTitle>{service.title}</CardTitle>
+                      <CardTitle className="text-xl mb-2">
+                        {service.title}
+                      </CardTitle>
                       <CardDescription>{service.description}</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
+                  <ul className="space-y-3">
                     {service.features.map((feature, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-2 text-gray-600"
-                      >
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                        {feature}
+                      <li key={i} className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
                 </CardContent>
-                <CardFooter className="flex justify-between items-center">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                <CardFooter className="flex justify-between items-center pt-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
                       <Clock className="w-4 h-4" />
                       {service.duration}
                     </div>
-                    <div className="font-semibold">{service.price}</div>
+                    <div className="text-xl font-semibold">{service.price}</div>
                   </div>
-                  <Button>
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
                     Book Now
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
@@ -284,11 +275,15 @@ const ServicesPage = () => {
         </section>
 
         {/* Meet Our Therapists */}
-        <section className="mb-16">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Our Team</Badge>
-            <h2 className="text-3xl font-bold mb-4">Meet Our Therapists</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+        <section className="mb-24">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 px-4 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200">
+              Our Team
+            </Badge>
+            <h2 className="text-4xl font-bold mb-6 gradient-text">
+              Meet Our Therapists
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto text-lg">
               Experienced professionals dedicated to supporting your mental
               health journey
             </p>
@@ -296,64 +291,82 @@ const ServicesPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {therapists.map((therapist, index) => (
-              <Card key={index} className="group">
+              <Card
+                key={index}
+                className="therapist-card border shadow-lg hover:shadow-xl"
+              >
                 <CardHeader className="text-center">
-                  <Avatar className="w-24 h-24 mx-auto mb-4">
+                  <Avatar className="w-32 h-32 mx-auto mb-6 ring-4 ring-blue-100">
                     <AvatarImage src={therapist.image} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-blue-600 text-white text-2xl">
                       {therapist.name
                         .split(' ')
                         .map(n => n[0])
                         .join('')}
                     </AvatarFallback>
                   </Avatar>
-                  <CardTitle className="group-hover:text-blue-600 transition-colors">
+                  <CardTitle className="text-xl mb-2">
                     {therapist.name}
                   </CardTitle>
-                  <CardDescription>{therapist.title}</CardDescription>
+                  <CardDescription className="text-gray-600">
+                    {therapist.title}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="font-medium">{therapist.rating}</span>
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-center gap-2">
+                      <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                      <span className="font-semibold text-lg">
+                        {therapist.rating}
+                      </span>
                       <span className="text-gray-500">
                         ({therapist.reviewCount} reviews)
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {therapist.specialties.map((specialty, i) => (
-                        <Badge key={i} variant="secondary">
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        >
                           {specialty}
                         </Badge>
                       ))}
                     </div>
                     <Separator />
-                    <div className="text-sm text-gray-500 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Award className="w-4 h-4" />
+                    <div className="text-sm space-y-3">
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Award className="w-4 h-4 text-blue-600" />
                         {therapist.experience} experience
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Brain className="w-4 h-4" />
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Brain className="w-4 h-4 text-blue-600" />
                         {therapist.education}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Calendar className="w-4 h-4 text-blue-600" />
                         Next available: {therapist.nextAvailable}
                       </div>
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="justify-center">
+                <CardFooter className="justify-center pt-4">
                   <HoverCard>
                     <HoverCardTrigger asChild>
-                      <Button variant="outline">View Profile</Button>
+                      <Button
+                        variant="outline"
+                        className="border-blue-200 hover:border-blue-300"
+                      >
+                        View Profile
+                      </Button>
                     </HoverCardTrigger>
                     <HoverCardContent className="w-80">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">{therapist.name}</h4>
-                        <p className="text-sm text-gray-500">{therapist.bio}</p>
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-lg text-blue-600">
+                          {therapist.name}
+                        </h4>
+                        <p className="text-gray-600">{therapist.bio}</p>
                       </div>
                     </HoverCardContent>
                   </HoverCard>
@@ -365,27 +378,31 @@ const ServicesPage = () => {
 
         {/* Insurance */}
         <section>
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Insurance</Badge>
-            <h2 className="text-3xl font-bold mb-4">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 px-4 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200">
+              Insurance
+            </Badge>
+            <h2 className="text-4xl font-bold mb-6 gradient-text">
               Accepted Insurance Providers
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-gray-600 max-w-2xl mx-auto text-lg">
               We work with major insurance providers to make mental health care
               accessible
             </p>
           </div>
 
-          <Card>
-            <CardContent className="py-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="py-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {insuranceProviders.map((provider, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-4 rounded-lg border bg-gray-50"
+                    className="flex items-center gap-3 p-6 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100"
                   >
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="font-medium">{provider}</span>
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                    <span className="font-medium text-gray-700">
+                      {provider}
+                    </span>
                   </div>
                 ))}
               </div>

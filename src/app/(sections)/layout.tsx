@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, ChevronDown } from 'lucide-react';
+import {
+  Menu,
+  ChevronDown,
+  ChevronLeftCircleIcon,
+  ChevronRightCircleIcon,
+  ArrowRightIcon,
+} from 'lucide-react';
 import BlogRightSection from '@/components/BlogRightSection';
 import PsychologistSection from '@/components/PsychologistSection';
 import StoriesSection from '@/components/StoriesSection';
@@ -31,21 +37,23 @@ const routeTitles = {
   // User routes
   '/stories': 'Our Stories',
   '/services': 'Services',
+  '/psychologist': 'Psychologists',
   '/psychologists': 'Psychologists',
   '/articles': 'Articles',
   '/resources': 'Resources',
   '/blogs': 'Blogs',
   '/account': 'Your Account',
   '/notifications': 'Notifications',
+  '/dashboard': 'Dashboard',
   // Psychologist routes
-  '/psychologist/dashboard': 'Dashboard',
+  '/dashboard/psychologist': 'Dashboard',
   '/psychologist/patients': 'My Patients',
   '/psychologist/appointments': 'Appointments',
   '/psychologist/messages': 'Messages',
   '/psychologist/articles': 'My Articles',
   '/psychologist/blogs': 'My Blogs',
   // Admin routes
-  '/admin/dashboard': 'Dashboard',
+  '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
   '/admin/psychologists': 'Psychologists Management',
   '/admin/articles': 'Articles Management',
@@ -81,8 +89,8 @@ const RootLayout = ({ children }) => {
 
   const isDashboardPage =
     pathname === '/dashboard' ||
-    pathname === '/psychologist/dashboard' ||
-    pathname === '/admin/dashboard';
+    pathname === '/dashboard/psychologist' ||
+    pathname === '/dashboard/admin';
 
   const pathParts = pathname.split('/').filter(Boolean);
   const isNestedRoute = pathParts.length > 1;
@@ -113,9 +121,9 @@ const RootLayout = ({ children }) => {
     if (isAuthenticated) {
       const dashboardPath =
         role === 'psychologist'
-          ? '/psychologist/dashboard'
+          ? '/dashboard/psychologist'
           : role === 'admin'
-            ? '/admin/dashboard'
+            ? '/dashboard/admin'
             : '/dashboard';
       router.push(dashboardPath);
     } else {
@@ -134,7 +142,7 @@ const RootLayout = ({ children }) => {
 
     const sections = {
       '/blogs': BlogRightSection,
-      '/psychologists': PsychologistSection,
+      '/psychologist': PsychologistSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
@@ -213,7 +221,7 @@ const RootLayout = ({ children }) => {
                   </SheetContent>
                 </Sheet>
                 <Link
-                  href={isAuthenticated ? '/dashboard' : '/'}
+                  href={isAuthenticated ? `/dashboard/${role!}` : '/'}
                   onClick={handleLogoClick}
                   className="flex items-center ml-2"
                 >
@@ -246,7 +254,7 @@ const RootLayout = ({ children }) => {
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
-                href={isAuthenticated ? `/${role}/dashboard` : '/'}
+                href={isAuthenticated ? `/dashboard/${role!}` : '/'}
                 onClick={handleLogoClick}
                 className="flex items-center"
               >
@@ -297,34 +305,46 @@ const RootLayout = ({ children }) => {
             showRightSidebar ? 'lg:mr-[420px]' : ''
           } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
         >
-          <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-30">
-            <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between">
+          <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[100]">
+            <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between relative">
               <div className="flex items-center gap-x-3">
                 {isNestedRoute && currentSection === 'blogs' && (
                   <div className="flex items-center gap-x-2">
-                    <Button
+                    <button
+                      type="button"
                       onClick={() => router.push('/blogs')}
-                      variant="ghost"
-                      size="icon"
-                      className="mr-2"
+                      className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
                     >
-                      <ChevronDown className="h-4 w-4 rotate-90" />
-                    </Button>
+                      <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
+                    </button>
+                  </div>
+                )}
+                {isNestedRoute && currentSection === 'psychologists' && (
+                  <div className="flex items-center gap-x-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push('/psychologists')}
+                      className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                      <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
+                    </button>
                   </div>
                 )}
                 {title && <h1 className="text-base font-semibold">{title}</h1>}
               </div>
               {!showRightSidebar && (
-                <UserActions
-                  isAuthenticated={isAuthenticated}
-                  profileImage={profileImage}
-                  role={role}
-                  firstName={firstName}
-                  lastName={lastName}
-                  router={router}
-                  onLoginClick={() => setShowLoginModal(true)}
-                  logout={logout}
-                />
+                <div className="relative z-[101]">
+                  <UserActions
+                    isAuthenticated={isAuthenticated}
+                    profileImage={profileImage}
+                    role={role}
+                    firstName={firstName}
+                    lastName={lastName}
+                    router={router}
+                    onLoginClick={() => setShowLoginModal(true)}
+                    logout={logout}
+                  />
+                </div>
               )}
             </div>
           </div>

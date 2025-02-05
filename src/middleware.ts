@@ -3,15 +3,22 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { decrypt } from './lib/token';
+import { getDashboardByRole } from './helpers/getDashboardByRole';
 
-const protectedRoutes = ['/dashboard', '/account', '/settings/profile'];
+const protectedRoutes = [
+  '/dashboard',
+  '/dashboard/admin',
+  '/dashboard/psychologist',
+  '/account',
+  '/settings/profile',
+];
 
 const publicRoutes = [
   '/login',
   '/signup',
   '/stories',
   '/services',
-  '/psychologists',
+  '/psychologist',
   '/articles',
   '/resources',
   '/blogs',
@@ -49,6 +56,8 @@ export default async function middleware(req: NextRequest) {
   }
 
   if (session?.id) {
+    const dashboardPath = getDashboardByRole(session.role || '');
+
     if (
       path === '/' ||
       path === '/login' ||
@@ -56,9 +65,30 @@ export default async function middleware(req: NextRequest) {
       path === '/forgot-password'
     ) {
       if (session.isVerified && session.profileComplete) {
-        return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+        return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
       } else if (!session.isVerified) {
         return NextResponse.redirect(new URL('/verify', req.nextUrl));
+      }
+    }
+
+    if (path.startsWith('/dashboard')) {
+      if (!session.isVerified) {
+        return NextResponse.redirect(new URL('/verify', req.nextUrl));
+      }
+
+      if (session.isVerified && session.profileComplete) {
+        if (session.role === 'user') {
+          if (path === '/dashboard') {
+            return NextResponse.next();
+          }
+          if (path.startsWith('/dashboard/')) {
+            return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+          }
+        } else {
+          if (path === '/dashboard' || path !== dashboardPath) {
+            return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
+          }
+        }
       }
     }
 
@@ -97,7 +127,7 @@ export const config = {
     '/settings/profile',
     '/stories/:path*',
     '/services/:path*',
-    '/psychologists/:path*',
+    '/psychologist/:path*',
     '/articles/:path*',
     '/resources/:path*',
     '/blogs/:path*',

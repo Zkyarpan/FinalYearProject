@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Skeleton from '@/components/common/Skeleton';
-import generateSlug from '@/helpers/generateSlug';
+import { generateSlug } from '@/helpers/generateSlug';
 import { useUserStore } from '@/store/userStore';
 
 interface Author {

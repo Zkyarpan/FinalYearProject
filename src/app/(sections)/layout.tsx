@@ -1,13 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Menu,
-  ChevronDown,
-  ChevronLeftCircleIcon,
-  ChevronRightCircleIcon,
-  ArrowRightIcon,
-} from 'lucide-react';
+import { Menu, ArrowRightIcon } from 'lucide-react';
 import BlogRightSection from '@/components/BlogRightSection';
 import PsychologistSection from '@/components/PsychologistSection';
 import StoriesSection from '@/components/StoriesSection';
@@ -47,11 +41,11 @@ const routeTitles = {
   '/dashboard': 'Dashboard',
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
-  '/psychologist/patients': 'My Patients',
-  '/psychologist/appointments': 'Appointments',
-  '/psychologist/messages': 'Messages',
-  '/psychologist/articles': 'My Articles',
-  '/psychologist/blogs': 'My Blogs',
+  '/psychologists/patients': 'My Patients',
+  '/psychologists/appointments': 'Appointments',
+  '/psychologists/messages': 'Messages',
+  '/psychologists/articles': 'My Articles',
+  '/psychologists/blog': 'My Blogs',
   // Admin routes
   '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
@@ -72,14 +66,9 @@ const RootLayout = ({ children }) => {
   const router = useRouter();
 
   const NAV_ITEMS =
-    isAuthenticated && role ? getNavItemsByRole(role) : USER_NAV_ITEMS;
-
-  const accountPath =
-    role === 'psychologist'
-      ? '/psychologist/account'
-      : role === 'admin'
-        ? '/admin/account'
-        : '/account';
+    isAuthenticated && role
+      ? getNavItemsByRole(role)
+      : USER_NAV_ITEMS.filter(item => !item.href.includes('dashboard'));
 
   const isAccountPage =
     pathname === '/account' ||
@@ -93,16 +82,20 @@ const RootLayout = ({ children }) => {
     pathname === '/dashboard/admin';
 
   const pathParts = pathname.split('/').filter(Boolean);
-  const isNestedRoute = pathParts.length > 1;
   const baseRoute = `/${pathParts[0]}`;
-  const currentSection = pathParts[0];
   const title = routeTitles[pathname] || routeTitles[baseRoute];
+
+  const isNestedBlogRoute =
+    pathname.startsWith('/blogs/') && pathname !== '/blogs';
+  const isNestedPsychologistRoute =
+    pathname.startsWith('/psychologists/') && pathname !== '/psychologists';
 
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
       (isAuthenticated && !isDashboardPage && role === 'user')) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
+      pathname === '/psychologists' ||
       pathname === '/' ||
       isAccountPage);
 
@@ -131,6 +124,14 @@ const RootLayout = ({ children }) => {
     }
   };
 
+  const handleBackNavigation = () => {
+    if (isNestedBlogRoute) {
+      router.push('/blogs');
+    } else if (isNestedPsychologistRoute) {
+      router.push('/psychologists');
+    }
+  };
+
   const renderSidebarContent = () => {
     if (isAccountPage && isAuthenticated) {
       return <UserSidebar />;
@@ -142,7 +143,7 @@ const RootLayout = ({ children }) => {
 
     const sections = {
       '/blogs': BlogRightSection,
-      '/psychologist': PsychologistSection,
+      '/psychologists': PsychologistSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
@@ -308,22 +309,11 @@ const RootLayout = ({ children }) => {
           <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[100]">
             <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between relative">
               <div className="flex items-center gap-x-3">
-                {isNestedRoute && currentSection === 'blogs' && (
+                {(isNestedBlogRoute || isNestedPsychologistRoute) && (
                   <div className="flex items-center gap-x-2">
                     <button
                       type="button"
-                      onClick={() => router.push('/blogs')}
-                      className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
-                    >
-                      <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
-                    </button>
-                  </div>
-                )}
-                {isNestedRoute && currentSection === 'psychologists' && (
-                  <div className="flex items-center gap-x-2">
-                    <button
-                      type="button"
-                      onClick={() => router.push('/psychologists')}
+                      onClick={handleBackNavigation}
                       className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
                     >
                       <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />

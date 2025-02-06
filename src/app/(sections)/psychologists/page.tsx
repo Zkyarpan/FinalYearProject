@@ -2,21 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Star,
   Search,
   MapPin,
-  Filter,
   ArrowUpDown,
-  CalendarDays,
   Clock,
   GraduationCap,
-  Award,
-  Heart,
-  Mail,
   Phone,
   Video,
   Loader2,
-  ArrowRight,
 } from 'lucide-react';
 
 import {
@@ -44,17 +37,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BookingDialog } from '@/components/BookingDialog';
+import { toast } from 'sonner';
 
 interface Education {
   degree: string;
@@ -163,10 +150,12 @@ const PsychologistDirectory = () => {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-600">{error}</p>
-        </div>
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
@@ -181,22 +170,6 @@ const PsychologistDirectory = () => {
       </div>
     );
   }
-
-  const getAvailableTimeSlots = (
-    availability: PsychologistProfile['availability']
-  ) => {
-    const slots: { day: string; startTime: string; endTime: string }[] = [];
-    Object.entries(availability).forEach(([day, time]) => {
-      if (time.available && time.startTime && time.endTime) {
-        slots.push({
-          day,
-          startTime: time.startTime,
-          endTime: time.endTime,
-        });
-      }
-    });
-    return slots;
-  };
 
   const filteredPsychologists = psychologists.filter(psych => {
     const matchesSearch =
@@ -303,7 +276,7 @@ const PsychologistDirectory = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 my-6">
           {filteredPsychologists.map(psych => (
             <Card key={psych.id} className="relative">
               <Link
@@ -415,64 +388,20 @@ const PsychologistDirectory = () => {
                         ${psych.sessionFee}/session
                       </span>
                     </div>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button className="w-full">
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          Book Consultation
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Schedule a Consultation</DialogTitle>
-                          <DialogDescription>
-                            Choose an available time slot with Dr.{' '}
-                            {psych.firstName} {psych.lastName}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          {getAvailableTimeSlots(psych.availability).length >
-                          0 ? (
-                            <div className="grid grid-cols-2 gap-4">
-                              {getAvailableTimeSlots(psych.availability).map(
-                                (slot, index) => (
-                                  <Button
-                                    key={index}
-                                    variant="outline"
-                                    className="w-full justify-start"
-                                  >
-                                    <div className="text-left">
-                                      <div className="font-medium capitalize">
-                                        {slot.day}
-                                      </div>
-                                      <div className="text-xs">
-                                        {slot.startTime} - {slot.endTime}
-                                      </div>
-                                    </div>
-                                  </Button>
-                                )
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-center text-muted-foreground">
-                              No available time slots. Please contact for custom
-                              scheduling.
-                            </p>
-                          )}
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" className="w-full">
-                            <Mail className="mr-2 h-4 w-4" />
-                            Request Custom Time
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <BookingDialog
+                      psychologist={psych}
+                      onBookingComplete={() => {
+                        toast.success('Appointment booked', {
+                          description:
+                            "You'll receive a confirmation email shortly",
+                        });
+                      }}
+                    />
                   </TabsContent>
                 </Tabs>
               </CardContent>
 
-              <CardFooter className="border-t p-5">
+              <div className="border-t p-5">
                 <div className="flex items-center justify-between w-full text-xs">
                   <div className="flex items-center space-x-2">
                     <div
@@ -489,7 +418,7 @@ const PsychologistDirectory = () => {
                     <span>{psych.languages.join(' • ')}</span>
                   </div>
                 </div>
-              </CardFooter>
+              </div>
             </Card>
           ))}
         </div>

@@ -85,11 +85,10 @@ const VerificationDialog = ({
       localStorage.removeItem('email');
       setIsRedirecting(true);
 
-      // Add a delay before redirecting to show the loading state
       setTimeout(() => {
         onVerificationComplete();
-        router.push('/psychologist/dashboard');
-      }, 1500); // Increased delay to ensure loading state is visible
+        router.push('/dashboard/psychologist');
+      }, 1500);
     } catch (error) {
       toast.error(
         error.message || 'Invalid verification code. Please try again.'

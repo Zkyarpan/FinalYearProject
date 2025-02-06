@@ -119,18 +119,18 @@ const UserActions = ({
             <Notification />
             <div className="relative" ref={dropdownRef}>
               <button
-                className="p-1 rounded-full hover:opacity-80 transition-all"
+                className="p-1 rounded-full hover:bg-gray-300 hover:dark:bg-input transition-colors duration-300"
                 onClick={handleProfileClick}
+                aria-label="Profile"
               >
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-border dark:border-[#333333]">
-                  <Image
-                    src={profileImage || '/default-avatar.jpg'}
-                    alt={`${firstName}'s profile picture`}
-                    width={32}
-                    height={32}
-                    layout="responsive"
-                    className="object-cover"
-                  />
+                <div className="relative w-8 h-8">
+                  <div className="absolute inset-0 rounded-full overflow-hidden">
+                    <img
+                      src={profileImage || '/default-avatar.jpg'}
+                      alt={`${firstName}'s profile picture`}
+                      className="w-full h-full object-cover opacity-90"
+                    />
+                  </div>
                 </div>
               </button>
 
@@ -166,7 +166,7 @@ const UserActions = ({
                   <div className="p-2 flex flex-col gap-1">
                     <button
                       onClick={navigateToProfile}
-                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 hover:bg-muted"
+                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 dark:hover:bg-input hover:bg-muted"
                     >
                       <User />
                       <span className="group-hover:translate-x-1 transition-transform duration-200">
@@ -178,7 +178,7 @@ const UserActions = ({
                         router.push('/settings');
                         setIsDropdownOpen(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 hover:bg-muted"
+                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 dark:hover:bg-input hover:bg-muted"
                     >
                       <Settings />
                       <span className="group-hover:translate-x-1 transition-transform duration-200">
@@ -188,7 +188,7 @@ const UserActions = ({
                     <button
                       onClick={handleLogout}
                       disabled={isLoading || isRedirecting}
-                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors text-red-500 flex items-center gap-2 hover:bg-muted"
+                      className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors text-red-500 flex items-center gap-2 hover:bg-muted dark:hover:bg-input"
                     >
                       {isLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

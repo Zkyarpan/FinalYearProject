@@ -20,7 +20,6 @@ import { Checkbox } from './ui/checkbox';
 import { Switch } from './ui/switch';
 import { Card, CardContent } from './ui/card';
 import { Label } from './ui/label';
-import Clock from '@/icons/Clock';
 import VerificationDialog from './VerificationDialog';
 
 const PsychologistRegister = () => {
@@ -256,41 +255,11 @@ const PsychologistRegister = () => {
     }));
   };
 
-  const [availability, setAvailability] = useState({
-    monday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    tuesday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    wednesday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    thursday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    friday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    saturday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-    sunday: { enabled: false, startTime: '09:00', endTime: '17:00' },
-  });
-
   const timeSlots = Array.from({ length: 48 }, (_, i) => {
     const hour = Math.floor(i / 2);
     const minute = i % 2 === 0 ? '00' : '30';
     return `${hour.toString().padStart(2, '0')}:${minute}`;
   });
-
-  const handleToggleDay = day => {
-    setAvailability(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        enabled: !prev[day].enabled,
-      },
-    }));
-  };
-
-  const handleTimeChange = (day, type, value) => {
-    setAvailability(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [type]: value,
-      },
-    }));
-  };
 
   useEffect(() => {
     return () => {
@@ -1100,81 +1069,7 @@ const PsychologistRegister = () => {
             </div>
 
             <div className="w-full max-w-2xl">
-              <div className="flex items-center gap-2 mb-6">
-                <Clock />
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl main-font font-bold text-[hsl(var(--foreground))]">
-                    Weekly Availability
-                  </h2>
-                </div>
-              </div>
-
               <div className="space-y-6">
-                {Object.entries(availability).map(
-                  ([day, { enabled, startTime, endTime }]) => (
-                    <div key={day} className="flex items-center gap-6">
-                      <div className="flex items-center gap-2 w-40">
-                        <Switch
-                          checked={enabled}
-                          onCheckedChange={() => handleToggleDay(day)}
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label className="capitalize font-medium">{day}</Label>
-                      </div>
-
-                      {enabled && (
-                        <div className="flex items-center gap-4">
-                          <Select
-                            value={startTime}
-                            onValueChange={value =>
-                              handleTimeChange(day, 'startTime', value)
-                            }
-                          >
-                            <SelectTrigger
-                              className="h-10 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30 w-32"
-                            >
-                              <SelectValue placeholder="Start time" />
-                            </SelectTrigger>
-                            <SelectContent className="h-48 dark:bg-input">
-                              {timeSlots.map(time => (
-                                <SelectItem key={`start-${time}`} value={time}>
-                                  {time}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          <span className="text-sm">to</span>
-
-                          <Select
-                            value={endTime}
-                            onValueChange={value =>
-                              handleTimeChange(day, 'endTime', value)
-                            }
-                          >
-                            <SelectTrigger
-                              className="w-32 h-10 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                            >
-                              <SelectValue placeholder="End time" />
-                            </SelectTrigger>
-                            <SelectContent className="h-48 dark:bg-input">
-                              {timeSlots.map(time => (
-                                <SelectItem key={`end-${time}`} value={time}>
-                                  {time}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  )
-                )}
-
                 <div className="mt-6 flex items-center justify-end gap-x-6 pb-10">
                   <Link
                     href={`/signup`}

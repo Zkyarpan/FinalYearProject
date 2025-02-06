@@ -59,27 +59,27 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   {
     icon: <Users />,
     text: 'My Patients',
-    href: '/psychologist/patients',
+    href: '/psychologists/patients',
   },
   {
     icon: <Calendar />,
     text: 'Appointments',
-    href: '/psychologist/appointments',
+    href: '/psychologists/appointments',
   },
   {
     icon: <Messages />,
     text: 'Messages',
-    href: '/psychologist/messages',
+    href: '/psychologists/messages',
   },
   {
     icon: <ArticlesIcon />,
     text: 'My Articles',
-    href: '/psychologist/articles',
+    href: '/psychologists/articles',
   },
   {
     icon: <BlogIcon />,
     text: 'My Blogs',
-    href: '/psychologist/blogs',
+    href: '/psychologists/blog',
   },
 ];
 

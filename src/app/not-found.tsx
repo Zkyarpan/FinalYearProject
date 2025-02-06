@@ -19,7 +19,7 @@ const NotFoundPage = () => {
           removed, renamed, or… might never have existed. 🤷‍♂️
         </p>
       </div>
-      <Link href="/stories" passHref>
+      <Link href="/" passHref>
         <button className="mt-6 inline-flex items-center justify-center px-4 py-2  text-sm font-medium shadow-sm text-white bg-[hsl(210,96.1%,40%)] hover:bg-[hsl(210,96.1%,50%)] rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]">
           <svg
             className="mr-2 -ml-1 h-4 w-4"
@@ -42,7 +42,7 @@ const NotFoundPage = () => {
               d="M22 10.5L17.6569 6.33548C14.9902 3.77849 13.6569 2.5 12 2.5C10.3431 2.5 9.00981 3.77849 6.34315 6.33548L2 10.5"
             />
           </svg>
-          Stories
+          Back Home
         </button>
       </Link>
     </div>

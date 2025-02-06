@@ -9,13 +9,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
-  console.log('API Route Handler - Received request for slug:', params.slug);
-
   try {
     await connectDB();
 
-    const slug = params.slug;
-    console.log('Processing slug:', slug);
+    const slug = await params.slug;
 
     if (!slug) {
       return NextResponse.json(createErrorResponse(400, 'Slug is required'), {
@@ -39,22 +36,17 @@ export async function GET(
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
 
-    console.log('Searching for psychologist:', { firstName, lastName });
-
     const psychologist: any = await Psychologist.findOne({
       firstName: new RegExp(`^${firstName}$`, 'i'),
       lastName: new RegExp(`^${lastName}$`, 'i'),
     }).lean();
 
     if (!psychologist) {
-      console.log('Psychologist not found for:', { firstName, lastName });
       return NextResponse.json(
         createErrorResponse(404, 'Psychologist not found'),
         { status: 404 }
       );
     }
-
-    console.log('Found psychologist:', psychologist._id);
 
     const formattedPsychologist = {
       id: psychologist._id.toString(),

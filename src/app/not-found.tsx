@@ -20,7 +20,7 @@ const NotFoundPage = () => {
         </p>
       </div>
       <Link href="/" passHref>
-        <button className="mt-6 inline-flex items-center justify-center px-4 py-2  text-sm font-medium shadow-sm text-white bg-[hsl(210,96.1%,40%)] hover:bg-[hsl(210,96.1%,50%)] rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]">
+        <a className="mt-6 inline-flex items-center justify-center px-4 py-2 text-sm font-medium shadow-sm text-white bg-[hsl(210,96.1%,40%)] hover:bg-[hsl(210,96.1%,50%)] rounded-xl border border-[hsl(var(--border))] hover:shadow-md dark:bg-[#404040] dark:border-[#525252] hover:dark:bg-[#505050]">
           <svg
             className="mr-2 -ml-1 h-4 w-4"
             fill="none"
@@ -43,7 +43,7 @@ const NotFoundPage = () => {
             />
           </svg>
           Back Home
-        </button>
+        </a>
       </Link>
     </div>
   );

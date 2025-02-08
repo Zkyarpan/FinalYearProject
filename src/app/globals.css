@@ -155,3 +155,79 @@ select:-webkit-autofill:focus {
     --color-5: 90 100% 63%;
   }
 }
+
+
+/* app/styles/calendar.css */
+.fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-button-text-color: hsl(var(--foreground));
+  --fc-button-bg-color: hsl(var(--background));
+  --fc-button-border-color: hsl(var(--border));
+  --fc-button-hover-bg-color: hsl(var(--accent));
+  --fc-button-hover-border-color: hsl(var(--accent));
+  --fc-button-active-bg-color: hsl(var(--accent));
+  --fc-button-active-border-color: hsl(var(--accent));
+  --fc-event-bg-color: hsl(var(--primary));
+  --fc-event-border-color: hsl(var(--primary));
+  --fc-event-text-color: hsl(var(--primary-foreground));
+  --fc-today-bg-color: hsl(var(--accent) / 0.1);
+  --fc-now-indicator-color: hsl(var(--destructive));
+}
+
+.fc .fc-button {
+  @apply shadow-sm hover:bg-accent hover:text-accent-foreground;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  @apply bg-accent text-accent-foreground;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  @apply border-border;
+}
+
+.fc .fc-scrollgrid-section table {
+  @apply border-border;
+}
+
+.fc-theme-standard td, 
+.fc-theme-standard th {
+  @apply border-border;
+}
+
+.fc .fc-timegrid-slot {
+  @apply h-12;
+}
+
+.fc .fc-timegrid-slot-label {
+  @apply text-muted-foreground text-sm;
+}
+
+.fc .fc-toolbar-title {
+  @apply text-xl font-semibold;
+}
+
+.fc-event {
+  @apply cursor-pointer transition-colors;
+}
+
+.fc .fc-today-button {
+  @apply text-sm;
+}
+
+.fc .fc-button-group {
+  @apply space-x-1;
+}
+
+.fc .fc-button {
+  @apply text-sm px-3 py-2;
+}
+
+.fc-direction-ltr .fc-button-group > .fc-button:not(:last-child) {
+  @apply rounded-r-none border-r-0;
+}
+
+.fc-direction-ltr .fc-button-group > .fc-button:not(:first-child) {
+  @apply rounded-l-none;
+}

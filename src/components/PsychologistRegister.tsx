@@ -383,7 +383,7 @@ const PsychologistRegister = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background mt-10">
         <form onSubmit={handleSubmit}>
           <div className="space-y-12">
             <div className="border-b border-[hsl(var(--border))] pb-12">

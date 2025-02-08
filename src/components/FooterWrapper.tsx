@@ -12,6 +12,7 @@ const FooterWrapper = () => {
     '/psychologist',
     '/verify',
     '/dashboard',
+    '/appointments',
     '/psychologist/dashboard',
     '/admin/dashboard',
     '/forgot-password',

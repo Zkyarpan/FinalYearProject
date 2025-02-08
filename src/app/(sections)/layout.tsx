@@ -32,20 +32,21 @@ const routeTitles = {
   '/stories': 'Our Stories',
   '/services': 'Services',
   '/psychologist': 'Psychologists',
-  '/psychologists': 'Psychologists',
   '/articles': 'Articles',
   '/resources': 'Resources',
   '/blogs': 'Blogs',
   '/account': 'Your Account',
   '/notifications': 'Notifications',
   '/dashboard': 'Dashboard',
+  '/appointments': 'Appointments',
+
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
-  '/psychologists/patients': 'My Patients',
-  '/psychologists/appointments': 'Appointments',
-  '/psychologists/messages': 'Messages',
-  '/psychologists/articles': 'My Articles',
-  '/psychologists/blog': 'My Blogs',
+  '/psychologist/patients': 'My Patients',
+  '/psychologist/appointments': 'Appointments',
+  '/psychologist/messages': 'Messages',
+  '/psychologist/articles': 'My Articles',
+  '/psychologist/blog': 'My Blogs',
   // Admin routes
   '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
@@ -68,7 +69,11 @@ const RootLayout = ({ children }) => {
   const NAV_ITEMS =
     isAuthenticated && role
       ? getNavItemsByRole(role)
-      : USER_NAV_ITEMS.filter(item => !item.href.includes('dashboard'));
+      : USER_NAV_ITEMS.filter(
+          item =>
+            !item.href.includes('dashboard') &&
+            !item.href.includes('appointments')
+        );
 
   const isAccountPage =
     pathname === '/account' ||
@@ -88,14 +93,14 @@ const RootLayout = ({ children }) => {
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
   const isNestedPsychologistRoute =
-    pathname.startsWith('/psychologists/') && pathname !== '/psychologists';
+    pathname.startsWith('/psychologist/') && pathname !== '/psychologist';
 
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
       (isAuthenticated && !isDashboardPage && role === 'user')) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
-      pathname === '/psychologists' ||
+      pathname === '/psychologist' ||
       pathname === '/' ||
       isAccountPage);
 
@@ -116,8 +121,8 @@ const RootLayout = ({ children }) => {
         role === 'psychologist'
           ? '/dashboard/psychologist'
           : role === 'admin'
-            ? '/dashboard/admin'
-            : '/dashboard';
+          ? '/dashboard/admin'
+          : '/dashboard';
       router.push(dashboardPath);
     } else {
       router.push('/');
@@ -128,7 +133,7 @@ const RootLayout = ({ children }) => {
     if (isNestedBlogRoute) {
       router.push('/blogs');
     } else if (isNestedPsychologistRoute) {
-      router.push('/psychologists');
+      router.push('/psychologist');
     }
   };
 
@@ -143,7 +148,7 @@ const RootLayout = ({ children }) => {
 
     const sections = {
       '/blogs': BlogRightSection,
-      '/psychologists': PsychologistSection,
+      '/psychologist': PsychologistSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
@@ -170,7 +175,7 @@ const RootLayout = ({ children }) => {
     <>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[60]">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center">
@@ -198,7 +203,7 @@ const RootLayout = ({ children }) => {
                         </div>
                       </SheetTitle>
                     </SheetHeader>
-                    <nav className="mt-8">
+                    <nav className="mt-5 overflow-auto scroll-smooth">
                       {NAV_ITEMS.map(item => (
                         <button
                           key={item.text}
@@ -251,7 +256,7 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-40">
+        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[40]">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
@@ -270,7 +275,7 @@ const RootLayout = ({ children }) => {
                 <span className="ml-2 text-2xl logo-font">Mentality</span>
               </Link>
             </div>
-            <nav className="px-6 flex-1 mt-10">
+            <nav className="px-6 flex-1 mt-5 overflow-auto scroll-smooth">
               {NAV_ITEMS.map(item => (
                 <NavItem
                   key={item.text}
@@ -293,11 +298,6 @@ const RootLayout = ({ children }) => {
               )}
             </nav>
           </div>
-          <div className="px-6">
-            <p className="text-muted-foreground text-[10px]">
-              © {currentYear} Mentality, Inc.
-            </p>
-          </div>
         </div>
 
         {/* Main Content Area */}
@@ -306,7 +306,7 @@ const RootLayout = ({ children }) => {
             showRightSidebar ? 'lg:mr-[420px]' : ''
           } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
         >
-          <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[100]">
+          <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[60]">
             <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between relative">
               <div className="flex items-center gap-x-3">
                 {(isNestedBlogRoute || isNestedPsychologistRoute) && (
@@ -348,7 +348,7 @@ const RootLayout = ({ children }) => {
 
         {/* Right Sidebar */}
         {showRightSidebar && (
-          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-40">
+          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[40]">
             <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <UserActions
                 isAuthenticated={isAuthenticated}

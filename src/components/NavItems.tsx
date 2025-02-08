@@ -19,6 +19,11 @@ export const USER_NAV_ITEMS = [
     href: '/dashboard',
   },
   {
+    icon: <Calendar />,
+    text: 'Appointments',
+    href: '/appointments',
+  },
+  {
     icon: <StoriesIcon />,
     text: 'Stories',
     href: '/stories',
@@ -31,7 +36,7 @@ export const USER_NAV_ITEMS = [
   {
     icon: <PsychologistIcon />,
     text: 'Psychologist',
-    href: '/psychologists',
+    href: '/psychologist',
   },
   {
     icon: <ArticlesIcon />,
@@ -59,27 +64,27 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   {
     icon: <Users />,
     text: 'My Patients',
-    href: '/psychologists/patients',
+    href: '/psychologist/patients',
   },
   {
     icon: <Calendar />,
     text: 'Appointments',
-    href: '/psychologists/appointments',
+    href: '/psychologist/appointments',
   },
   {
     icon: <Messages />,
     text: 'Messages',
-    href: '/psychologists/messages',
+    href: '/psychologist/messages',
   },
   {
     icon: <ArticlesIcon />,
     text: 'My Articles',
-    href: '/psychologists/articles',
+    href: '/psychologist/articles',
   },
   {
     icon: <BlogIcon />,
     text: 'My Blogs',
-    href: '/psychologists/blog',
+    href: '/psychologist/blog',
   },
 ];
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, X } from 'lucide-react';
@@ -15,6 +15,7 @@ const VALID_REDIRECT_PATHS = [
   '/blogs/create',
   '/stories/create',
   '/articles/create',
+  '/appointments/',
 ];
 
 const LoginModal = ({ isOpen, onClose }) => {
@@ -110,137 +111,144 @@ const LoginModal = ({ isOpen, onClose }) => {
   return (
     <>
       {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-background w-full max-w-[380px] mx-4 relative rounded-2xl border">
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors duration-200 rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      <div className="fixed inset-0 z-[99999]">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[8px] -mt-10" />
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="relative bg-background w-full max-w-[380px] rounded-2xl border">
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors duration-200 rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
-          <div className="px-6 py-10">
-            <h2 className="text-5xl font-instrument text-center mb-6">
-              Log in
-            </h2>
+              <div className="px-6 py-10">
+                <h2 className="text-5xl font-instrument text-center mb-6">
+                  Log in
+                </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <Label
-                  htmlFor="email"
-                  className="text-sm font-semibold text-foreground"
-                >
-                  Email
-                </Label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={e => {
-                    setEmail(e.target.value);
-                    setEmailError('');
-                  }}
-                  className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                />
-                {emailError && (
-                  <p className="text-destructive text-xs mt-1">{emailError}</p>
-                )}
-              </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="email"
+                      className="text-sm font-semibold text-foreground"
+                    >
+                      Email
+                    </Label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={e => {
+                        setEmail(e.target.value);
+                        setEmailError('');
+                      }}
+                      className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                    />
+                    {emailError && (
+                      <p className="text-destructive text-xs mt-1">
+                        {emailError}
+                      </p>
+                    )}
+                  </div>
 
-              <div className="space-y-1">
-                <Label
-                  htmlFor="password"
-                  className="text-sm font-semibold text-foreground"
-                >
-                  Password
-                </Label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
-                  />
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="password"
+                      className="text-sm font-semibold text-foreground"
+                    >
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-8 w-8 text-foreground/50 hover:text-foreground hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M3 7c3.6 7.8 14.4 7.8 18 0m-3.22 3.982L21 15.4m-9-2.55v4.35m-5.78-6.218L3 15.4"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M3 12.85c3.6-7.8 14.4-7.8 18 0m-9 4.2a2.4 2.4 0 110-4.801 2.4 2.4 0 010 4.801z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          </svg>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-muted-foreground hover:text-foreground hover:underline font-semibold"
+                    >
+                      Forgot Password?
+                    </Link>
+                  </div>
+
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-8 w-8 text-foreground/50 hover:text-foreground hover:bg-transparent focus:bg-transparent active:bg-transparent transition-none"
-                    onClick={() => setShowPassword(!showPassword)}
+                    type="submit"
+                    className="w-full mt-2 font-semibold rounded-2xl shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
+                    disabled={isLoading}
                   >
-                    {showPassword ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M3 7c3.6 7.8 14.4 7.8 18 0m-3.22 3.982L21 15.4m-9-2.55v4.35m-5.78-6.218L3 15.4"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      </svg>
+                    {isLoading ? (
+                      <Loader />
                     ) : (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M3 12.85c3.6-7.8 14.4-7.8 18 0m-9 4.2a2.4 2.4 0 110-4.801 2.4 2.4 0 010 4.801z"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      </svg>
+                      <>
+                        Login <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
                     )}
                   </Button>
-                </div>
+                </form>
+
+                <p className="text-center text-xs text-muted-foreground mt-4">
+                  Don't have a Mentality profile?{' '}
+                  <Link
+                    href="/signup"
+                    className="text-foreground hover:underline font-semibold"
+                  >
+                    Create One!
+                  </Link>
+                </p>
               </div>
-
-              <div className="text-right">
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline font-semibold"
-                >
-                  Forgot Password?
-                </Link>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full mt-2 font-semibold rounded-2xl shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader />
-                ) : (
-                  <>
-                    Login <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <p className="text-center text-xs text-muted-foreground mt-4">
-              Don't have a Mentality profile?{' '}
-              <Link
-                href="/signup"
-                className="text-foreground hover:underline font-semibold"
-              >
-                Create One!
-              </Link>
-            </p>
+            </div>
           </div>
         </div>
       </div>

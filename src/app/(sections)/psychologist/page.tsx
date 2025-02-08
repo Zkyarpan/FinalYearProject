@@ -42,6 +42,8 @@ import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookingDialog } from '@/components/BookingDialog';
 import { toast } from 'sonner';
+import { useUserStore } from '@/store/userStore';
+import LoginModal from '@/components/LoginModel';
 
 interface Education {
   degree: string;
@@ -109,6 +111,8 @@ const PsychologistDirectory = () => {
   const [psychologists, setPsychologists] = useState<PsychologistProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { user } = useUserStore();
 
   useEffect(() => {
     const fetchPsychologists = async () => {
@@ -138,6 +142,15 @@ const PsychologistDirectory = () => {
 
     fetchPsychologists();
   }, []);
+
+  const handleNavigation = async (path, requireAuth = false) => {
+    if (requireAuth && !user) {
+      localStorage.setItem('redirectAfterLogin', path);
+      setShowLoginModal(true);
+      return false;
+    }
+    return true;
+  };
 
   if (loading) {
     return (
@@ -279,9 +292,7 @@ const PsychologistDirectory = () => {
         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 my-6">
           {filteredPsychologists.map(psych => (
             <Card key={psych.id} className="relative">
-              <Link
-                href={`/psychologists/${psych.firstName}-${psych.lastName}`}
-              >
+              <Link href={`/psychologist/${psych.firstName}-${psych.lastName}`}>
                 <CardHeader className="pb-4">
                   <div className="flex items-start space-x-4">
                     <Avatar className="w-24 h-24 rounded-lg border-2 border-white shadow-lg">
@@ -388,14 +399,10 @@ const PsychologistDirectory = () => {
                         ${psych.sessionFee}/session
                       </span>
                     </div>
-                    <BookingDialog
-                      psychologist={psych}
-                      onBookingComplete={() => {
-                        toast.success('Appointment booked', {
-                          description:
-                            "You'll receive a confirmation email shortly",
-                        });
-                      }}
+                    <BookingDialog handleNavigation={handleNavigation} />
+                    <LoginModal
+                      isOpen={showLoginModal}
+                      onClose={() => setShowLoginModal(false)}
                     />
                   </TabsContent>
                 </Tabs>
@@ -405,7 +412,11 @@ const PsychologistDirectory = () => {
                 <div className="flex items-center justify-between w-full text-xs">
                   <div className="flex items-center space-x-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${psych.acceptingNewClients ? 'bg-green-500' : 'bg-red-500'}`}
+                      className={`w-2 h-2 rounded-full ${
+                        psych.acceptingNewClients
+                          ? 'bg-green-500'
+                          : 'bg-red-500'
+                      }`}
                     />
                     <span className="font-medium">
                       {psych.acceptingNewClients

@@ -10,6 +10,7 @@ const protectedRoutes = [
   '/dashboard/admin',
   '/dashboard/psychologist',
   '/account',
+  '/appointments',
   '/settings/profile',
 ];
 
@@ -131,5 +132,6 @@ export const config = {
     '/articles/:path*',
     '/resources/:path*',
     '/blogs/:path*',
+    '/appointments/:path*',
   ],
 };

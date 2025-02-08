@@ -82,7 +82,7 @@ const SignUpPage = () => {
               </div>
               <div className="mt-6">
                 <Link
-                  href="/psychologist"
+                  href="/signup/psychologist"
                   className="flex items-center justify-center w-full font-semibold text-center rounded-2xl bg-primary text-white py-2 h-9 hover:shadow-lg transition-shadow"
                 >
                   Register as Professional

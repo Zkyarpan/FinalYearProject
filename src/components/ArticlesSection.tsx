@@ -1,3 +1,5 @@
+'use client'
+
 import { Loader2 as Loader, ArrowRight as RightIcon } from 'lucide-react';
 
 import Article from '@/icons/Atricles';

@@ -111,7 +111,7 @@ const LoginModal = ({ isOpen, onClose }) => {
   return (
     <>
       {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
-      <div className="fixed inset-0 z-[99999]">
+      <div className="fixed inset-0 z-[100]">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[8px] -mt-10" />
         <div className="fixed inset-0 overflow-y-auto">
           <div className="min-h-full flex items-center justify-center p-4">

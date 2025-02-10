@@ -19,11 +19,11 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
     <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
       <div className="h-full flex flex-col max-w-sm mx-auto space-y-6">
         <div className="space-y-4">
-          <h2 className="text-2xl font-normal italic text-center text-foreground font-instrument">
+          <h2 className="text-2xl font-bold text-center text-foreground main-font">
             Hey, do you write?
           </h2>
           <div className="space-y-2">
-            <p className="text-sm text-center">
+            <p className="text-sm text-center main-font">
               Share your thoughts, experiences, and insights with our community.
               Start writing and publishing your own blogs today.
             </p>
@@ -34,8 +34,8 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           <div className="p-4 rounded-xl bg-card/50 border border-border/50">
             <div className="flex flex-col items-start gap-2">
               <Brain />
-              <h3 className="font-medium text-sm">Mental Health</h3>
-              <p className="text-xs">
+              <h3 className="font-medium text-sm main-font">Mental Health</h3>
+              <p className="text-xs main-font">
                 Share your mental health journey and help others through their
                 own path.
               </p>
@@ -45,8 +45,8 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           <div className="p-4 rounded-xl bg-card/50 border border-border/50">
             <div className="flex flex-col items-start gap-2">
               <Heart />
-              <h3 className="font-medium text-sm">Self Care</h3>
-              <p className="text-xs">
+              <h3 className="font-medium text-sm main-font">Self Care</h3>
+              <p className="text-xs main-font">
                 Share wellness tips and self-care practices that work for you.
               </p>
             </div>
@@ -76,7 +76,7 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           )}
         </button>
 
-        <p className="text-xs text-center italic text-muted-foreground">
+        <p className="text-xs text-center  text-muted-foreground main-font">
           Join our community of mental health writers
         </p>
       </div>

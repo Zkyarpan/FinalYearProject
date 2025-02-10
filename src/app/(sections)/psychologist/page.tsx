@@ -4,24 +4,17 @@ import { useState, useEffect } from 'react';
 import {
   Search,
   MapPin,
-  ArrowUpDown,
-  Clock,
   GraduationCap,
   Phone,
   Video,
-  Loader2,
+  Star,
+  Calendar,
+  Users,
+  Languages,
+  Filter,
 } from 'lucide-react';
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -30,18 +23,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-
+import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookingDialog } from '@/components/BookingDialog';
-import { toast } from 'sonner';
 import { useUserStore } from '@/store/userStore';
 import LoginModal from '@/components/LoginModel';
 
@@ -108,6 +94,8 @@ const PsychologistDirectory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('All');
   const [selectedLocation, setSelectedLocation] = useState('All');
+  const [selectedFormat, setSelectedFormat] = useState('All');
+  const [priceRange, setPriceRange] = useState('All');
   const [psychologists, setPsychologists] = useState<PsychologistProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,46 +131,12 @@ const PsychologistDirectory = () => {
     fetchPsychologists();
   }, []);
 
-  const handleNavigation = async (path, requireAuth = false) => {
-    if (requireAuth && !user) {
-      localStorage.setItem('redirectAfterLogin', path);
-      setShowLoginModal(true);
-      return false;
-    }
-    return true;
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!psychologists || psychologists.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">No Data Available</h2>
-          <p className="text-gray-600">No psychologists found.</p>
-        </div>
-      </div>
-    );
-  }
+  const specializations = [
+    'All',
+    ...new Set(psychologists.flatMap(p => p.specializations)),
+  ];
+  const sessionFormats = ['All', 'Video', 'Phone', 'In-person'];
+  const priceRanges = ['All', '$50-100', '$100-150', '$150-200', '$200+'];
 
   const filteredPsychologists = psychologists.filter(psych => {
     const matchesSearch =
@@ -198,46 +152,85 @@ const PsychologistDirectory = () => {
       selectedLocation === 'All' ||
       `${psych.city}, ${psych.country}` === selectedLocation;
 
-    return matchesSearch && matchesSpecialization && matchesLocation;
+    const matchesFormat =
+      selectedFormat === 'All' || psych.sessionFormats.includes(selectedFormat);
+
+    const matchesPriceRange =
+      priceRange === 'All' ||
+      (priceRange === '$50-100' &&
+        psych.sessionFee >= 50 &&
+        psych.sessionFee <= 100) ||
+      (priceRange === '$100-150' &&
+        psych.sessionFee > 100 &&
+        psych.sessionFee <= 150) ||
+      (priceRange === '$150-200' &&
+        psych.sessionFee > 150 &&
+        psych.sessionFee <= 200) ||
+      (priceRange === '$200+' && psych.sessionFee > 200);
+
+    return (
+      matchesSearch &&
+      matchesSpecialization &&
+      matchesLocation &&
+      matchesFormat &&
+      matchesPriceRange
+    );
   });
 
-  const specializations = [
-    'All',
-    ...new Set(psychologists.flatMap(p => p.specializations)),
-  ];
-  const locations = [
-    'All',
-    ...new Set(psychologists.map(p => `${p.city}, ${p.country}`)),
-  ];
+  const handleNavigation = async (path, requireAuth = false) => {
+    if (requireAuth && !user) {
+      localStorage.setItem('redirectAfterLogin', path);
+      setShowLoginModal(true);
+      return false;
+    }
+    return true;
+  };
 
   return (
-    <div className="min-h-screen">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16 rounded-2xl">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold mb-4">
-            Find Your Perfect Mental Health Match
-          </h1>
-          <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Connect with licensed psychologists who understand your needs and
-            can help you thrive. Book online consultations with experts from
-            around the country.
-          </p>
+    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900/50">
+      <div className="text-white py-20 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e')]  bg-cover bg-center" />
+        <div className="relative z-10">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-5xl font-bold mb-6 leading-tight">
+              Find Your Path to Mental Wellness
+            </h1>
+            <p className="text-xl opacity-90 mb-8 leading-relaxed">
+              Connect with experienced, licensed psychologists who specialize in
+              your needs. Take the first step towards a healthier mind with
+              personalized care and support.
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <Badge variant="secondary" className="px-4 py-2 text-lg">
+                <Users className="w-4 h-4 mr-2" />
+                {psychologists.length}+ Professionals
+              </Badge>
+              <Badge variant="secondary" className="px-4 py-2 text-lg">
+                <Star className="w-4 h-4 mr-2" />
+                Verified Experts
+              </Badge>
+              <Badge variant="secondary" className="px-4 py-2 text-lg">
+                <Calendar className="w-4 h-4 mr-2" />
+                Easy Scheduling
+              </Badge>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto px-4 -mt-8 mb-12">
-        <Card className="shadow-lg">
+      <div className="mx-auto px-4 -mt-10 mb-12">
+        <Card className="shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-800/90">
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="relative col-span-2">
                 <Input
                   type="text"
-                  placeholder="Search..."
+                  placeholder="Search by name, specialization, or license..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
-                <Search className="absolute left-3 top-3 w-4 h-4" />
+                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
               </div>
 
               <Select
@@ -245,6 +238,7 @@ const PsychologistDirectory = () => {
                 onValueChange={setSelectedSpecialization}
               >
                 <SelectTrigger>
+                  <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Specialization" />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,135 +250,112 @@ const PsychologistDirectory = () => {
                 </SelectContent>
               </Select>
 
-              <Select
-                value={selectedLocation}
-                onValueChange={setSelectedLocation}
-              >
+              <Select value={selectedFormat} onValueChange={setSelectedFormat}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Location" />
+                  <Video className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Session Format" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map(loc => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
+                  {sessionFormats.map(format => (
+                    <SelectItem key={format} value={format}>
+                      {format}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="default" className="w-full">
-                    <ArrowUpDown className="mr-2 h-4 w-4" />
-                    Sort by
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Years of Experience</DropdownMenuItem>
-                  <DropdownMenuItem>Session Fee</DropdownMenuItem>
-                  <DropdownMenuItem>Availability</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Select value={priceRange} onValueChange={setPriceRange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Price Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {priceRanges.map(range => (
+                    <SelectItem key={range} value={range}>
+                      {range}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 my-6">
+        <div className="grid grid-cols-1 gap-6 my-8">
           {filteredPsychologists.map(psych => (
-            <Card key={psych.id} className="relative">
-              <Link href={`/psychologist/${psych.firstName}-${psych.lastName}`}>
-                <CardHeader className="pb-4">
-                  <div className="flex items-start space-x-4">
-                    <Avatar className="w-24 h-24 rounded-lg border-2 border-white shadow-lg">
-                      <AvatarImage
-                        src={psych.profilePhoto}
-                        alt={`${psych.firstName} ${psych.lastName}`}
-                      />
-                      <AvatarFallback>
-                        {psych.firstName[0]}
-                        {psych.lastName[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-xl">
-                            Dr. {psych.firstName} {psych.lastName}
-                          </CardTitle>
-                          <CardDescription className="text-base">
-                            {psych.licenseType.replace(/_/g, ' ').toUpperCase()}
-                          </CardDescription>
+            <Card
+              key={psych.id}
+              className="hover:shadow-lg transition-shadow duration-300"
+            >
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <Link
+                      href={`/psychologist/${psych.firstName}-${psych.lastName}`}
+                    >
+                      <div className="relative group">
+                        <Avatar className="w-full h-64 rounded-lg border-2 border-white shadow-lg">
+                          <AvatarImage
+                            src={psych.profilePhoto}
+                            alt={`${psych.firstName} ${psych.lastName}`}
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="text-4xl">
+                            {psych.firstName[0]}
+                            {psych.lastName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-medium">
+                            View Profile
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center mt-2">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span>
-                          {psych.city}, {psych.country}
+                    </Link>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Session Fee</span>
+                        <span className="font-semibold">
+                          ${psych.sessionFee}
                         </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Duration</span>
+                        <span>{psych.sessionDuration} min</span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Experience</span>
+                        <span>{psych.yearsOfExperience} years</span>
                       </div>
                     </div>
                   </div>
-                </CardHeader>
-              </Link>
 
-              <CardContent>
-                <Tabs defaultValue="about">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="about">About</TabsTrigger>
-                    <TabsTrigger value="experience">Experience</TabsTrigger>
-                    <TabsTrigger value="booking">Booking</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="about" className="space-y-4 mt-4">
-                    <p className="text-sm text-justify leading-relaxed my-2 mx-0">
-                      {truncateText(psych.about, 200)}
-                    </p>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">
-                        Specializations
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {psych.specializations.map(spec => (
-                          <Badge key={spec} variant="default">
-                            {spec}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <h4 className="font-semibold mb-2">Age Groups</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {psych.ageGroups.map(age => (
-                          <Badge key={age} variant="default">
-                            {age}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="experience" className="space-y-4 mt-4">
-                    <div className="space-y-3">
-                      {psych.education.map((edu, index) => (
-                        <div key={index} className="flex items-center">
-                          <GraduationCap className="w-5 h-5 mr-2" />
-                          <span className="text-sm">
-                            {edu.degree} from {edu.university} (
-                            {edu.graduationYear})
+                  <div className="md:w-3/4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <Link href={`/psychologist/${psych.id}`}>
+                          <h2 className="text-2xl font-bold hover:text-blue-600 transition-colors">
+                            Dr. {psych.firstName} {psych.lastName}
+                          </h2>
+                        </Link>
+                        <p className="text-muted-foreground">
+                          {psych.licenseType.replace(/_/g, ' ')}
+                        </p>
+                        <div className="flex items-center mt-2 text-muted-foreground">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          <span>
+                            {psych.city}, {psych.country}
                           </span>
                         </div>
-                      ))}
-                      <div className="flex items-center">
-                        <Clock className="w-5 h-5 mr-2" />
-                        <span className="text-sm">
-                          {psych.yearsOfExperience} years of experience
-                        </span>
                       </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="booking" className="space-y-4 mt-4">
-                    <div className="flex items-center justify-between">
                       <div className="flex gap-2">
                         {psych.sessionFormats.map(format => (
-                          <Badge key={format} variant="outline">
+                          <Badge
+                            key={format}
+                            variant="outline"
+                            className="capitalize"
+                          >
                             {format === 'video' && (
                               <Video className="w-3 h-3 mr-1" />
                             )}
@@ -395,45 +366,106 @@ const PsychologistDirectory = () => {
                           </Badge>
                         ))}
                       </div>
-                      <span className="text-sm">
-                        ${psych.sessionFee}/session
-                      </span>
                     </div>
-                    <BookingDialog handleNavigation={handleNavigation} />
-                    <LoginModal
-                      isOpen={showLoginModal}
-                      onClose={() => setShowLoginModal(false)}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
 
-              <div className="border-t p-5">
-                <div className="flex items-center justify-between w-full text-xs">
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        psych.acceptingNewClients
-                          ? 'bg-green-500'
-                          : 'bg-red-500'
-                      }`}
-                    />
-                    <span className="font-medium">
-                      {psych.acceptingNewClients
-                        ? 'Accepting new clients'
-                        : 'Not accepting new clients'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">Language:</span>
-                    <span>{psych.languages.join(' • ')}</span>
+                    <Tabs defaultValue="about" className="mt-6">
+                      <TabsList className="grid w-full grid-cols-3 mb-4">
+                        <TabsTrigger value="about">About</TabsTrigger>
+                        <TabsTrigger value="expertise">Expertise</TabsTrigger>
+                        <TabsTrigger value="education">Education</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="about">
+                        <p className="text-sm leading-relaxed">
+                          {truncateText(psych.about, 300)}
+                        </p>
+                      </TabsContent>
+
+                      <TabsContent value="expertise">
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="font-medium mb-2">
+                              Specializations
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {psych.specializations.map(spec => (
+                                <Badge key={spec} variant="secondary">
+                                  {spec}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="font-medium mb-2">Age Groups</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {psych.ageGroups.map(age => (
+                                <Badge key={age} variant="outline">
+                                  {age}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="education">
+                        <div className="space-y-3">
+                          {psych.education.map((edu, index) => (
+                            <div key={index} className="flex items-center">
+                              <GraduationCap className="w-5 h-5 mr-2 text-blue-600" />
+                              <span>
+                                {edu.degree} from {edu.university} (
+                                {edu.graduationYear})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    <div className="mt-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center">
+                          <Languages className="w-4 h-4 mr-2 text-muted-foreground" />
+                          <span className="text-sm">
+                            {psych.languages.join(' • ')}
+                          </span>
+                        </div>
+                        <div
+                          className={`flex items-center ${
+                            psych.acceptingNewClients
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}
+                        >
+                          <div
+                            className={`w-2 h-2 rounded-full mr-2 ${
+                              psych.acceptingNewClients
+                                ? 'bg-green-600'
+                                : 'bg-red-600'
+                            }`}
+                          />
+                          <span className="text-sm font-medium">
+                            {psych.acceptingNewClients
+                              ? 'Accepting new clients'
+                              : 'Not accepting new clients'}
+                          </span>
+                        </div>
+                      </div>
+                      <BookingDialog handleNavigation={handleNavigation} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              </CardContent>
             </Card>
           ))}
         </div>
       </div>
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
     </div>
   );
 };

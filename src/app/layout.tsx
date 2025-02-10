@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 import { ThemeProviders } from './providers/ThemeProviders';
 import NextTopLoader from 'nextjs-toploader';
 import AuthGuard from './providers/AuthGuard';
+import { StripeProvider } from './providers/stripe-provider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -57,7 +58,9 @@ export default function RootLayout({
           />
           <Toaster position="bottom-right" richColors />
           <NavbarWrapper />
-          <AuthGuard>{children}</AuthGuard>
+          <AuthGuard>
+            <StripeProvider>{children}</StripeProvider>
+          </AuthGuard>
           <FooterWrapper />
         </ThemeProviders>
       </body>

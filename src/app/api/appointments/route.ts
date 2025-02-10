@@ -4,14 +4,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import { withAuth } from '@/middleware/authMiddleware';
 import Appointment from '@/models/Appointment';
-import Availability from '@/models/Availability';
-import { parse, isBefore, isAfter, set } from 'date-fns';
-import Payment from '@/models/Payment';
+import Stripe from 'stripe';
+import { validateAppointmentData } from '@/utils/validations';
+import { createErrorResponse, createSuccessResponse } from '@/lib/response';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function GET(req: NextRequest) {
   return withAuth(async (req: NextRequest, token: any) => {
     try {
       await connectDB();
+
       const query =
         token.role === 'psychologist'
           ? { psychologistId: token.id }
@@ -19,20 +22,29 @@ export async function GET(req: NextRequest) {
 
       const appointments = await Appointment.find(query)
         .populate('userId', 'firstName lastName email')
-        .populate('psychologistId', 'firstName lastName email')
-        .sort({ start: 1 });
+        .populate('psychologistId', 'firstName lastName email profilePhotoUrl')
+        .sort({ dateTime: 1 });
 
-      return NextResponse.json({
-        StatusCode: 200,
-        IsSuccess: true,
-        Result: { appointments },
-      });
+      if (appointments.length === 0) {
+        return NextResponse.json(
+          createSuccessResponse(200, {
+            message: 'No appointments found',
+            appointments: [],
+          })
+        );
+      }
+
+      return NextResponse.json(
+        createSuccessResponse(200, {
+          message: 'Appointments retrieved successfully',
+          appointments: appointments,
+        })
+      );
     } catch (error) {
-      return NextResponse.json({
-        StatusCode: 500,
-        IsSuccess: false,
-        ErrorMessage: [{ message: error.message }],
-      });
+      console.error('Error fetching appointments:', error);
+      return NextResponse.json(
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      );
     }
   }, req);
 }
@@ -40,114 +52,105 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return withAuth(async (req: NextRequest, token: any) => {
     try {
-      const { start, end, psychologistId, title, notes } = await req.json();
-      console.log('Hitting the request');
+      await connectDB();
+      const appointmentData = await req.json();
 
+      // Validate appointment data
+      const validation = validateAppointmentData(appointmentData);
+      if (!validation.isValid) {
+        return NextResponse.json(
+          createErrorResponse(400, validation.error || 'Validation error')
+        );
+      }
+
+      const {
+        psychologistId,
+        start,
+        end,
+        paymentIntentId,
+        sessionFormat,
+        patientName,
+        email,
+        phone,
+        reasonForVisit,
+        notes,
+        insuranceProvider,
+      } = appointmentData;
+
+      // Verify the payment intent
+      try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+          paymentIntentId
+        );
+        if (paymentIntent.status !== 'succeeded') {
+          return NextResponse.json(
+            createErrorResponse(400, 'Payment not completed')
+          );
+        }
+      } catch (stripeError) {
+        console.error('Stripe error:', stripeError);
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid payment information')
+        );
+      }
+
+      // Check for time slot availability
       const startDate = new Date(start);
       const endDate = new Date(end);
 
-      // Calculate duration in minutes
-      const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
-
-      // First check availability
-      const availability = await Availability.findOne({
+      const existingAppointment = await Appointment.findOne({
         psychologistId,
-        daysOfWeek: startDate.getDay(),
-        isActive: true,
+        $or: [
+          {
+            dateTime: { $lt: endDate },
+            endTime: { $gt: startDate },
+          },
+        ],
+        status: { $nin: ['canceled'] },
       });
 
-      if (!availability) {
-        return NextResponse.json({
-          StatusCode: 400,
-          IsSuccess: false,
-          ErrorMessage: [{ message: 'Time slot is not available' }],
-        });
+      if (existingAppointment) {
+        return NextResponse.json(
+          createErrorResponse(409, 'Time slot is no longer available')
+        );
       }
 
-      // Create a temporary payment record (or handle payment logic)
-      const payment = await Payment.create({
-        userId: token.id,
-        amount: 0, // Set your amount
-        status: 'pending',
-      });
-
-      // Create appointment with all required fields
+      // Create new appointment
       const appointment = await Appointment.create({
         userId: token.id,
         psychologistId,
-        dateTime: startDate, // Use start date as dateTime
-        duration,
-        status: 'pending',
-        paymentId: payment._id, // Link the payment
-        title,
-        notes,
+        dateTime: startDate,
+        endTime: endDate,
+        duration: Math.round(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+        ),
+        stripePaymentIntentId: paymentIntentId,
+        sessionFormat,
+        patientName: patientName.trim(),
+        email: email.trim(),
+        phone: phone.replace(/\D/g, ''),
+        reasonForVisit: reasonForVisit.trim(),
+        notes: notes?.trim() || '',
+        insuranceProvider: insuranceProvider?.trim() || '',
+        status: 'confirmed',
       });
 
-      // Update availability
-      if (availability.bookedSlots) {
-        availability.bookedSlots.push({
-          start: startDate,
-          end: endDate,
-          appointmentId: appointment._id,
-        });
-        await availability.save();
-      }
+      // Populate appointment details for response
+      const populatedAppointment = await Appointment.findById(appointment._id)
+        .populate('userId', 'firstName lastName email')
+        .populate('psychologistId', 'firstName lastName email profilePhotoUrl');
 
-      const populatedAppointment = await appointment.populate([
-        { path: 'userId', select: 'firstName lastName email' },
-        { path: 'psychologistId', select: 'firstName lastName email' },
-      ]);
-
-      return NextResponse.json({
-        StatusCode: 201,
-        IsSuccess: true,
-        Result: { appointment: populatedAppointment },
-      });
-    } catch (error) {
-      console.error('Appointment creation error:', error);
-      return NextResponse.json({
-        StatusCode: 500,
-        IsSuccess: false,
-        ErrorMessage: [{ message: error.message }],
-      });
-    }
-  }, req);
-}
-
-export async function PATCH(req: NextRequest) {
-  return withAuth(async (req: NextRequest, token: any) => {
-    try {
-      await connectDB();
-      const { appointmentId, status, notes } = await req.json();
-
-      const appointment = await Appointment.findOneAndUpdate(
-        {
-          _id: appointmentId,
-          $or: [{ psychologistId: token.id }, { userId: token.id }],
-        },
-        { status, ...(notes && { notes }) },
-        { new: true }
+      return NextResponse.json(
+        createSuccessResponse(200, {
+          message: 'Appointment created successfully',
+          appointment: populatedAppointment,
+        })
       );
-
-      if (!appointment) {
-        return NextResponse.json({
-          StatusCode: 404,
-          IsSuccess: false,
-          ErrorMessage: [{ message: 'Appointment not found or unauthorized' }],
-        });
-      }
-
-      return NextResponse.json({
-        StatusCode: 200,
-        IsSuccess: true,
-        Result: { appointment },
-      });
     } catch (error) {
-      return NextResponse.json({
-        StatusCode: 500,
-        IsSuccess: false,
-        ErrorMessage: [{ message: error.message }],
-      });
+      console.error('Error creating appointment:', error);
+      return NextResponse.json(
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      );
     }
   }, req);
 }

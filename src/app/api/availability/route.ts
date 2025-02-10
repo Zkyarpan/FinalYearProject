@@ -1,10 +1,10 @@
-// app/api/availability/route.ts
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import Availability from '@/models/Availability';
 import Psychologist from '@/models/Psychologist';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
-import mongoose from 'mongoose';
 import { withAuth } from '@/middleware/authMiddleware';
 
 export async function POST(req: NextRequest) {
@@ -124,17 +124,34 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    const availability = await Availability.find({ isActive: true });
+    // Populate full psychologist details when fetching availability
+    const availability = await Availability.find({ isActive: true }).populate({
+      path: 'psychologistId',
+      model: 'Psychologist',
+      select:
+        'firstName lastName about languages sessionDuration sessionFee sessionFormats specializations acceptsInsurance insuranceProviders licenseType yearsOfExperience profilePhotoUrl',
+    });
 
     const availabilityEvents = availability.map(slot => ({
-      title: slot.psychologistDetails?.name || 'Available',
+      title: `${slot.psychologistId.firstName} ${slot.psychologistId.lastName}`,
       daysOfWeek: slot.daysOfWeek,
       startTime: slot.startTime,
       endTime: slot.endTime,
       extendedProps: {
         type: 'availability',
-        psychologistId: slot.psychologistId,
-        psychologistName: slot.psychologistDetails?.name || 'Available',
+        psychologistId: slot.psychologistId._id,
+        psychologistName: `${slot.psychologistId.firstName} ${slot.psychologistId.lastName}`,
+        about: slot.psychologistId.about,
+        languages: slot.psychologistId.languages,
+        sessionDuration: slot.psychologistId.sessionDuration,
+        sessionFee: slot.psychologistId.sessionFee,
+        sessionFormats: slot.psychologistId.sessionFormats,
+        specializations: slot.psychologistId.specializations,
+        acceptsInsurance: slot.psychologistId.acceptsInsurance,
+        insuranceProviders: slot.psychologistId.insuranceProviders,
+        licenseType: slot.psychologistId.licenseType,
+        yearsOfExperience: slot.psychologistId.yearsOfExperience,
+        profilePhotoUrl: slot.psychologistId.profilePhotoUrl,
       },
       display: 'background',
       color: 'rgba(59, 130, 246, 0.1)',

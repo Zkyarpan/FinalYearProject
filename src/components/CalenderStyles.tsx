@@ -51,6 +51,31 @@ export const CalendarStyles = () => {
         color: hsl(var(--accent-foreground));
       }
 
+      .fc .fc-timegrid-event {
+        background: hsl(var(--background));
+        border: 1px solid hsl(var(--border));
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        border-radius: 0;
+      }
+
+      /* Success Event Style */
+      .fc .event-success {
+        background-color: hsl(142.1 76.2% 36.3%) !important;
+        border: none !important;
+      }
+
+      .fc .event-success .fc-event-main {
+        background-color: hsl(142.1 76.2% 36.3%) !important;
+        color: white !important;
+        padding: 0.5rem;
+      }
+
+      .fc .event-success .fc-event-title,
+      .fc .event-success .fc-event-time {
+        color: white !important;
+        font-weight: 500;
+      }
+
       /* Available slots styling - Light Mode Options */
       .fc .available-slot {
         margin: 0 !important;

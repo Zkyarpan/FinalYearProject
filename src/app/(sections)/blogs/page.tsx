@@ -127,7 +127,7 @@ const BlogPage = () => {
               <div className="mb-8">
                 <Link
                   href={`/blogs/${generateSlug(blogs[0].title)}`}
-                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
+                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
                 >
                   <article className="h-full relative">
                     <div className="relative h-[400px] w-full">

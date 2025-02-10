@@ -26,11 +26,11 @@ const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
     <div className="rounded-2xl border border-border p-6 dark:border-[#333333] min-h-[calc(100vh-8rem)] bg-gradient-to-br from-primary/10 to-background">
       <div className="h-full flex flex-col max-w-sm mx-auto space-y-6">
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-center text-foreground">
+          <h2 className="text-2xl font-bold text-center text-foreground main-font">
             Share Your Story
           </h2>
           <div className="space-y-2">
-            <p className="text-sm text-center">
+            <p className="text-sm text-center main-font">
               Every story matters. Share your mental health journey and inspire
               others in their path to wellness and healing.
             </p>
@@ -41,8 +41,10 @@ const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           <div className="p-4 rounded-xl bg-card/50 border border-border/50">
             <div className="flex flex-col items-start gap-2">
               <Stories />
-              <h3 className="font-medium text-sm">Personal Stories</h3>
-              <p className="text-xs">
+              <h3 className="font-medium text-sm main-font">
+                Personal Stories
+              </h3>
+              <p className="text-xs main-font">
                 Share your experiences and connect with others on similar
                 journeys.
               </p>
@@ -52,8 +54,10 @@ const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           <div className="p-4 rounded-xl bg-card/50 border border-border/50">
             <div className="flex flex-col items-start gap-2">
               <Journey />
-              <h3 className="font-medium text-sm">Recovery Journey</h3>
-              <p className="text-xs">
+              <h3 className="font-medium text-sm main-font">
+                Recovery Journey
+              </h3>
+              <p className="text-xs main-font">
                 Document your progress and inspire others with your healing
                 path.
               </p>
@@ -88,7 +92,7 @@ const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           )}
         </Button>
 
-        <p className="text-xs text-center italic text-muted-foreground">
+        <p className="text-xs text-center main-font text-muted-foreground">
           Join our community of mental health storytellers
         </p>
       </div>

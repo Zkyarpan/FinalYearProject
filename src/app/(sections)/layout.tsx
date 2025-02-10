@@ -34,7 +34,7 @@ const routeTitles = {
   '/psychologist': 'Psychologists',
   '/articles': 'Articles',
   '/resources': 'Resources',
-  '/blogs': 'Blogs',
+  '/blogs': 'Mentality Blogs',
   '/account': 'Your Account',
   '/notifications': 'Notifications',
   '/dashboard': 'Dashboard',
@@ -86,18 +86,48 @@ const RootLayout = ({ children }) => {
     pathname === '/dashboard/psychologist' ||
     pathname === '/dashboard/admin';
 
+  const EXCLUDED_NESTED_ROUTES = [
+    '/psychologist/appointments',
+    '/psychologist/articles',
+    '/psychologist/blog',
+    '/psychologist/messages',
+    '/psychologist/patients',
+    '/psychologist/resources',
+    '/psychologist/services',
+  ];
+
   const pathParts = pathname.split('/').filter(Boolean);
   const baseRoute = `/${pathParts[0]}`;
   const title = routeTitles[pathname] || routeTitles[baseRoute];
 
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
+  const isPsychologistProfileRoute = (pathname: string) => {
+    const pathParts = pathname.split('/');
+    return (
+      pathParts.length === 3 &&
+      pathParts[1] === 'psychologist' &&
+      pathParts[2] !== ''
+    );
+  };
+
+  const showBackButton =
+    isNestedBlogRoute ||
+    (pathname.startsWith('/psychologist/') &&
+      pathname !== '/psychologist' &&
+      !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route)));
+
   const isNestedPsychologistRoute =
-    pathname.startsWith('/psychologist/') && pathname !== '/psychologist';
+    pathname.startsWith('/psychologist/') &&
+    pathname !== '/psychologist' &&
+    isPsychologistProfileRoute(pathname);
 
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
-      (isAuthenticated && !isDashboardPage && role === 'user')) &&
+      (isAuthenticated &&
+        !isDashboardPage &&
+        role === 'user' &&
+        !pathname.startsWith('/psychologist'))) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
       pathname === '/psychologist' ||
@@ -306,40 +336,50 @@ const RootLayout = ({ children }) => {
             showRightSidebar ? 'lg:mr-[420px]' : ''
           } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
         >
-          <div className="hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[60]">
-            <div className="h-full max-w-[1920px] mx-auto px-6 flex items-center justify-between relative">
-              <div className="flex items-center gap-x-3">
-                {(isNestedBlogRoute || isNestedPsychologistRoute) && (
-                  <div className="flex items-center gap-x-2">
-                    <button
-                      type="button"
-                      onClick={handleBackNavigation}
-                      className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
-                    >
-                      <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
-                    </button>
+          <div
+            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] fixed top-0 z-[100] 
+    ${showRightSidebar ? 'w-[calc(100vw-632px)]' : 'w-[calc(100vw-212px)]'} 
+    left-[212px]`}
+          >
+            <div className="h-full w-full flex justify-center">
+              {' '}
+              {/* Added wrapper for centering */}
+              <div className="h-full w-full max-w-[1920px] px-4 lg:px-6 flex items-center justify-between">
+                <div className="flex items-center gap-x-3">
+                  {showBackButton && (
+                    <div className="flex items-center gap-x-2">
+                      <button
+                        type="button"
+                        onClick={handleBackNavigation}
+                        className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
+                      >
+                        <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
+                      </button>
+                    </div>
+                  )}
+                  {title && (
+                    <h1 className="text-base font-semibold">{title}</h1>
+                  )}
+                </div>
+                {!showRightSidebar && (
+                  <div className="relative z-[102]">
+                    <UserActions
+                      isAuthenticated={isAuthenticated}
+                      profileImage={profileImage}
+                      role={role}
+                      firstName={firstName}
+                      lastName={lastName}
+                      router={router}
+                      onLoginClick={() => setShowLoginModal(true)}
+                      logout={logout}
+                    />
                   </div>
                 )}
-                {title && <h1 className="text-base font-semibold">{title}</h1>}
               </div>
-              {!showRightSidebar && (
-                <div className="relative z-[101]">
-                  <UserActions
-                    isAuthenticated={isAuthenticated}
-                    profileImage={profileImage}
-                    role={role}
-                    firstName={firstName}
-                    lastName={lastName}
-                    router={router}
-                    onLoginClick={() => setShowLoginModal(true)}
-                    logout={logout}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto hide-scrollbar">
+          <div className="flex-1 overflow-auto hide-scrollbar relative z-[90] pt-14">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>

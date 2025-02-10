@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
         await connectDB();
         const data = await req.json();
 
-        // Validate required fields
         const { daysOfWeek, startTime, endTime } = data;
         const missingFields: string[] = [];
 
@@ -22,14 +21,12 @@ export async function POST(req: NextRequest) {
         if (!startTime) missingFields.push('startTime');
         if (!endTime) missingFields.push('endTime');
 
-        // Validate time format
         const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
         if (!timeRegex.test(startTime))
           missingFields.push('invalid startTime format');
         if (!timeRegex.test(endTime))
           missingFields.push('invalid endTime format');
 
-        // Validate start time is before end time
         const start = new Date(`2000-01-01T${startTime}:00`);
         const end = new Date(`2000-01-01T${endTime}:00`);
         if (start >= end) {
@@ -46,7 +43,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Find psychologist and validate existence
         const psychologist = await Psychologist.findById(token.id).select(
           'firstName lastName specialty profileImage'
         );
@@ -61,7 +57,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Check for overlapping availability
         const existingSlot = await Availability.findOne({
           psychologistId: token.id,
           daysOfWeek: { $in: daysOfWeek },
@@ -84,7 +79,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Create availability
         const availability = await Availability.create({
           psychologistId: token.id,
           daysOfWeek,
@@ -124,7 +118,6 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    // Populate full psychologist details when fetching availability
     const availability = await Availability.find({ isActive: true }).populate({
       path: 'psychologistId',
       model: 'Psychologist',

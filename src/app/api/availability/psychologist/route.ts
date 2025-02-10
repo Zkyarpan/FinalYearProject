@@ -12,13 +12,11 @@ export async function GET(req: NextRequest) {
       try {
         await connectDB();
 
-        // Only fetch necessary fields
         const availability = await Availability.find({
           psychologistId: token.id,
           isActive: true,
         }).select('daysOfWeek startTime endTime');
 
-        // Simplified response structure
         const availabilityEvents = availability.map(slot => ({
           id: slot._id,
           daysOfWeek: slot.daysOfWeek,
@@ -48,7 +46,6 @@ export async function GET(req: NextRequest) {
   );
 }
 
-// Also add DELETE endpoint to manage availability
 export async function DELETE(req: NextRequest) {
   return withAuth(
     async (req: NextRequest, token: any) => {
@@ -66,11 +63,10 @@ export async function DELETE(req: NextRequest) {
           );
         }
 
-        // Find and delete the availability slot
         const deletedAvailability = await Availability.findOneAndUpdate(
           {
             _id: availabilityId,
-            psychologistId: token.id, // Ensure the availability belongs to the logged-in psychologist
+            psychologistId: token.id, 
           },
           { isActive: false },
           { new: true }
@@ -105,7 +101,6 @@ export async function DELETE(req: NextRequest) {
   );
 }
 
-// Add PUT endpoint to update availability
 export async function PUT(req: NextRequest) {
   return withAuth(
     async (req: NextRequest, token: any) => {
@@ -113,7 +108,6 @@ export async function PUT(req: NextRequest) {
         await connectDB();
         const data = await req.json();
 
-        // Validate required fields
         const { id, daysOfWeek, startTime, endTime } = data;
         const missingFields: string[] = [];
 
@@ -122,7 +116,6 @@ export async function PUT(req: NextRequest) {
         if (!startTime) missingFields.push('startTime');
         if (!endTime) missingFields.push('endTime');
 
-        // Validate time format
         const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
         if (!timeRegex.test(startTime))
           missingFields.push('invalid startTime format');
@@ -139,7 +132,6 @@ export async function PUT(req: NextRequest) {
           );
         }
 
-        // Check for overlapping availability (excluding current slot)
         const existingSlot = await Availability.findOne({
           psychologistId: token.id,
           _id: { $ne: id },
@@ -163,7 +155,6 @@ export async function PUT(req: NextRequest) {
           );
         }
 
-        // Update availability
         const updatedAvailability = await Availability.findOneAndUpdate(
           {
             _id: id,

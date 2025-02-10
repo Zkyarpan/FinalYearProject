@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
       await connectDB();
       const appointmentData = await req.json();
 
-      // Validate appointment data
       const validation = validateAppointmentData(appointmentData);
       if (!validation.isValid) {
         return NextResponse.json(
@@ -77,7 +76,6 @@ export async function POST(req: NextRequest) {
         insuranceProvider,
       } = appointmentData;
 
-      // Verify the payment intent
       try {
         const paymentIntent = await stripe.paymentIntents.retrieve(
           paymentIntentId
@@ -94,7 +92,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Check for time slot availability
       const startDate = new Date(start);
       const endDate = new Date(end);
 
@@ -115,7 +112,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Create new appointment
       const appointment = await Appointment.create({
         userId: token.id,
         psychologistId,
@@ -135,7 +131,6 @@ export async function POST(req: NextRequest) {
         status: 'confirmed',
       });
 
-      // Populate appointment details for response
       const populatedAppointment = await Appointment.findById(appointment._id)
         .populate('userId', 'firstName lastName email')
         .populate('psychologistId', 'firstName lastName email profilePhotoUrl');

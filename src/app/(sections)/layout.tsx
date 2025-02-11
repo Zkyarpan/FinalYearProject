@@ -62,7 +62,6 @@ const RootLayout = ({ children }) => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { isAuthenticated, profileImage, role, firstName, lastName, logout } =
     useUserStore();
-  const currentYear = new Date().getFullYear();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -205,7 +204,7 @@ const RootLayout = ({ children }) => {
     <>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[60]">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[100]">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center">
@@ -251,7 +250,7 @@ const RootLayout = ({ children }) => {
                       <AccountSection
                         firstName={firstName || 'Anonymous'}
                         profileImage={profileImage || '/default-avatar.jpg'}
-                        onNavigate={handleNavigation}
+                        role={role ?? undefined}
                       />
                     </nav>
                   </SheetContent>
@@ -286,7 +285,7 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[40]">
+        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[100]">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
@@ -322,7 +321,7 @@ const RootLayout = ({ children }) => {
                   <AccountSection
                     firstName={firstName || 'Anonymous'}
                     profileImage={profileImage || '/default-avatar.jpg'}
-                    onNavigate={handleNavigation}
+                    role={role ?? undefined}
                   />
                 </div>
               )}

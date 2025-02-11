@@ -26,12 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 const availabilitySchema = z.object({
   daysOfWeek: z.array(z.number()).min(1, 'Please select at least one day'),
@@ -39,11 +33,13 @@ const availabilitySchema = z.object({
   endTime: z.string().min(1, 'Please select an end time'),
 });
 
-const timeSlots = Array.from({ length: 13 }, (_, i) => {
-  const hour = i + 8; // Start from 8 AM
+const timeSlots = Array.from({ length: 16 }, (_, i) => {
+  const hour = i + 6; // Start from 6 AM to 9 PM
+  const time = `${hour.toString().padStart(2, '0')}:00`;
+  const label = `${hour % 12 || 12}:00 ${hour >= 12 ? 'PM' : 'AM'}`; // Proper 12-hour format
   return {
-    value: `${hour.toString().padStart(2, '0')}:00`,
-    label: `${hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`,
+    value: time,
+    label: label,
   };
 });
 
@@ -108,7 +104,7 @@ const AvailabilitySettings = ({ onRefresh }) => {
         return;
       }
 
-      const response = await fetch('/api/availability/psychologist', {
+      const response = await fetch('/api/availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAvailability),
@@ -161,14 +157,10 @@ const AvailabilitySettings = ({ onRefresh }) => {
     }
   };
 
-  const formatTime = time => {
+  const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
-    const date = new Date();
-    date.setHours(parseInt(hours), parseInt(minutes));
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    const hour = parseInt(hours);
+    return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
   };
 
   return (
@@ -306,12 +298,20 @@ const AvailabilitySettings = ({ onRefresh }) => {
                 <Label>Start Time</Label>
                 <Select
                   value={newAvailability.startTime}
-                  onValueChange={value =>
+                  onValueChange={value => {
+                    // Validate that end time is after start time
+                    if (
+                      newAvailability.endTime &&
+                      value >= newAvailability.endTime
+                    ) {
+                      toast.error('Start time must be before end time');
+                      return;
+                    }
                     setNewAvailability({
                       ...newAvailability,
                       startTime: value,
-                    })
-                  }
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Start time" />
@@ -322,6 +322,47 @@ const AvailabilitySettings = ({ onRefresh }) => {
                         key={slot.value}
                         value={slot.value}
                         className="py-1.5"
+                        disabled={
+                          Boolean(newAvailability.endTime) &&
+                          slot.value >= newAvailability.endTime
+                        }
+                      >
+                        {slot.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={newAvailability.endTime}
+                  onValueChange={value => {
+                    // Validate that end time is after start time
+                    if (
+                      newAvailability.startTime &&
+                      value <= newAvailability.startTime
+                    ) {
+                      toast.error('End time must be after start time');
+                      return;
+                    }
+                    setNewAvailability({
+                      ...newAvailability,
+                      endTime: value,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="End time" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="h-[200px]">
+                    {timeSlots.map(slot => (
+                      <SelectItem
+                        key={slot.value}
+                        value={slot.value}
+                        className="py-1.5"
+                        disabled={Boolean(
+                          newAvailability.startTime &&
+                            slot.value <= newAvailability.startTime
+                        )}
                       >
                         {slot.label}
                       </SelectItem>
@@ -344,7 +385,7 @@ const AvailabilitySettings = ({ onRefresh }) => {
                   <SelectTrigger>
                     <SelectValue placeholder="End time" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="-[200px]">
+                  <SelectContent position="popper" className="h-[200px]">
                     {timeSlots.map(slot => (
                       <SelectItem key={slot.value} value={slot.value}>
                         {slot.label}

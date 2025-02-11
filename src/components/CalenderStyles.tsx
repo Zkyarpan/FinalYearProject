@@ -8,6 +8,82 @@ export const CalendarStyles = () => {
         --fc-today-bg-color: hsl(var(--accent) / 0.1);
       }
 
+      /* Status messages for all types */
+      .fc .calendar-status-messages {
+        display: grid;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .fc .status-message {
+        padding: 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-left-width: 3px;
+        border-left-style: solid;
+      }
+
+      /* Available status */
+      .fc .status-message-available {
+        background-color: rgba(239, 68, 68, 0.1);
+        border-left-color: rgb(239, 68, 68);
+        color: rgb(239, 68, 68);
+      }
+
+      /* Booked status */
+      .fc .status-message-booked {
+        background-color: rgba(37, 99, 235, 0.1);
+        color: rgb(37, 99, 235);
+      }
+
+      /* Confirmed status */
+      .fc .status-message-confirmed {
+        background-color: rgba(5, 150, 105, 0.1);
+        border-left-color: rgb(5, 150, 105);
+        color: rgb(5, 150, 105);
+      }
+
+      /* Available Slots */
+      .fc .availability-slot {
+        background-color: rgba(239, 68, 68, 0.15) !important;
+        border: 2px solid rgb(239, 68, 68) !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+      }
+
+      .fc .availability-slot .fc-event-title,
+      .fc .availability-slot .fc-event-time {
+        color: rgb(239, 68, 68) !important;
+        font-weight: 600;
+      }
+
+      /* Booked Appointments */
+      .fc .booked-event {
+        background-color: rgb(37, 99, 235) !important;
+        border: none !important;
+        opacity: 1 !important;
+      }
+
+      .fc .booked-event .fc-event-title,
+      .fc .booked-event .fc-event-time {
+        color: white !important;
+        font-weight: 500;
+      }
+
+      /* Confirmed Appointments */
+      .fc .confirmed-event {
+        background-color: rgb(5, 150, 105) !important;
+        border: none !important;
+        opacity: 1 !important;
+      }
+
+      .fc .confirmed-event .fc-event-title,
+      .fc .confirmed-event .fc-event-time {
+        color: white !important;
+        font-weight: 500;
+      }
+
+      /* Base calendar styles */
       .fc .fc-timegrid-slot {
         height: 4rem;
         border-bottom: 1px solid hsl(var(--border));
@@ -33,155 +109,17 @@ export const CalendarStyles = () => {
         border-radius: 0;
       }
 
-      .fc .fc-button:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-
-      .fc .fc-button:not(:disabled):hover {
-        background: hsl(var(--accent));
-        border-color: hsl(var(--accent));
-        color: hsl(var(--accent-foreground));
-      }
-
-      .fc .fc-button-primary:not(:disabled).fc-button-active,
-      .fc .fc-button-primary:not(:disabled):active {
-        background: hsl(var(--accent));
-        border-color: hsl(var(--accent));
-        color: hsl(var(--accent-foreground));
-      }
-
-      .fc .fc-timegrid-event {
-        background: hsl(var(--background));
-        border: 1px solid hsl(var(--border));
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-        border-radius: 0;
-      }
-
-      /* Success Event Style */
-      .fc .event-success {
-        background-color: hsl(142.1 76.2% 36.3%) !important;
-        border: none !important;
-      }
-
-      .fc .event-success .fc-event-main {
-        background-color: hsl(142.1 76.2% 36.3%) !important;
-        color: white !important;
-        padding: 0.5rem;
-      }
-
-      .fc .event-success .fc-event-title,
-      .fc .event-success .fc-event-time {
-        color: white !important;
-        font-weight: 500;
-      }
-
-      /* Available slots styling - Light Mode Options */
-      .fc .available-slot {
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        inset-inline: 0 !important;
-        inset-block: 0 !important;
-        height: 100% !important;
-        border-radius: 0 !important;
-
-        /* Default - Sky Blue */
-        background: #0ea5e9 !important;
-
-        /* Option 1 - Calm Blue */
-        /* background: #3b82f6 !important; */
-
-        /* Option 2 - Soft Teal */
-        /* background: #14b8a6 !important; */
-
-        /* Option 3 - Gentle Indigo */
-        /* background: #6366f1 !important; */
-
-        /* Option 4 - Professional Purple */
-        /* background: #8b5cf6 !important; */
-      }
-
-      /* Available slots styling - Dark Mode Options */
+      /* Dark mode adjustments */
       @media (prefers-color-scheme: dark) {
-        .fc .available-slot {
-          /* Default - Deep Blue */
-          /* background: #1d4ed8 !important; */
-
-          /* Option 1 - Rich Purple */
-          /* background: #7c3aed !important; */
-
-          /* Option 2 - Dark Teal */
-          /* background: #0d9488 !important; */
-
-          /* Option 3 - Navy Blue */
-          /* background: #1e40af !important; */
-
-          /* Option 4 - Deep Indigo */
-          /* background: #4338ca !important; */
+        .fc .availability-slot {
+          background-color: rgba(239, 68, 68, 0.25) !important;
         }
-      }
-
-      .fc .available-slot .fc-event-main {
-        padding: 0.5rem;
-        height: 100%;
-      }
-
-      .fc .available-slot .fc-event-title,
-      .fc .available-slot .fc-event-time {
-        color: white !important;
-        font-weight: 500;
-      }
-
-      .fc .available-slot:hover {
-        filter: brightness(1.1);
-      }
-
-      .fc .fc-timegrid-event {
-        background: hsl(var(--background));
-        border: 1px solid hsl(var(--border));
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-        border-radius: 0;
-      }
-
-      .fc .fc-timegrid-event .fc-event-main {
-        padding: 0.5rem;
-      }
-
-      .fc .fc-timegrid-event .fc-event-time {
-        font-size: 0.875rem;
-        font-weight: 500;
-      }
-
-      .fc .fc-timegrid-slots td {
-        height: 4rem;
-      }
-
-      .fc .fc-timegrid-col {
-        padding: 0 !important;
-      }
-
-      .fc .fc-timegrid-col-events {
-        margin: 0 !important;
-      }
-
-      .fc .fc-timegrid-axis {
-        padding: 0.5rem;
-        border-right: 1px solid hsl(var(--border));
-      }
-
-      .fc .fc-col-header-cell {
-        padding: 0.75rem 0.5rem;
-        background: hsl(var(--background));
-        border-bottom: 1px solid hsl(var(--border));
-      }
-
-      .fc .fc-timegrid-event-harness {
-        margin: 0 !important;
-      }
-
-      .fc .fc-timegrid-now-indicator-line {
-        border-color: hsl(var(--destructive));
+        .fc .booked-event {
+          background-color: rgb(59, 130, 246) !important;
+        }
+        .fc .confirmed-event {
+          background-color: rgb(16, 185, 129) !important;
+        }
       }
     `}</style>
   );

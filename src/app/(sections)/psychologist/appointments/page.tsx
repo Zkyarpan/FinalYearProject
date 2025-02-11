@@ -16,20 +16,26 @@ import AppointmentDialog from '@/components/AppointmentDialog';
 import AvailabilitySettings from '@/components/AvailabilitySettings';
 import { CalendarStyles } from '@/components/CalenderStyles';
 
-import { Appointment, Availability } from '@/types/types';
+import { Appointment } from '@/types/types';
 import AvailabilitySettingsSkeleton from '@/components/AvailabilitySettingsSkeleton';
+
+interface AvailabilitySlot {
+  id: string;
+  daysOfWeek: number[];
+  startTime: string;
+  endTime: string;
+}
 
 export default function PsychologistAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [availabilitySlots, setAvailabilitySlots] = useState<
+    AvailabilitySlot[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [view, setView] = useState('calendar');
-  const [availability, setAvailability] = useState<Availability>({
-    daysOfWeek: [],
-    timeSlots: [],
-  });
 
   useEffect(() => {
     fetchInitialData();
@@ -67,60 +73,93 @@ export default function PsychologistAppointments() {
       const data = await response.json();
 
       if (data.IsSuccess) {
-        processAvailabilityData(data.Result.availability);
+        setAvailabilitySlots(data.Result.availability);
       }
     } catch (error) {
       toast.error('Error loading availability');
     }
   };
 
-  const processAvailabilityData = (availabilityData: any) => {
-    const days = [
-      'sunday',
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-    ];
-    const daysOfWeek: number[] = [];
-    const timeSlots: any[] = [];
+  const formatCalendarEvents = () => {
+    const events: Array<{
+      id: string;
+      title: string;
+      start: string;
+      end: string;
+      backgroundColor: string;
+      borderColor: string;
+      textColor: string;
+      classNames: string[];
+      display?: string;
+    }> = [];
 
-    days.forEach((day, index) => {
-      const dayData = availabilityData[day];
-      if (dayData?.available) {
-        daysOfWeek.push(index);
+    events.push(
+      ...appointments.map(apt => ({
+        id: apt._id,
+        title: `${apt.userId.profile.firstName} ${apt.userId.profile.lastName}`,
+        start: apt.dateTime,
+        end: new Date(
+          new Date(apt.dateTime).getTime() + apt.duration * 60000
+        ).toISOString(),
+        backgroundColor:
+          apt.status === 'confirmed' ? 'rgb(5, 150, 105)' : 'rgb(37, 99, 235)',
+        borderColor:
+          apt.status === 'confirmed' ? 'rgb(5, 150, 105)' : 'rgb(37, 99, 235)',
+        textColor: '#ffffff',
+        classNames: [
+          apt.status === 'confirmed' ? 'confirmed-event' : 'booked-event',
+        ],
+      }))
+    );
 
-        const slots = Array.isArray(dayData.timeSlots)
-          ? dayData.timeSlots
-          : [{ startTime: dayData.startTime, endTime: dayData.endTime }];
+    const currentDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
 
-        timeSlots.push({
-          dayOfWeek: index,
-          timeSlots: slots,
-        });
+    availabilitySlots.forEach(slot => {
+      let date = new Date(currentDate);
+
+      while (date <= endDate) {
+        if (slot.daysOfWeek.includes(date.getDay())) {
+          const [startHour, startMinute] = slot.startTime.split(':');
+          const [endHour, endMinute] = slot.endTime.split(':');
+
+          const hasAppointment = appointments.some(apt => {
+            const aptDate = new Date(apt.dateTime);
+            return (
+              aptDate.getDate() === date.getDate() &&
+              aptDate.getMonth() === date.getMonth() &&
+              aptDate.getFullYear() === date.getFullYear() &&
+              aptDate.getHours() >= parseInt(startHour) &&
+              aptDate.getHours() < parseInt(endHour)
+            );
+          });
+
+          if (!hasAppointment) {
+            const start = new Date(date);
+            start.setHours(parseInt(startHour), parseInt(startMinute), 0);
+
+            const end = new Date(date);
+            end.setHours(parseInt(endHour), parseInt(endMinute), 0);
+
+            events.push({
+              id: `availability-${slot.id}-${date.toISOString()}`,
+              title: 'Available',
+              start: start.toISOString(),
+              end: end.toISOString(),
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              borderColor: 'rgb(239, 68, 68)',
+              textColor: 'rgb(239, 68, 68)',
+              classNames: ['availability-slot'],
+              display: 'block',
+            });
+          }
+        }
+        date.setDate(date.getDate() + 1);
       }
     });
 
-    setAvailability({ daysOfWeek, timeSlots });
-  };
-
-  const formatCalendarEvents = () => {
-    return appointments.map(apt => ({
-      id: apt._id,
-      title: `${apt.userId.profile.firstName} ${apt.userId.profile.lastName}`,
-      start: apt.dateTime,
-      end: new Date(
-        new Date(apt.dateTime).getTime() + apt.duration * 60000
-      ).toISOString(),
-      backgroundColor:
-        apt.status === 'confirmed' ? 'rgb(var(--primary))' : '#94a3b8',
-      borderColor:
-        apt.status === 'confirmed' ? 'rgb(var(--primary))' : '#94a3b8',
-      textColor: '#ffffff',
-      classNames: ['appointment-event'],
-    }));
+    return events;
   };
 
   const handleAppointmentClick = (appointment: Appointment) => {
@@ -136,7 +175,7 @@ export default function PsychologistAppointments() {
     <div className="min-h-screen bg-background p-6">
       {CalendarStyles()}
 
-      <AvailabilitySettings onRefresh={fetchAppointments} />
+      <AvailabilitySettings onRefresh={fetchInitialData} />
 
       <Card>
         <CardContent className="p-4">
@@ -147,16 +186,48 @@ export default function PsychologistAppointments() {
                   <Calendar className="h-4 w-4" />
                   Calendar View
                 </TabsTrigger>
-                <TabsTrigger value="list" className="gap-2">
+                <TabsTrigger value="list" className="flex items-center gap-2">
                   <ListTodo className="h-4 w-4" />
-                  List View
+                  <span>Upcoming Patients</span>
+                  {appointments.length > 0 && (
+                    <Badge variant="default">{appointments.length}</Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="gap-1">
+                  <div className="w-2 h-2 rounded-full bg-[rgb(5,150,105)]" />
+                  Confirmed
+                </Badge>
+                <Badge variant="outline" className="gap-1">
+                  <div className="w-2 h-2 rounded-full bg-[rgb(37,99,235)]" />
+                  Booked
+                </Badge>
+                <Badge variant="outline" className="gap-1">
+                  <div className="w-2 h-2 rounded-full bg-[rgb(239,68,68)]" />
+                  Available
+                </Badge>
+              </div>
+            </div>
 
-              <Badge variant="outline" className="gap-1">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                Confirmed Appointments
-              </Badge>
+            <div className="flex items-center gap-8 mb-4">
+              <div className="flex-1 dark:bg-red-950/30 border-l-4 border-red-500 p-3">
+                <p className="text-red-500 text-sm font-medium">
+                  Available slots in red
+                </p>
+              </div>
+
+              <div className="flex-1 dark:bg-blue-950/30 border-l-4 border-blue-500 p-3">
+                <p className="text-blue-500 text-sm font-medium">
+                  Booked slots in blue
+                </p>
+              </div>
+
+              <div className="flex-1 dark:bg-emerald-950/30 border-l-4 border-emerald-500 p-3">
+                <p className="text-emerald-500 text-sm font-medium">
+                  Confirmed slots in green
+                </p>
+              </div>
             </div>
 
             <TabsContent value="calendar" className="mt-4">
@@ -174,10 +245,12 @@ export default function PsychologistAppointments() {
                   slotMaxTime="21:00:00"
                   events={formatCalendarEvents()}
                   eventClick={info => {
-                    const appointment = appointments.find(
-                      apt => apt._id === info.event.id
-                    );
-                    if (appointment) handleAppointmentClick(appointment);
+                    if (!info.event.id.startsWith('availability-')) {
+                      const appointment = appointments.find(
+                        apt => apt._id === info.event.id
+                      );
+                      if (appointment) handleAppointmentClick(appointment);
+                    }
                   }}
                   allDaySlot={false}
                   nowIndicator

@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest) {
         const deletedAvailability = await Availability.findOneAndUpdate(
           {
             _id: availabilityId,
-            psychologistId: token.id, 
+            psychologistId: token.id,
           },
           { isActive: false },
           { new: true }

@@ -26,6 +26,7 @@ import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
 import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
+import { DEFAULT_AVATAR } from '@/constants';
 
 const routeTitles = {
   // User routes
@@ -204,7 +205,7 @@ const RootLayout = ({ children }) => {
     <>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[100]">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[60]">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center">
@@ -285,7 +286,7 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[100]">
+        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[50]">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
@@ -319,8 +320,8 @@ const RootLayout = ({ children }) => {
               {isAuthenticated && (
                 <div className="mt-4">
                   <AccountSection
-                    firstName={firstName || 'Anonymous'}
-                    profileImage={profileImage || '/default-avatar.jpg'}
+                    firstName={firstName || 'User'}
+                    profileImage={profileImage || DEFAULT_AVATAR}
                     role={role ?? undefined}
                   />
                 </div>
@@ -333,16 +334,15 @@ const RootLayout = ({ children }) => {
         <div
           className={`flex-1 ${
             showRightSidebar ? 'lg:mr-[420px]' : ''
-          } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
+          } lg:ml-[212px] flex flex-col min-h-screen relative`}
         >
+          {/* Fixed Header */}
           <div
-            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] fixed top-0 z-[100] 
+            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[100] 
     ${showRightSidebar ? 'w-[calc(100vw-632px)]' : 'w-[calc(100vw-212px)]'} 
     left-[212px]`}
           >
             <div className="h-full w-full flex justify-center">
-              {' '}
-              {/* Added wrapper for centering */}
               <div className="h-full w-full max-w-[1920px] px-4 lg:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-x-3">
                   {showBackButton && (
@@ -378,7 +378,7 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto hide-scrollbar relative z-[90] pt-14">
+          <div className="flex-1 overflow-auto hide-scrollbar relative">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>
@@ -387,7 +387,7 @@ const RootLayout = ({ children }) => {
 
         {/* Right Sidebar */}
         {showRightSidebar && (
-          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[40]">
+          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[50]">
             <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <UserActions
                 isAuthenticated={isAuthenticated}

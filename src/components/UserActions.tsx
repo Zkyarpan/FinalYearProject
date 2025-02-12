@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { DEFAULT_AVATAR } from '@/constants';
 
 interface UserActionsProps {
   isAuthenticated: boolean;
@@ -126,7 +127,7 @@ const UserActions = ({
                 <div className="relative w-8 h-8">
                   <div className="absolute inset-0 rounded-full overflow-hidden">
                     <img
-                      src={profileImage || '/default-avatar.jpg'}
+                      src={profileImage || DEFAULT_AVATAR}
                       alt={`${firstName}'s profile picture`}
                       className="w-full h-full object-cover opacity-90"
                     />
@@ -140,7 +141,7 @@ const UserActions = ({
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full overflow-hidden border border-border dark:border-[#333333]">
                         <Image
-                          src={profileImage || '/default-avatar.jpg'}
+                          src={profileImage || DEFAULT_AVATAR}
                           alt="Profile"
                           width={40}
                           height={40}

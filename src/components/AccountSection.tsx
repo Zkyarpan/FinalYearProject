@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { DEFAULT_AVATAR } from '@/constants';
 
 interface AccountSectionProps {
   firstName: string;
@@ -13,7 +14,6 @@ export default function AccountSection({
   profileImage,
   role = 'user',
 }: AccountSectionProps) {
-  // Function to get the correct account path based on role
   const getAccountPath = () => {
     switch (role) {
       case 'psychologist':
@@ -25,7 +25,6 @@ export default function AccountSection({
     }
   };
 
-  // Function to get the label based on role
   const getManageLabel = () => {
     switch (role) {
       case 'psychologist':
@@ -45,7 +44,7 @@ export default function AccountSection({
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full overflow-hidden border shadow-sm">
           <img
-            src={profileImage || '/default-avatar.jpg'}
+            src={profileImage || DEFAULT_AVATAR}
             alt={`${firstName}'s profile picture`}
             width={32}
             height={32}

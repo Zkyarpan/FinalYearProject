@@ -13,15 +13,33 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from './ui/textarea';
 import Loader from '@/components/common/Loader';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import SpinnerLoader from '@/components/SpinnerLoader';
 import { useUserStore } from '@/store/userStore';
+import { Progress } from '@/components/ui/progress';
+import { DEFAULT_AVATAR } from '@/constants';
 
 interface ProfileCompletionProps {
   onComplete?: () => void;
+}
+
+interface FormData {
+  firstName: string;
+  lastName: string;
+  age: string;
+  gender: string;
+  phone: string;
+  address: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  therapyHistory: string;
+  preferredCommunication: string;
+  briefBio: string;
+  struggles: string[];
+  image: string | File | null;
 }
 
 const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
@@ -29,24 +47,12 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
 }) => {
   const router = useRouter();
   const { updateProfile } = useUserStore();
-  interface FormData {
-    firstName: string;
-    lastName: string;
-    age: string;
-    gender: string;
-    phone: string;
-    address: string;
-    emergencyContact: string;
-    emergencyPhone: string;
-    therapyHistory: string;
-    preferredCommunication: string;
-    briefBio: string;
-    struggles: string[];
-    image: string | File | null;
-  }
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 4;
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState<string>(DEFAULT_AVATAR);
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
     lastName: '',
@@ -57,21 +63,14 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
     emergencyContact: '',
     emergencyPhone: '',
     therapyHistory: 'no',
-    preferredCommunication: 'video',
+    preferredCommunication: '',
     briefBio: '',
     struggles: [],
     image: null,
   });
 
   const [errors, setErrors] = useState<{
-    firstName?: string;
-    lastName?: string;
-    age?: string;
-    phone?: string;
-    emergencyContact?: string;
-    emergencyPhone?: string;
-    briefBio?: string;
-    struggles?: string;
+    [key in keyof FormData]?: string;
   }>({});
 
   const struggleOptions = [
@@ -85,19 +84,31 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
     'Other',
   ];
 
-  const handleInputChange = e => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [id]: value,
     }));
+    if (errors[id as keyof FormData]) {
+      setErrors(prev => ({
+        ...prev,
+        [id]: undefined,
+      }));
+    }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    try {
+      setIsImageLoading(true);
+
       if (!file.type.startsWith('image/')) {
-        toast.error('Please upload an image file');
+        toast.error('Please upload an image file (JPEG, PNG, or WebP)');
         return;
       }
 
@@ -108,52 +119,115 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
 
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
-
       setFormData(prev => ({
         ...prev,
         image: file,
       }));
+    } catch (error) {
+      console.error('Image upload error:', error);
+      toast.error('Failed to process image. Please try again.');
+      setImagePreview(DEFAULT_AVATAR);
+    } finally {
+      setIsImageLoading(false); // Fixed: Using setIsImageLoading instead of setIsLoading
     }
   };
 
   useEffect(() => {
     return () => {
-      if (imagePreview) {
+      if (imagePreview && imagePreview !== DEFAULT_AVATAR) {
         URL.revokeObjectURL(imagePreview);
       }
     };
   }, [imagePreview]);
 
-  const handleStruggleToggle = struggle => {
+  const handleStruggleToggle = (struggle: string) => {
     setFormData(prev => ({
       ...prev,
       struggles: prev.struggles.includes(struggle)
         ? prev.struggles.filter(s => s !== struggle)
         : [...prev.struggles, struggle],
     }));
+    if (errors.struggles) {
+      setErrors(prev => ({
+        ...prev,
+        struggles: undefined,
+      }));
+    }
   };
 
-  const validateForm = () => {
-    const newErrors: Partial<typeof errors> = {};
-    if (!formData.firstName) newErrors.firstName = 'First name is required';
-    if (!formData.lastName) newErrors.lastName = 'Last name is required';
-    if (!formData.age || parseInt(formData.age) < 18)
-      newErrors.age = 'Must be 18 or older';
-    if (!formData.phone) newErrors.phone = 'Phone number is required';
-    if (!formData.emergencyContact)
-      newErrors.emergencyContact = 'Emergency contact is required';
-    if (!formData.emergencyPhone)
-      newErrors.emergencyPhone = 'Emergency contact phone is required';
-    if (formData.briefBio.length < 20)
-      newErrors.briefBio = 'Provide a more detailed bio about 20 characters';
-    if (formData.struggles.length === 0)
-      newErrors.struggles = 'Please select at least one option';
+  const validateCurrentStep = () => {
+    const newErrors: { [key in keyof FormData]?: string } = {};
+
+    switch (currentStep) {
+      case 1:
+        if (!formData.firstName.trim())
+          newErrors.firstName = 'First name is required';
+        if (!formData.lastName.trim())
+          newErrors.lastName = 'Last name is required';
+        if (!formData.age) newErrors.age = 'Age is required';
+        if (formData.age && parseInt(formData.age) < 18)
+          newErrors.age = 'Must be 18 or older';
+        if (!formData.gender) newErrors.gender = 'Gender is required';
+        break;
+
+      case 2:
+        if (!formData.phone.trim())
+          newErrors.phone = 'Phone number is required';
+        if (!formData.address.trim()) newErrors.address = 'Address is required';
+        if (!formData.emergencyContact.trim())
+          newErrors.emergencyContact = 'Emergency contact is required';
+        if (!formData.emergencyPhone.trim())
+          newErrors.emergencyPhone = 'Emergency contact phone is required';
+        if (
+          formData.phone &&
+          !/^\+?[\d\s-]{10,}$/.test(formData.phone.trim())
+        ) {
+          newErrors.phone = 'Please enter a valid phone number';
+        }
+        if (
+          formData.emergencyPhone &&
+          !/^\+?[\d\s-]{10,}$/.test(formData.emergencyPhone.trim())
+        ) {
+          newErrors.emergencyPhone =
+            'Please enter a valid emergency contact phone number';
+        }
+        break;
+
+      case 3:
+        if (!formData.preferredCommunication)
+          newErrors.preferredCommunication =
+            'Please select preferred communication mode';
+        if (formData.struggles.length === 0)
+          newErrors.struggles = 'Please select at least one area to work on';
+        break;
+
+      case 4:
+        if (!formData.briefBio.trim()) newErrors.briefBio = 'Bio is required';
+        if (formData.briefBio.trim().length < 20)
+          newErrors.briefBio = 'Bio must be at least 20 characters';
+        break;
+    }
+
     return newErrors;
+  };
+
+  const handleNext = () => {
+    const newErrors = validateCurrentStep();
+    if (Object.keys(newErrors).length === 0) {
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+    } else {
+      setErrors(newErrors);
+      toast.error('Please fill in all required fields correctly');
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newErrors = validateForm();
+    const newErrors = validateCurrentStep();
 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
@@ -163,14 +237,14 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
         const formDataObj = new FormData();
 
         Object.entries(formData).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) {
-            if (key === 'struggles' && Array.isArray(value)) {
-              formDataObj.append(key, value.join(','));
-            } else if (key === 'image' && value instanceof File) {
+          if (key === 'struggles' && Array.isArray(value)) {
+            formDataObj.append(key, value.join(','));
+          } else if (key === 'image') {
+            if (value instanceof File) {
               formDataObj.append(key, value);
-            } else {
-              formDataObj.append(key, value.toString());
             }
+          } else if (value !== null && value !== undefined) {
+            formDataObj.append(key, value.toString());
           }
         });
 
@@ -181,14 +255,17 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
 
         const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to complete profile');
+        if (!data.IsSuccess) {
+          const errorMessage =
+            data.ErrorMessage?.[0]?.message || 'Failed to complete profile';
+          toast.error(errorMessage);
+          return;
         }
 
         updateProfile({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          profileImage: data.Result?.profileImage || null,
+          profileImage: data.Result?.image || DEFAULT_AVATAR,
         });
 
         toast.success('Profile completed successfully!');
@@ -209,68 +286,56 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
       }
     } else {
       setErrors(newErrors);
+      toast.error('Please fill in all required fields correctly');
     }
   };
 
-  return (
-    <>
-      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
-      <Card className="w-full max-w-4xl mx-auto rounded-2xl dark:bg-[#171717]">
-        <CardHeader>
-          <CardTitle className="text-xl text-center">
-            Welcome to Mentality
-          </CardTitle>
-          <p className="text-sm text-center">
-            First things first, tell us a bit about yourself!
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6">
             <div className="flex justify-center">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-blue-500 relative">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Profile Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 dark:bg-background flex items-center justify-center">
-                      <Camera className="w-8 h-8 text-gray-400" />
+                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-blue-500 relative group">
+                  {isImageLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                      <Loader />
                     </div>
+                  ) : (
+                    <>
+                      <img
+                        src={imagePreview}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover transition-opacity duration-200"
+                        onError={() => {
+                          setImagePreview(DEFAULT_AVATAR);
+                          setFormData(prev => ({ ...prev, image: null }));
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <p className="text-white text-xs">Change Photo</p>
+                      </div>
+                    </>
                   )}
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="profile-image"
-                  />
-                  <label
-                    htmlFor="profile-image"
-                    className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity"
-                  >
-                    <span className="sr-only">Upload Profile Picture</span>
-                  </label>
                 </div>
                 <label
-                  htmlFor="image-upload"
-                  className="absolute bottom-10 right-2 bg-blue-500 text-white p-1 rounded-full cursor-pointer"
+                  htmlFor="profile-image"
+                  className="absolute bottom-10 right-2 bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded-full cursor-pointer shadow-lg transition-transform duration-200 hover:scale-110"
                   style={{ transform: 'translate(50%, 50%)' }}
                 >
                   <Camera className="w-4 h-4" />
+                  <input
+                    type="file"
+                    id="profile-image"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isImageLoading}
+                  />
                 </label>
-                <input
-                  id="image-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <p className="text-center mt-2 text-sm text-gray-700 dark:text-gray-300">
-                  Upload Photo
+                <p className="text-center mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  {formData.image ? 'Change Photo' : 'Upload Photo'}
                 </p>
               </div>
             </div>
@@ -283,9 +348,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <Input
                   id="firstName"
                   type="text"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.firstName ? 'border-red-500' : ''
+                  }`}
                   value={formData.firstName}
                   onChange={handleInputChange}
                 />
@@ -300,9 +365,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <Input
                   id="lastName"
                   type="text"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.lastName ? 'border-red-500' : ''
+                  }`}
                   value={formData.lastName}
                   onChange={handleInputChange}
                 />
@@ -311,6 +376,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 )}
               </div>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="age" className="text-sm font-medium">
@@ -319,9 +385,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <Input
                   id="age"
                   type="number"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.age ? 'border-red-500' : ''
+                  }`}
                   value={formData.age}
                   onChange={handleInputChange}
                 />
@@ -331,64 +397,42 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
               </div>
               <div className="space-y-2">
                 <label htmlFor="gender" className="text-sm font-medium">
-                  Gender
+                  Gender *
                 </label>
                 <Select
                   value={formData.gender}
-                  onValueChange={value =>
-                    setFormData({ ...formData, gender: value })
-                  }
+                  onValueChange={value => {
+                    setFormData({ ...formData, gender: value });
+                    if (errors.gender) {
+                      setErrors(prev => ({ ...prev, gender: undefined }));
+                    }
+                  }}
                 >
                   <SelectTrigger
-                    className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                    className={`w-full h-8 dark:bg-input border rounded-md ${
+                      errors.gender ? 'border-red-500' : ''
+                    }`}
                   >
-                    <SelectValue
-                      placeholder="Select Gender"
-                      className="text-foreground"
-                    />
+                    <SelectValue placeholder="Select Gender" />
                   </SelectTrigger>
-                  <SelectContent className="dark:bg-input">
-                    <SelectItem
-                      value="male"
-                      className="text-foreground hover:bg-muted"
-                    >
-                      Male
-                    </SelectItem>
-                    <SelectItem
-                      value="female"
-                      className="text-foreground hover:bg-muted"
-                    >
-                      Female
-                    </SelectItem>
-                    <SelectItem
-                      value="other"
-                      className="text-foreground hover:bg-muted"
-                    >
-                      Other
-                    </SelectItem>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="firstName" className="text-sm font-medium">
-                  Address
-                </label>
-                <Input
-                  id="address"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                />
-                {errors.firstName && (
-                  <p className="text-red-500 text-xs">{errors.firstName}</p>
+                {errors.gender && (
+                  <p className="text-red-500 text-xs">{errors.gender}</p>
                 )}
               </div>
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="phone" className="text-sm font-medium">
                   Phone Number *
@@ -396,9 +440,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <Input
                   id="phone"
                   type="tel"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.phone ? 'border-red-500' : ''
+                  }`}
                   value={formData.phone}
                   onChange={handleInputChange}
                 />
@@ -406,13 +450,79 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                   <p className="text-red-500 text-xs">{errors.phone}</p>
                 )}
               </div>
+              <div className="space-y-2">
+                <label htmlFor="address" className="text-sm font-medium">
+                  Address *
+                </label>
+                <Input
+                  id="address"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.address ? 'border-red-500' : ''
+                  }`}
+                  value={formData.address}
+                  onChange={handleInputChange}
+                />
+                {errors.address && (
+                  <p className="text-red-500 text-xs">{errors.address}</p>
+                )}
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="emergencyContact"
+                  className="text-sm font-medium"
+                >
+                  Emergency Contact Name *
+                </label>
+                <Input
+                  id="emergencyContact"
+                  type="text"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.emergencyContact ? 'border-red-500' : ''
+                  }`}
+                  value={formData.emergencyContact}
+                  onChange={handleInputChange}
+                />
+                {errors.emergencyContact && (
+                  <p className="text-red-500 text-xs">
+                    {errors.emergencyContact}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="emergencyPhone" className="text-sm font-medium">
+                  Emergency Contact Phone *
+                </label>
+                <Input
+                  id="emergencyPhone"
+                  type="tel"
+                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                    errors.emergencyPhone ? 'border-red-500' : ''
+                  }`}
+                  value={formData.emergencyPhone}
+                  onChange={handleInputChange}
+                />
+                {errors.emergencyPhone && (
+                  <p className="text-red-500 text-xs">
+                    {errors.emergencyPhone}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
             <div className="space-y-3">
-              <label className="text-sm font-medium dark:border-foreground/30">
-                Have you been in therapy before?
+              <label className="text-sm font-medium">
+                Have you been in therapy before? *
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="relative flex items-center h-9 px-4 rounded-lg dark:bg-input cursor-pointer hover:bg-muted transition-colors group border dark:border-foreground/30 ">
+                <label className="relative flex items-center h-9 px-4 rounded-lg dark:bg-input cursor-pointer hover:bg-muted transition-colors group border dark:border-foreground/30">
                   <Input
                     type="radio"
                     name="therapyHistory"
@@ -445,54 +555,11 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                     }}
                     className="peer sr-only"
                   />
-                  <div className="w-4 h-4 border-2 rounded-full border-gray-500  group-hover:border-blue-500 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all">
+                  <div className="w-4 h-4 border-2 rounded-full border-gray-500 group-hover:border-blue-500 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all">
                     <div className="w-full h-full rounded-full scale-0 peer-checked:scale-[0.4] bg-white transition-transform" />
                   </div>
                   <span className="ml-3 text-sm font-medium">No</span>
                 </label>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="emergencyContact"
-                  className="text-sm font-medium"
-                >
-                  Emergency Contact Name *
-                </label>
-                <Input
-                  id="emergencyContact"
-                  type="text"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                  value={formData.emergencyContact}
-                  onChange={handleInputChange}
-                />
-                {errors.emergencyContact && (
-                  <p className="text-red-500 text-xs">
-                    {errors.emergencyContact}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="emergencyPhone" className="text-sm font-medium">
-                  Emergency Contact Phone *
-                </label>
-                <Input
-                  id="emergencyPhone"
-                  type="tel"
-                  className="w-full h-8 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                  value={formData.emergencyPhone}
-                  onChange={handleInputChange}
-                />
-                {errors.emergencyPhone && (
-                  <p className="text-red-500 text-xs">
-                    {errors.emergencyPhone}
-                  </p>
-                )}
               </div>
             </div>
 
@@ -501,47 +568,43 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 htmlFor="preferredCommunication"
                 className="text-sm font-medium"
               >
-                Preferred Mode of Communication
+                Preferred Mode of Communication *
               </label>
               <Select
                 value={formData.preferredCommunication}
-                onValueChange={value =>
-                  setFormData({
-                    ...formData,
-                    preferredCommunication: value,
-                  })
-                }
+                onValueChange={value => {
+                  setFormData({ ...formData, preferredCommunication: value });
+                  if (errors.preferredCommunication) {
+                    setErrors(prev => ({
+                      ...prev,
+                      preferredCommunication: undefined,
+                    }));
+                  }
+                }}
               >
                 <SelectTrigger
-                  className="w-full h-10 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+                  className={`w-full h-10 dark:bg-input border rounded-md ${
+                    errors.preferredCommunication ? 'border-red-500' : ''
+                  }`}
                 >
-                  <SelectValue
-                    placeholder="Select Communication Mode "
-                    children={
-                      formData.preferredCommunication
-                        ? formData.preferredCommunication
-                            .charAt(0)
-                            .toUpperCase() +
-                          formData.preferredCommunication
-                            .slice(1)
-                            .replace(/-/g, ' ')
-                        : ''
-                    }
-                  />
+                  <SelectValue placeholder="Select Communication Mode" />
                 </SelectTrigger>
-                <SelectContent className="dark:bg-input">
+                <SelectContent>
                   <SelectItem value="video">Video Call</SelectItem>
                   <SelectItem value="audio">Audio Call</SelectItem>
                   <SelectItem value="chat">Chat</SelectItem>
                   <SelectItem value="in-person">In-Person</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.preferredCommunication && (
+                <p className="text-red-500 text-xs">
+                  {errors.preferredCommunication}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground ">
+              <label className="text-sm font-medium">
                 What areas are you looking to work on? *
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -549,12 +612,14 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                   <label
                     key={struggle}
                     className={`text-xs flex items-center p-2 rounded-lg cursor-pointer transition-colors
-              dark:bg-input border border-border
-              ${
-                formData.struggles.includes(struggle)
-                  ? 'dark:bg-input bg-primary/20 text-primary-foreground'
-                  : 'hover:bg-muted'
-              }`}
+                      dark:bg-input border ${
+                        errors.struggles ? 'border-red-500' : 'border-border'
+                      }
+                      ${
+                        formData.struggles.includes(struggle)
+                          ? 'dark:bg-input bg-primary/20 text-primary-foreground'
+                          : 'hover:bg-muted'
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -567,19 +632,25 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 ))}
               </div>
               {errors.struggles && (
-                <p className="text-destructive text-xs">{errors.struggles}</p>
+                <p className="text-red-500 text-xs">{errors.struggles}</p>
               )}
             </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
             <div className="space-y-2">
               <label htmlFor="briefBio" className="text-sm font-medium">
                 Tell us a bit about yourself and what brings you here *
               </label>
               <Textarea
                 id="briefBio"
-                className="w-full h-10 dark:bg-input border border-input rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
-                rows={4}
+                className={`w-full dark:bg-input border rounded-md ${
+                  errors.briefBio ? 'border-red-500' : ''
+                }`}
+                rows={6}
                 value={formData.briefBio}
                 onChange={handleInputChange}
                 placeholder="Share as much as you feel comfortable with..."
@@ -588,23 +659,82 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <p className="text-red-500 text-xs">{errors.briefBio}</p>
               )}
             </div>
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                className={`w-full mt-5 font-semibold shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 rounded-lg ${
-                  isLoading ? 'cursor-not-allowed opacity-75' : ''
-                }`}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader />
-                ) : (
-                  <>
-                    Create Profile{' '}
-                    <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </Button>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
+      <Card className="w-full max-w-4xl mx-auto rounded-2xl dark:bg-[#171717]">
+        <CardHeader>
+          <CardTitle className="text-xl text-center">
+            Welcome to Mentality
+          </CardTitle>
+          <p className="text-sm text-center text-muted-foreground">
+            {currentStep === 1 && "Let's start with your basic information"}
+            {currentStep === 2 && "Now, let's get your contact details"}
+            {currentStep === 3 && 'Tell us about your therapy preferences'}
+            {currentStep === 4 && 'Finally, share a bit about yourself'}
+          </p>
+          <div className="mt-4">
+            <Progress
+              value={(currentStep / totalSteps) * 100}
+              className="h-2"
+            />
+            <p className="text-sm text-center mt-2 text-muted-foreground">
+              Step {currentStep} of {totalSteps}
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {renderStepContent()}
+
+            <div className="flex justify-between mt-8">
+              {currentStep > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
+              )}
+              <div className="flex-1" />
+              {currentStep < totalSteps ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="flex items-center gap-2"
+                >
+                  Next
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  className={`flex items-center gap-2 ${
+                    isLoading ? 'cursor-not-allowed opacity-75' : ''
+                  }`}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader />
+                  ) : (
+                    <>
+                      Complete Profile
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>

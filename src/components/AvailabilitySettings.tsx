@@ -299,7 +299,6 @@ const AvailabilitySettings = ({ onRefresh }) => {
                 <Select
                   value={newAvailability.startTime}
                   onValueChange={value => {
-                    // Validate that end time is after start time
                     if (
                       newAvailability.endTime &&
                       value >= newAvailability.endTime
@@ -316,7 +315,10 @@ const AvailabilitySettings = ({ onRefresh }) => {
                   <SelectTrigger>
                     <SelectValue placeholder="Start time" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="h-[200px]">
+                  <SelectContent
+                    position="popper"
+                    className="h-[200px] items-center justify-center"
+                  >
                     {timeSlots.map(slot => (
                       <SelectItem
                         key={slot.value}
@@ -326,43 +328,6 @@ const AvailabilitySettings = ({ onRefresh }) => {
                           Boolean(newAvailability.endTime) &&
                           slot.value >= newAvailability.endTime
                         }
-                      >
-                        {slot.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={newAvailability.endTime}
-                  onValueChange={value => {
-                    // Validate that end time is after start time
-                    if (
-                      newAvailability.startTime &&
-                      value <= newAvailability.startTime
-                    ) {
-                      toast.error('End time must be after start time');
-                      return;
-                    }
-                    setNewAvailability({
-                      ...newAvailability,
-                      endTime: value,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="End time" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="h-[200px]">
-                    {timeSlots.map(slot => (
-                      <SelectItem
-                        key={slot.value}
-                        value={slot.value}
-                        className="py-1.5"
-                        disabled={Boolean(
-                          newAvailability.startTime &&
-                            slot.value <= newAvailability.startTime
-                        )}
                       >
                         {slot.label}
                       </SelectItem>

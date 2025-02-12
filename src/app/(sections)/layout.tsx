@@ -338,7 +338,7 @@ const RootLayout = ({ children }) => {
         >
           {/* Fixed Header */}
           <div
-            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] sticky top-0 z-[100] 
+            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] fixed top-0 z-[100] 
     ${showRightSidebar ? 'w-[calc(100vw-632px)]' : 'w-[calc(100vw-212px)]'} 
     left-[212px]`}
           >
@@ -378,7 +378,7 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto hide-scrollbar relative">
+          <div className="flex-1 overflow-auto hide-scrollbar relative mt-10">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>

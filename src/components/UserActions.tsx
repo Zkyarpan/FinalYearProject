@@ -35,7 +35,7 @@ const UserActions = ({
 }: UserActionsProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showFullPageLoader, setShowFullPageLoader] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isNestedBlogRoute =
@@ -59,9 +59,10 @@ const UserActions = ({
   };
 
   const handleLogout = async () => {
-    if (isLoading || isRedirecting) return;
+    if (isLoading) return;
     setIsLoading(true);
-    setIsRedirecting(true);
+    setShowFullPageLoader(true);
+
     try {
       const response = await fetch('/api/logout', {
         method: 'POST',
@@ -70,12 +71,17 @@ const UserActions = ({
           'Content-Type': 'application/json',
         },
       });
+
       if (response.ok) {
         logout();
         toast.success('Logged out successfully!');
+
+        localStorage.clear();
+        sessionStorage.clear();
+
         setTimeout(() => {
           router.push('/login');
-        }, 500);
+        }, 300);
       } else {
         const data = await response.json();
         throw new Error(data.message || 'Failed to log out');
@@ -83,7 +89,7 @@ const UserActions = ({
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out. Please try again.');
-      setIsRedirecting(false);
+      setShowFullPageLoader(false);
     } finally {
       setIsLoading(false);
     }
@@ -96,9 +102,31 @@ const UserActions = ({
     setIsDropdownOpen(false);
   };
 
-  if (isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-end w-full relative z-50">
+        <div className="flex items-center gap-3 px-1">
+          <Link
+            href="/login"
+            className="font-medium text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/signup"
+            className="font-medium text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Create Profile
+          </Link>
+          <ThemeSwitch />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-end w-full relative z-40">
         <div className="flex items-center gap-x-3">
           <div className="flex items-center relative">
             <div
@@ -188,7 +216,7 @@ const UserActions = ({
                     </button>
                     <button
                       onClick={handleLogout}
-                      disabled={isLoading || isRedirecting}
+                      disabled={isLoading}
                       className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors text-red-500 flex items-center gap-2 hover:bg-muted dark:hover:bg-input"
                     >
                       {isLoading ? (
@@ -207,27 +235,7 @@ const UserActions = ({
           </div>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-end w-full relative z-50">
-      <div className="flex items-center gap-3 px-1">
-        <Link
-          href="/login"
-          className="font-medium text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
-        >
-          Log in
-        </Link>
-        <Link
-          href="/signup"
-          className="font-medium text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Create Profile
-        </Link>
-        <ThemeSwitch />
-      </div>
-    </div>
+    </>
   );
 };
 

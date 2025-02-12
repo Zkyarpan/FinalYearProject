@@ -128,7 +128,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
       toast.error('Failed to process image. Please try again.');
       setImagePreview(DEFAULT_AVATAR);
     } finally {
-      setIsImageLoading(false); // Fixed: Using setIsImageLoading instead of setIsLoading
+      setIsImageLoading(false);
     }
   };
 
@@ -345,10 +345,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="firstName" className="text-sm font-medium">
                   First Name *
                 </label>
-                <Input
+                <input
                   id="firstName"
                   type="text"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.firstName ? 'border-red-500' : ''
                   }`}
                   value={formData.firstName}
@@ -362,10 +362,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="lastName" className="text-sm font-medium">
                   Last Name *
                 </label>
-                <Input
+                <input
                   id="lastName"
                   type="text"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.lastName ? 'border-red-500' : ''
                   }`}
                   value={formData.lastName}
@@ -382,10 +382,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="age" className="text-sm font-medium">
                   Age *
                 </label>
-                <Input
+                <input
                   id="age"
                   type="number"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.age ? 'border-red-500' : ''
                   }`}
                   value={formData.age}
@@ -409,13 +409,15 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                   }}
                 >
                   <SelectTrigger
-                    className={`w-full h-8 dark:bg-input border rounded-md ${
-                      errors.gender ? 'border-red-500' : ''
-                    }`}
+                    className={`w-full h-8 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30 ${
+          errors.gender ? 'border-red-500' : ''
+        }`}
                   >
                     <SelectValue placeholder="Select Gender" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-input">
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
@@ -437,10 +439,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="phone" className="text-sm font-medium">
                   Phone Number *
                 </label>
-                <Input
+                <input
                   id="phone"
                   type="tel"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.phone ? 'border-red-500' : ''
                   }`}
                   value={formData.phone}
@@ -454,9 +456,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="address" className="text-sm font-medium">
                   Address *
                 </label>
-                <Input
+                <input
                   id="address"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.address ? 'border-red-500' : ''
                   }`}
                   value={formData.address}
@@ -476,10 +478,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 >
                   Emergency Contact Name *
                 </label>
-                <Input
+                <input
                   id="emergencyContact"
                   type="text"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.emergencyContact ? 'border-red-500' : ''
                   }`}
                   value={formData.emergencyContact}
@@ -495,10 +497,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 <label htmlFor="emergencyPhone" className="text-sm font-medium">
                   Emergency Contact Phone *
                 </label>
-                <Input
+                <input
                   id="emergencyPhone"
                   type="tel"
-                  className={`w-full h-8 dark:bg-input border rounded-md ${
+                  className={`block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input ${
                     errors.emergencyPhone ? 'border-red-500' : ''
                   }`}
                   value={formData.emergencyPhone}
@@ -523,7 +525,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="relative flex items-center h-9 px-4 rounded-lg dark:bg-input cursor-pointer hover:bg-muted transition-colors group border dark:border-foreground/30">
-                  <Input
+                  <input
                     type="radio"
                     name="therapyHistory"
                     value="yes"
@@ -534,7 +536,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                         therapyHistory: e.target.value,
                       });
                     }}
-                    className="peer sr-only"
+                    className="peer sr-only "
                   />
                   <div className="w-4 h-4 border-2 rounded-full border-gray-500 group-hover:border-blue-500 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all">
                     <div className="w-full h-full rounded-full scale-0 peer-checked:scale-[0.4] bg-white transition-transform" />
@@ -583,13 +585,15 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
                 }}
               >
                 <SelectTrigger
-                  className={`w-full h-10 dark:bg-input border rounded-md ${
-                    errors.preferredCommunication ? 'border-red-500' : ''
-                  }`}
+                  className={`w-full h-8 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30 ${
+          errors.preferredCommunication ? 'border-red-500' : ''
+        }`}
                 >
                   <SelectValue placeholder="Select Communication Mode" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:bg-input">
                   <SelectItem value="video">Video Call</SelectItem>
                   <SelectItem value="audio">Audio Call</SelectItem>
                   <SelectItem value="chat">Chat</SelectItem>
@@ -647,9 +651,11 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
               </label>
               <Textarea
                 id="briefBio"
-                className={`w-full dark:bg-input border rounded-md ${
-                  errors.briefBio ? 'border-red-500' : ''
-                }`}
+                className={`w-full h-40 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30 ${
+          errors.briefBio ? 'border-red-500' : ''
+        }`}
                 rows={6}
                 value={formData.briefBio}
                 onChange={handleInputChange}
@@ -670,75 +676,78 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
   return (
     <>
       {isRedirecting && <SpinnerLoader isLoading={isRedirecting} />}
-      <Card className="w-full max-w-4xl mx-auto rounded-2xl dark:bg-[#171717]">
-        <CardHeader>
-          <CardTitle className="text-xl text-center">
-            Welcome to Mentality
-          </CardTitle>
-          <p className="text-sm text-center text-muted-foreground">
-            {currentStep === 1 && "Let's start with your basic information"}
-            {currentStep === 2 && "Now, let's get your contact details"}
-            {currentStep === 3 && 'Tell us about your therapy preferences'}
-            {currentStep === 4 && 'Finally, share a bit about yourself'}
-          </p>
-          <div className="mt-4">
-            <Progress
-              value={(currentStep / totalSteps) * 100}
-              className="h-2"
-            />
-            <p className="text-sm text-center mt-2 text-muted-foreground">
-              Step {currentStep} of {totalSteps}
+      <div className="w-full bg-[#171717] rounded-2xl overflow-hidden">
+        <div className="p-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-semibold main-font">
+              Welcome to Mentality
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {currentStep === 1 && "Let's start with your basic information"}
+              {currentStep === 2 && "Now, let's get your contact details"}
+              {currentStep === 3 && 'Tell us about your therapy preferences'}
+              {currentStep === 4 && 'Finally, share a bit about yourself'}
             </p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {renderStepContent()}
-
-            <div className="flex justify-between mt-8">
-              {currentStep > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleBack}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
-              )}
-              <div className="flex-1" />
-              {currentStep < totalSteps ? (
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex items-center gap-2"
-                >
-                  Next
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  className={`flex items-center gap-2 ${
-                    isLoading ? 'cursor-not-allowed opacity-75' : ''
-                  }`}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader />
-                  ) : (
-                    <>
-                      Complete Profile
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </Button>
-              )}
+            <div className="mt-4">
+              <Progress
+                value={(currentStep / totalSteps) * 100}
+                className="h-2"
+              />
+              <p className="text-sm text-center mt-2 text-muted-foreground">
+                Step {currentStep} of {totalSteps}
+              </p>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          <div className="mt-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {renderStepContent()}
+
+              <div className="flex justify-between mt-8">
+                {currentStep > 1 && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={handleBack}
+                    className="flex items-center gap-2 dark:bg-input border"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                )}
+                <div className="flex-1" />
+                {currentStep < totalSteps ? (
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="flex items-center gap-2"
+                  >
+                    Next
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className={`flex items-center gap-2 ${
+                      isLoading ? 'cursor-not-allowed opacity-75' : ''
+                    }`}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader />
+                    ) : (
+                      <>
+                        Complete Profile
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </>
   );
 };

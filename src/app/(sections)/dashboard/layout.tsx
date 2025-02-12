@@ -16,7 +16,6 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     if (isAuthenticated && !profileComplete && role === 'user') {
       setShowProfileCompletion(true);
-      // Add a class to the html element instead of inline style
       document.documentElement.classList.add('overflow-hidden');
     } else {
       setShowProfileCompletion(false);
@@ -47,7 +46,6 @@ export default function DashboardLayout({ children }) {
           className="fixed inset-0 bg-black/20 backdrop-blur-[2px] overflow-hidden"
           style={{ zIndex: 999999 }}
           onClick={e => {
-            // Prevent closing when clicking the modal content
             if (e.target === e.currentTarget) {
               setShowProfileCompletion(false);
             }
@@ -55,9 +53,26 @@ export default function DashboardLayout({ children }) {
         >
           <div className="fixed inset-0 flex items-center justify-center">
             <div
-              className="w-full max-w-lg mx-4 bg-[#1a1a1a] rounded-2xl shadow-xl"
+              className="w-full max-w-lg mx-4 bg-[#1a1a1a] rounded-2xl shadow-xl relative"
               onClick={e => e.stopPropagation()}
+              style={{
+                isolation: 'isolate',
+                transform: 'translateZ(0)',
+              }}
             >
+              <style jsx global>{`
+                .select-dropdown {
+                  z-index: 50 !important;
+                }
+
+                /* Ensure select component is above modal */
+                [role='listbox'],
+                [role='combobox'],
+                .select__menu,
+                .select__menu-list {
+                  z-index: 1000000 !important;
+                }
+              `}</style>
               <ProfileCompletion
                 onComplete={() => setShowProfileCompletion(false)}
               />

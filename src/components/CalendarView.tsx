@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -10,38 +8,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-interface Event {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  extendedProps: {
-    type: string;
-    psychologistId: string;
-    psychologistName?: string;
-    slotId?: string;
-    isBooked?: boolean;
-    firstName?: string;
-    lastName?: string;
-    about?: string;
-    languages?: string[];
-    sessionDuration?: number;
-    sessionFee?: number;
-    sessionFormats?: string[];
-    specializations?: string[];
-    acceptsInsurance?: boolean;
-    insuranceProviders?: string[];
-    licenseType?: string;
-    yearsOfExperience?: number;
-    profilePhotoUrl?: string;
-  };
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
-  className?: string[];
-  display?: string;
-}
 
 interface CalendarViewProps {
   appointments: Event[];
@@ -56,13 +22,11 @@ export function CalendarView({
   onEventClick,
   className,
 }: CalendarViewProps) {
-  const [currentEvents, setCurrentEvents] = useState<Event[]>([]);
+  const [currentEvents, setCurrentEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'timeGridWeek' | 'timeGridDay'>(
-    'timeGridWeek'
-  );
+  const [view, setView] = useState('timeGridWeek');
 
   // Memoize event colors
   const eventColors = useMemo(
@@ -81,8 +45,56 @@ export function CalendarView({
     []
   );
 
+  const mergeAndProcessEvents = useCallback(
+    (availabilityEvents, appointmentEvents) => {
+      // Create a map of appointments by time slot
+      const appointmentMap = new Map();
+      appointmentEvents.forEach(apt => {
+        const key = `${new Date(apt.start).toISOString()}-${new Date(
+          apt.end
+        ).toISOString()}`;
+        appointmentMap.set(key, apt);
+      });
+
+      // Process availability events, marking them as booked if there's a matching appointment
+      const processedEvents = availabilityEvents.map(event => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        const timeKey = `${eventStart.toISOString()}-${eventEnd.toISOString()}`;
+        const hasAppointment = appointmentMap.has(timeKey);
+
+        // If there's an appointment for this slot, use appointment data
+        if (hasAppointment) {
+          const appointment = appointmentMap.get(timeKey);
+          return {
+            ...event,
+            title: appointment.title,
+            ...eventColors.booked,
+            extendedProps: {
+              ...event.extendedProps,
+              isBooked: true,
+            },
+          };
+        }
+
+        // Otherwise, keep it as an available slot
+        return {
+          ...event,
+          ...eventColors.available,
+          extendedProps: {
+            ...event.extendedProps,
+            isBooked: false,
+          },
+        };
+      });
+
+      return processedEvents;
+    },
+    [eventColors]
+  );
+
   const fetchSlots = useCallback(
-    async (date: Date) => {
+    async date => {
       setIsLoading(true);
       setError(null);
 
@@ -95,46 +107,11 @@ export function CalendarView({
         }
 
         if (data.IsSuccess && data.Result.events) {
-          const appointmentMap = new Map(
-            appointments.map(apt => [
-              `${new Date(apt.start).toISOString()}-${new Date(
-                apt.end
-              ).toISOString()}`,
-              apt,
-            ])
+          const processedEvents = mergeAndProcessEvents(
+            data.Result.events,
+            appointments
           );
-
-          const formattedEvents = data.Result.events.map((event: any) => {
-            const eventStart = new Date(event.start);
-            const eventEnd = new Date(event.end);
-            const timeKey = `${eventStart.toISOString()}-${eventEnd.toISOString()}`;
-            const hasAppointment = appointmentMap.has(timeKey);
-
-            const availabilitySlot = data.Result.availability
-              .find((a: any) =>
-                a.slots.some((s: any) => s._id === event.extendedProps.slotId)
-              )
-              ?.slots.find((s: any) => s._id === event.extendedProps.slotId);
-
-            const isBooked =
-              hasAppointment || (availabilitySlot?.isBooked ?? false);
-            const colors = isBooked
-              ? eventColors.booked
-              : eventColors.available;
-
-            return {
-              ...event,
-              start: eventStart,
-              end: eventEnd,
-              ...colors,
-              extendedProps: {
-                ...event.extendedProps,
-                isBooked,
-              },
-            };
-          });
-
-          setCurrentEvents(formattedEvents);
+          setCurrentEvents(processedEvents);
         }
       } catch (err) {
         console.error('Error fetching slots:', err);
@@ -145,19 +122,16 @@ export function CalendarView({
         setIsLoading(false);
       }
     },
-    [appointments, eventColors]
+    [appointments, mergeAndProcessEvents]
   );
 
   useEffect(() => {
     fetchSlots(selectedDate);
-  }, [selectedDate, fetchSlots]);
+  }, [selectedDate, appointments, fetchSlots]);
 
   const handleEventClick = useCallback(
-    (info: any) => {
-      if (
-        info.event.extendedProps.type === 'availability' &&
-        !info.event.extendedProps.isBooked
-      ) {
+    info => {
+      if (!info.event.extendedProps.isBooked) {
         const clickedEvent = {
           start: info.event.start,
           end: info.event.end,
@@ -169,71 +143,52 @@ export function CalendarView({
     [onEventClick]
   );
 
-  const handleDatesSet = useCallback((arg: any) => {
-    setSelectedDate(arg.start);
-  }, []);
-
-  const renderEventContent = useCallback((eventInfo: any) => {
+  const renderEventContent = useCallback(eventInfo => {
     const isBooked = eventInfo.event.extendedProps.isBooked;
-    const startTime = format(eventInfo.event.start, 'h:mm a');
-    const endTime = format(eventInfo.event.end, 'h:mm a');
+    const startTime = format(eventInfo.event.start, 'h');
+    const endTime = format(eventInfo.event.end, 'h');
+    const period = format(eventInfo.event.end, 'a');
 
     return (
-      <div className="event-content p-2">
-        <div className="event-status flex items-center gap-2 text-sm font-medium">
+      <div className="px-2 py-1.5">
+        <div className="flex items-center gap-1.5">
           <div
             className={cn(
-              'w-2 h-2 rounded-full',
+              'w-1.5 h-1.5 rounded-full shrink-0',
               isBooked ? 'bg-red-500' : 'bg-green-500'
             )}
           />
-          {isBooked ? 'Booked' : 'Available'}
+          <span className="text-sm font-semibold main-font">
+            {isBooked ? 'Booked' : 'Available'}
+          </span>
         </div>
-        <div className="event-time flex items-center gap-1 text-sm mt-1">
-          <CalendarIcon className="h-3 w-3" />
+        <div className="flex items-center text-sm mt-0.5 text-black dark:text-white main-font">
+          <CalendarIcon className="h-2.5 w-2.5 mr-1 text-black dark:text-white" />
           <span>
-            {startTime} - {endTime}
+            {startTime} - {endTime} {period}
           </span>
         </div>
       </div>
     );
   }, []);
-
   return (
     <div className={cn('space-y-4', className)}>
-      <div className="flex items-center justify-between">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center gap-4">
-            <span className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-600" />
-              Available
-            </span>
-            <span className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              Booked
-            </span>
-          </AlertDescription>
-        </Alert>
-
-   
-      </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription className="flex items-center gap-4">
+          <span className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-600" />
+            Available
+          </span>
+          <span className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+            Booked
+          </span>
+        </AlertDescription>
+      </Alert>
 
       <Card>
         <CardContent className="p-6 relative">
-          {isLoading && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          )}
-
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView={view}
@@ -246,13 +201,13 @@ export function CalendarView({
             slotMinTime="06:00:00"
             slotMaxTime="21:00:00"
             eventClick={handleEventClick}
-            events={[...currentEvents, ...appointments]}
+            events={currentEvents}
             allDaySlot={false}
             nowIndicator
             height="700px"
             expandRows
             stickyHeaderDates
-            datesSet={handleDatesSet}
+            datesSet={arg => setSelectedDate(arg.start)}
             slotLabelFormat={{
               hour: 'numeric',
               minute: '2-digit',

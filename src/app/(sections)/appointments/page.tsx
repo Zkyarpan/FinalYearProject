@@ -18,16 +18,21 @@ import { PsychologistDetails } from '@/components/PsychologistDetails';
 import { PaymentForm } from '@/components/payment-form';
 import AppointmentManager from '@/components/AppointmentManager';
 import { CalendarStyles } from '@/components/CalenderStyles';
-import { Event, SelectedSlot, BookingDetails } from '@/types/appointment';
+import {
+  AppointmentEvent,
+  SelectedSlot,
+  BookingDetails,
+} from '@/types/appointment';
 import { checkAvailability } from '@/helpers/checkAvailability';
+import { CalendarEvent } from '@/types/calendar';
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 );
 
 export default function AppointmentScheduler() {
-  const [appointments, setAppointments] = useState<Event[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<Event[]>([]);
+  const [appointments, setAppointments] = useState<CalendarEvent[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<CalendarEvent[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -311,8 +316,8 @@ export default function AppointmentScheduler() {
       </div>
 
       <CalendarView
-        appointments={appointments}
-        availableSlots={availableSlots}
+        appointments={appointments as unknown as Event[]}
+        availableSlots={availableSlots as unknown as Event[]}
         onEventClick={handleEventClick}
       />
       <Dialog open={showBookingDialog} onOpenChange={handleCloseDialog}>

@@ -55,3 +55,18 @@ export interface BookingDetails {
   insuranceProvider: string;
   reasonForVisit: string;
 }
+
+export interface AppointmentEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  display: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  className?: string;
+  extendedProps?: Record<string, any>;
+}
+
+

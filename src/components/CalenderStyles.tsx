@@ -9,24 +9,37 @@ export const CalendarStyles = () => {
       }
 
       /* Event styles */
-      .fc .calendar-event {
+      .fc .fc-event {
         margin: 1px 0;
         padding: 0;
-        border-radius: 4px;
+      }
+
+      .fc .fc-timegrid-event {
+        padding: 0 !important;
+        margin: 2px !important;
+        border: none !important;
+        background: transparent !important;
       }
 
       /* Available slot styles */
       .fc .available-slot {
-        background-color: rgba(34, 197, 94, 0.1) !important;
         border: 1px solid rgba(34, 197, 94, 0.25) !important;
         color: #166534 !important;
       }
 
       /* Booked slot styles */
       .fc .booked-slot {
-        background-color: rgba(239, 68, 68, 0.1) !important;
         border: 1px solid rgba(239, 68, 68, 0.25) !important;
         color: #dc2626 !important;
+      }
+
+      /* Ensure events don't overlap */
+      .fc .fc-timegrid-event-harness {
+        margin: 0 !important;
+      }
+
+      .fc .fc-timegrid-event {
+        margin: 1px !important;
       }
 
       /* Base calendar styles */
@@ -45,16 +58,6 @@ export const CalendarStyles = () => {
         color: hsl(var(--foreground));
       }
 
-      .fc .fc-button {
-        background: hsl(var(--background));
-        border: 1px solid hsl(var(--border));
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        height: 2.5rem;
-        color: hsl(var(--foreground));
-        border-radius: 0;
-      }
-
       /* Dark mode adjustments */
       @media (prefers-color-scheme: dark) {
         .fc .available-slot {
@@ -63,6 +66,12 @@ export const CalendarStyles = () => {
         .fc .booked-slot {
           background-color: rgba(239, 68, 68, 0.2) !important;
         }
+      }
+
+      /* Remove any background color transitions to prevent color blending */
+      .fc .fc-event,
+      .fc .fc-event-main {
+        transition: opacity 0.2s ease !important;
       }
     `}</style>
   );

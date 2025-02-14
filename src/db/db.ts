@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import User from '@/models/User';
+import Appointment from '@/models/Appointment';
+import Availability from '@/models/Availability';
 
 const MONGODB_URI = process.env.MONGO_URI!;
 
@@ -27,6 +30,26 @@ globalThis.mongooseCache = globalThis.mongooseCache || {
   conn: null,
   promise: null,
 };
+
+// Initialize models function
+function initializeModels() {
+  try {
+    // Initialize models in order of dependency
+    if (!mongoose.models.User) {
+      User;
+    }
+    if (!mongoose.models.Appointment) {
+      Appointment;
+    }
+    if (!mongoose.models.Availability) {
+      Availability;
+    }
+    console.log('✅ Models initialized successfully');
+  } catch (error) {
+    console.error('❌ Error initializing models:', error);
+    throw error;
+  }
+}
 
 const logCleanupStatus = (result: CleanupResult) => {
   if (result.deletedCount || result.modifiedCount) {
@@ -78,6 +101,7 @@ const connectDB = async (): Promise<typeof mongoose> => {
     // If we have an existing connection, return it
     if (mongoose.connections[0].readyState) {
       console.log('✅ Using existing MongoDB connection');
+      initializeModels(); // Ensure models are initialized
       return mongoose;
     }
 
@@ -85,6 +109,7 @@ const connectDB = async (): Promise<typeof mongoose> => {
     if (globalThis.mongooseCache.promise) {
       console.log('⏳ Waiting for existing MongoDB connection promise');
       await globalThis.mongooseCache.promise;
+      initializeModels(); // Ensure models are initialized
       return mongoose;
     }
 
@@ -108,6 +133,7 @@ const connectDB = async (): Promise<typeof mongoose> => {
     // Set up event listeners
     mongoose.connection.on('connected', () => {
       console.log('✅ Successfully connected to MongoDB');
+      initializeModels(); // Initialize models on connection
       console.log('🔄 Setting up automatic slot cleanup...');
       setupSlotCleanup();
     });

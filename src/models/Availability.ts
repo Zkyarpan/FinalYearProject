@@ -1,21 +1,23 @@
 import mongoose, { Document, Model } from 'mongoose';
 const { Schema } = mongoose;
 
-// Interfaces
-interface ITimeSlot {
+export interface ITimeSlot {
+  _id: mongoose.Types.ObjectId;
   startTime: Date;
   endTime: Date;
   isBooked: boolean;
-  _id?: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
+  appointmentId?: mongoose.Types.ObjectId;
 }
 
 interface IPsychologistDetails {
-  name?: string;
+  name?: string; // Made optional
   specialty?: string;
-  profileImage?: string;
+  profilePhotoUrl?: string;
+  sessionFee?: number;
 }
 
-interface IAvailability extends Document {
+export interface IAvailability {
   psychologistId: mongoose.Types.ObjectId;
   daysOfWeek: number[];
   startTime: string;
@@ -24,22 +26,27 @@ interface IAvailability extends Document {
   isActive: boolean;
   psychologistDetails?: IPsychologistDetails;
   lastCleanup: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  getAvailableSlots: () => ITimeSlot[];
-  bookSlot: (slotId: mongoose.Types.ObjectId) => boolean;
 }
 
-interface IAvailabilityModel extends Model<IAvailability> {
+interface IAvailabilityDocument extends IAvailability, Document {
+  getAvailableSlots(): ITimeSlot[];
+  bookSlot(
+    slotId: mongoose.Types.ObjectId,
+    userId: mongoose.Types.ObjectId,
+    appointmentId: mongoose.Types.ObjectId
+  ): boolean;
+}
+
+interface IAvailabilityModel extends Model<IAvailabilityDocument> {
   cleanupPastSlots(): Promise<mongoose.UpdateWriteOpResult>;
 }
 
-// Define the TimeSlot schema
 const TimeSlotSchema = new Schema<ITimeSlot>(
   {
     startTime: {
       type: Date,
       required: true,
+      index: true,
     },
     endTime: {
       type: Date,
@@ -48,17 +55,30 @@ const TimeSlotSchema = new Schema<ITimeSlot>(
     isBooked: {
       type: Boolean,
       default: false,
+      index: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    appointmentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Appointment',
     },
   },
   { _id: true }
 );
 
-const AvailabilitySchema = new Schema<IAvailability>(
+const AvailabilitySchema = new Schema<
+  IAvailabilityDocument,
+  IAvailabilityModel
+>(
   {
     psychologistId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     daysOfWeek: {
       type: [Number],
@@ -79,11 +99,13 @@ const AvailabilitySchema = new Schema<IAvailability>(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
     psychologistDetails: {
-      name: String,
+      name: { type: String, required: false }, // Made not required
       specialty: String,
-      profileImage: String,
+      profilePhotoUrl: String,
+      sessionFee: Number,
     },
     lastCleanup: {
       type: Date,
@@ -96,23 +118,19 @@ const AvailabilitySchema = new Schema<IAvailability>(
 );
 
 // Pre-find middleware
-AvailabilitySchema.pre('find', function (this: mongoose.Query<any, any>) {
-  // Get current date without minutes and seconds for more accurate comparison
+AvailabilitySchema.pre('find', function (next) {
   const currentDate = new Date();
-  currentDate.setMinutes(0, 0, 0);
+  currentDate.setSeconds(0, 0);
 
   this.where({
     isActive: true,
-    slots: {
-      $elemMatch: {
-        startTime: { $gte: currentDate },
-      },
-    },
+    'slots.startTime': { $gte: currentDate },
   });
+  next();
 });
 
-// Pre-save middleware to generate slots
-AvailabilitySchema.pre('save', async function (this: IAvailability, next) {
+// Pre-save middleware for slot generation
+AvailabilitySchema.pre('save', async function (next) {
   try {
     if (
       this.isNew ||
@@ -121,35 +139,33 @@ AvailabilitySchema.pre('save', async function (this: IAvailability, next) {
       this.isModified('daysOfWeek')
     ) {
       const currentDate = new Date();
-      currentDate.setMinutes(0, 0, 0); // Reset minutes and seconds for accurate comparison
+      currentDate.setSeconds(0, 0);
 
       const generatedSlots: ITimeSlot[] = [];
 
-      // Generate slots only for the current week
+      // Generate slots for the current week
       for (const dayOfWeek of this.daysOfWeek) {
         const date = new Date();
-        // Calculate days until next occurrence of this day in current week
         const daysUntilNext = (dayOfWeek - date.getDay() + 7) % 7;
 
-        // Only process if the day is today or later this week
         if (daysUntilNext < 7) {
           date.setDate(date.getDate() + daysUntilNext);
 
-          // Parse hours and minutes from startTime and endTime
-          const [startHour, startMinute = '0'] = this.startTime
-            .split(':')
-            .map(Number);
-          const [endHour, endMinute = '0'] = this.endTime
-            .split(':')
-            .map(Number);
+          // Parse time strings safely
+          const startTimeParts = this.startTime.split(':');
+          const endTimeParts = this.endTime.split(':');
+
+          const startHour = parseInt(startTimeParts[0], 10);
+          const startMinute = parseInt(startTimeParts[1] || '0', 10);
+          const endHour = parseInt(endTimeParts[0], 10);
+          const endMinute = parseInt(endTimeParts[1] || '0', 10);
 
           const slotStart = new Date(date);
-          slotStart.setHours(startHour, parseInt(startMinute.toString()), 0, 0);
+          slotStart.setHours(startHour, startMinute, 0, 0);
 
           const slotEnd = new Date(date);
-          slotEnd.setHours(endHour, parseInt(endMinute.toString()), 0, 0);
+          slotEnd.setHours(endHour, endMinute, 0, 0);
 
-          // Only add slots that are in the future or current hour if within first 5 minutes
           const now = new Date();
           if (
             slotStart >= currentDate &&
@@ -159,6 +175,7 @@ AvailabilitySchema.pre('save', async function (this: IAvailability, next) {
                 now.getMinutes() <= 5))
           ) {
             generatedSlots.push({
+              _id: new mongoose.Types.ObjectId(),
               startTime: slotStart,
               endTime: slotEnd,
               isBooked: false,
@@ -167,17 +184,17 @@ AvailabilitySchema.pre('save', async function (this: IAvailability, next) {
         }
       }
 
-      // Sort slots by start time
+      // Sort slots chronologically
       generatedSlots.sort(
         (a, b) => a.startTime.getTime() - b.startTime.getTime()
       );
 
-      // Keep existing booked slots that are still valid
+      // Preserve existing booked slots
       const existingValidBookedSlots = this.slots.filter(
         slot => slot.isBooked && slot.startTime >= currentDate
       );
 
-      // Merge existing booked slots with new generated slots
+      // Merge slots
       this.slots = [...existingValidBookedSlots, ...generatedSlots];
     }
 
@@ -187,84 +204,109 @@ AvailabilitySchema.pre('save', async function (this: IAvailability, next) {
   }
 });
 
-// Static method to clean up past slots
-AvailabilitySchema.statics.cleanupPastSlots = async function () {
-  const currentDate = new Date();
-  currentDate.setMinutes(0, 0, 0);
-
-  try {
-    const result = await this.updateMany(
-      {},
-      {
-        $pull: {
-          slots: {
-            startTime: { $lt: currentDate },
-          },
-        },
-        $set: {
-          lastCleanup: new Date(),
-        },
-      }
-    );
-
-    return result;
-  } catch (error) {
-    console.error('Error cleaning up past slots:', error);
-    throw error;
-  }
-};
-
 // Instance methods
-AvailabilitySchema.methods.getAvailableSlots = function (
-  this: IAvailability
-): ITimeSlot[] {
+AvailabilitySchema.methods.getAvailableSlots = function (): ITimeSlot[] {
   const currentDate = new Date();
-  currentDate.setMinutes(0, 0, 0);
+  currentDate.setSeconds(0, 0);
 
-  return this.slots.filter(
-    slot => !slot.isBooked && slot.startTime >= currentDate
-  );
+  return this.slots
+    .filter(slot => !slot.isBooked && slot.startTime >= currentDate)
+    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 };
 
 AvailabilitySchema.methods.bookSlot = function (
-  this: IAvailability,
-  slotId: mongoose.Types.ObjectId
+  slotId: mongoose.Types.ObjectId,
+  userId: mongoose.Types.ObjectId,
+  appointmentId: mongoose.Types.ObjectId
 ): boolean {
   const currentDate = new Date();
-  currentDate.setMinutes(0, 0, 0);
+  currentDate.setSeconds(0, 0);
 
   const slot = this.slots.find(slot => slot._id?.equals(slotId));
 
   if (slot && !slot.isBooked && slot.startTime >= currentDate) {
     slot.isBooked = true;
+    slot.userId = userId;
+    slot.appointmentId = appointmentId;
     return true;
   }
   return false;
 };
+
+// Static method for cleanup
+AvailabilitySchema.statics.cleanupPastSlots =
+  async function (): Promise<mongoose.UpdateWriteOpResult> {
+    const currentDate = new Date();
+    currentDate.setSeconds(0, 0);
+
+    try {
+      const result = await this.updateMany(
+        {},
+        {
+          $pull: {
+            slots: {
+              startTime: { $lt: currentDate },
+            },
+          },
+          $set: {
+            lastCleanup: currentDate,
+          },
+        }
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      throw error;
+    }
+  };
 
 // Indexes
 AvailabilitySchema.index({ psychologistId: 1, isActive: 1 });
 AvailabilitySchema.index({ 'slots.startTime': 1, 'slots.isBooked': 1 });
 AvailabilitySchema.index({ lastCleanup: 1 });
 
-// Create or get the model
+// Create model
 const Availability =
   (mongoose.models.Availability as IAvailabilityModel) ||
-  mongoose.model<IAvailability, IAvailabilityModel>(
+  mongoose.model<IAvailabilityDocument, IAvailabilityModel>(
     'Availability',
     AvailabilitySchema
   );
 
-// Setup cleanup interval
-if (mongoose.connection.readyState === 1) {
-  setInterval(async () => {
-    try {
-      await Availability.cleanupPastSlots();
-      console.log('✅ Past slots cleanup completed');
-    } catch (error) {
-      console.error('❌ Error during automatic cleanup:', error);
+// Cleanup interval setup (production only)
+if (
+  process.env.NODE_ENV === 'production' &&
+  mongoose.connection.readyState === 1
+) {
+  let cleanupIntervalId: NodeJS.Timeout | undefined;
+
+  const startCleanupInterval = () => {
+    if (cleanupIntervalId) {
+      clearInterval(cleanupIntervalId);
     }
-  }, 30 * 60 * 1000); // Run every 30 minutes
+
+    cleanupIntervalId = setInterval(async () => {
+      try {
+        await Availability.cleanupPastSlots();
+        console.log(
+          `✅ Slots cleanup completed at ${new Date().toISOString()}`
+        );
+      } catch (error) {
+        console.error('❌ Cleanup error:', error);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  };
+
+  // Start cleanup interval
+  startCleanupInterval();
+
+  // Cleanup on process termination
+  process.on('SIGTERM', () => {
+    if (cleanupIntervalId) {
+      clearInterval(cleanupIntervalId);
+    }
+  });
 }
 
 export default Availability;

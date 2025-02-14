@@ -1,8 +1,8 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document, Types } from 'mongoose';
 
-interface IAppointment extends Document {
-  userId: Schema.Types.ObjectId;
-  psychologistId: Schema.Types.ObjectId;
+export interface IAppointment extends Document {
+  userId: Types.ObjectId;
+  psychologistId: Types.ObjectId;
   dateTime: Date;
   endTime: Date;
   duration: number;
@@ -29,7 +29,7 @@ const appointmentSchema = new Schema<IAppointment>(
     },
     psychologistId: {
       type: Schema.Types.ObjectId,
-      ref: 'Psychologist',
+      ref: 'User',
       required: true,
       index: true,
     },
@@ -52,8 +52,8 @@ const appointmentSchema = new Schema<IAppointment>(
     },
     sessionFormat: {
       type: String,
-      required: true,
       enum: ['video', 'in-person'],
+      required: true,
     },
     patientName: {
       type: String,

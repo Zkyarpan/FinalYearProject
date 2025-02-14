@@ -7,6 +7,73 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { withAuth } from '@/middleware/authMiddleware';
 import Psychologist from '@/models/Psychologist';
 
+interface Slot {
+  _id?: string;
+  startTime: Date;
+  endTime: Date;
+  isBooked: boolean;
+  appointmentId?: string;
+}
+
+interface PsychologistDetails {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  about: string;
+  languages: string[];
+  sessionDuration: number;
+  sessionFee: number;
+  sessionFormats: string[];
+  specializations: string[];
+  acceptsInsurance: boolean;
+  insuranceProviders: string[];
+  licenseType: string;
+  yearsOfExperience: number;
+  profilePhotoUrl: string;
+}
+
+interface AvailabilityDocument {
+  psychologistId: PsychologistDetails;
+  slots?: Slot[];
+  daysOfWeek: number[];
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  extendedProps: {
+    type: string;
+    psychologistId: string;
+    psychologistName: string;
+    firstName: string;
+    lastName: string;
+    about: string;
+    languages: string[];
+    sessionDuration: number;
+    sessionFee: number;
+    sessionFormats: string[];
+    specializations: string[];
+    acceptsInsurance: boolean;
+    insuranceProviders: string[];
+    licenseType: string;
+    yearsOfExperience: number;
+    profilePhotoUrl: string;
+    slotId?: string;
+    isBooked: boolean;
+    appointmentId?: string;
+    dayOfWeek: number;
+  };
+  display: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  className: string[];
+}
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
@@ -33,7 +100,7 @@ export async function GET(req: NextRequest) {
           'profilePhotoUrl',
         ],
       })
-      .lean();
+      .lean<AvailabilityDocument[]>();
 
     if (!availabilities || availabilities.length === 0) {
       return NextResponse.json(
@@ -48,70 +115,73 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const events = availabilities.reduce((acc, avail) => {
-      const slots = avail.slots || [];
-      const psychologist = avail.psychologistId;
+    const events: CalendarEvent[] = availabilities.reduce(
+      (acc: CalendarEvent[], avail) => {
+        const slots = avail.slots || [];
+        const psychologist = avail.psychologistId;
 
-      const slotEvents = slots.map(slot => {
-        const startTime = new Date(slot.startTime);
-        const endTime = new Date(slot.endTime);
+        const slotEvents = slots.map((slot): CalendarEvent => {
+          const startTime = new Date(slot.startTime);
+          const endTime = new Date(slot.endTime);
 
-        const formatTime = (date: Date) => {
-          return date.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-        };
+          const formatTime = (date: Date): string => {
+            return date.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            });
+          };
 
-        const fullName = `Dr. ${psychologist.firstName} ${psychologist.lastName}`;
+          const fullName = `Dr. ${psychologist.firstName} ${psychologist.lastName}`;
 
-        return {
-          id: slot._id.toString(),
-          title: `${slot.isBooked ? 'Booked' : 'Available'} (${formatTime(
-            startTime
-          )} - ${formatTime(endTime)})`,
-          start: startTime,
-          end: endTime,
-          extendedProps: {
-            type: 'availability',
-            psychologistId: psychologist._id,
-            psychologistName: fullName,
-            firstName: psychologist.firstName,
-            lastName: psychologist.lastName,
-            about: psychologist.about,
-            languages: psychologist.languages,
-            sessionDuration: psychologist.sessionDuration,
-            sessionFee: psychologist.sessionFee,
-            sessionFormats: psychologist.sessionFormats,
-            specializations: psychologist.specializations,
-            acceptsInsurance: psychologist.acceptsInsurance,
-            insuranceProviders: psychologist.insuranceProviders,
-            licenseType: psychologist.licenseType,
-            yearsOfExperience: psychologist.yearsOfExperience,
-            profilePhotoUrl: psychologist.profilePhotoUrl,
-            slotId: slot._id,
-            isBooked: slot.isBooked,
-            appointmentId: slot.appointmentId,
-            dayOfWeek: startTime.getDay(),
-          },
-          display: 'block',
-          backgroundColor: slot.isBooked
-            ? 'rgba(59, 130, 246, 0.1)'
-            : 'rgba(34, 197, 94, 0.1)',
-          borderColor: slot.isBooked
-            ? 'rgba(59, 130, 246, 0.25)'
-            : 'rgba(34, 197, 94, 0.25)',
-          textColor: slot.isBooked ? '#1e40af' : '#166534',
-          className: [
-            'calendar-event',
-            slot.isBooked ? 'booked-slot' : 'available-slot',
-          ],
-        };
-      });
+          return {
+            id: slot._id?.toString() ?? 'temp-' + Date.now(),
+            title: `${slot.isBooked ? 'Booked' : 'Available'} (${formatTime(
+              startTime
+            )} - ${formatTime(endTime)})`,
+            start: startTime,
+            end: endTime,
+            extendedProps: {
+              type: 'availability',
+              psychologistId: psychologist._id,
+              psychologistName: fullName,
+              firstName: psychologist.firstName,
+              lastName: psychologist.lastName,
+              about: psychologist.about,
+              languages: psychologist.languages,
+              sessionDuration: psychologist.sessionDuration,
+              sessionFee: psychologist.sessionFee,
+              sessionFormats: psychologist.sessionFormats,
+              specializations: psychologist.specializations,
+              acceptsInsurance: psychologist.acceptsInsurance,
+              insuranceProviders: psychologist.insuranceProviders,
+              licenseType: psychologist.licenseType,
+              yearsOfExperience: psychologist.yearsOfExperience,
+              profilePhotoUrl: psychologist.profilePhotoUrl,
+              slotId: slot._id,
+              isBooked: slot.isBooked,
+              appointmentId: slot.appointmentId,
+              dayOfWeek: startTime.getDay(),
+            },
+            display: 'block',
+            backgroundColor: slot.isBooked
+              ? 'rgba(59, 130, 246, 0.1)'
+              : 'rgba(34, 197, 94, 0.1)',
+            borderColor: slot.isBooked
+              ? 'rgba(59, 130, 246, 0.25)'
+              : 'rgba(34, 197, 94, 0.25)',
+            textColor: slot.isBooked ? '#1e40af' : '#166534',
+            className: [
+              'calendar-event',
+              slot.isBooked ? 'booked-slot' : 'available-slot',
+            ],
+          };
+        });
 
-      return [...acc, ...slotEvents];
-    }, []);
+        return [...acc, ...slotEvents];
+      },
+      []
+    );
 
     const formattedAvailabilities = availabilities.map(avail => {
       const psychologist = avail.psychologistId;
@@ -190,17 +260,31 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Fetch availability error:', error);
     return NextResponse.json(
-      createErrorResponse(500, 'Error fetching availability: ' + error.message)
+      createErrorResponse(
+        500,
+        'Error fetching availability: ' + (error as Error).message
+      )
     );
   }
 }
 
+interface CreateAvailabilityData {
+  daysOfWeek: number[];
+  startTime: string;
+  endTime: string;
+}
+
+interface AuthToken {
+  id: string;
+  roles: string[];
+}
+
 export async function POST(req: NextRequest) {
   return withAuth(
-    async (req: NextRequest, token: any) => {
+    async (req: NextRequest, token: AuthToken) => {
       try {
         await connectDB();
-        const data = await req.json();
+        const data: CreateAvailabilityData = await req.json();
 
         console.log('Creating availability with data:', data);
 
@@ -243,10 +327,14 @@ export async function POST(req: NextRequest) {
           savedAvailability.slots.length
         );
 
-        // Fetch the saved document to verify
         const verifiedAvailability = await Availability.findById(
           savedAvailability._id
         );
+
+        if (!verifiedAvailability) {
+          throw new Error('Failed to verify created availability');
+        }
+
         console.log('Verified slots count:', verifiedAvailability.slots.length);
 
         return NextResponse.json(
@@ -262,7 +350,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           createErrorResponse(
             500,
-            'Error creating availability: ' + error.message
+            'Error creating availability: ' + (error as Error).message
           ),
           { status: 500 }
         );

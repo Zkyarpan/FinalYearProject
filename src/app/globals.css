@@ -39,6 +39,10 @@ html {
   font-family: 'logofont', sans-serif;
 }
 
+::placeholder {
+  font-family: 'mainfont', sans-serif;
+}
+
 .main-font {
   font-family: 'mainfont', sans-serif;
 }
@@ -67,9 +71,7 @@ select:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
   box-shadow: 0 0 0px 1000px transparent inset !important;
   -webkit-text-fill-color: inherit !important;
-  transition:
-    background-color 5000s ease-in-out 0s,
-    color 5000s ease-in-out 0s;
+  transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s;
 }
 
 .hide-scrollbar::-webkit-scrollbar {
@@ -156,7 +158,6 @@ select:-webkit-autofill:focus {
   }
 }
 
-
 /* app/styles/calendar.css */
 .fc {
   --fc-border-color: hsl(var(--border));
@@ -191,7 +192,7 @@ select:-webkit-autofill:focus {
   @apply border-border;
 }
 
-.fc-theme-standard td, 
+.fc-theme-standard td,
 .fc-theme-standard th {
   @apply border-border;
 }

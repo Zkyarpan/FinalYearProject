@@ -44,10 +44,11 @@ const routeTitles = {
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
   '/psychologist/patients': 'My Patients',
-  '/psychologist/appointments': 'Appointments',
+  '/psychologist/appointments': 'Your Appointments',
   '/psychologist/messages': 'Messages',
   '/psychologist/articles': 'My Articles',
   '/psychologist/blog': 'My Blogs',
+  '/psychologist/availability': 'My Availability',
   // Admin routes
   '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
@@ -94,6 +95,7 @@ const RootLayout = ({ children }) => {
     '/psychologist/patients',
     '/psychologist/resources',
     '/psychologist/services',
+    '/psychologist/availability',
   ];
 
   const pathParts = pathname.split('/').filter(Boolean);

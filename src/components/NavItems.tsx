@@ -11,6 +11,7 @@ import Users from '@/icons/Users';
 import Settings from '@/icons/Settings';
 import Calendar from '@/icons/Calendar';
 import Messages from '@/icons/Messages';
+import Availability from '@/icons/Availability';
 
 export const USER_NAV_ITEMS = [
   {
@@ -65,6 +66,11 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
     icon: <Users />,
     text: 'My Patients',
     href: '/psychologist/patients',
+  },
+  {
+    icon: <Availability />,
+    text: 'Availability',
+    href: '/psychologist/availability',
   },
   {
     icon: <Calendar />,

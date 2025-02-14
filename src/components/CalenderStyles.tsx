@@ -8,79 +8,25 @@ export const CalendarStyles = () => {
         --fc-today-bg-color: hsl(var(--accent) / 0.1);
       }
 
-      /* Status messages for all types */
-      .fc .calendar-status-messages {
-        display: grid;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
+      /* Event styles */
+      .fc .calendar-event {
+        margin: 1px 0;
+        padding: 0;
+        border-radius: 4px;
       }
 
-      .fc .status-message {
-        padding: 0.75rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        border-left-width: 3px;
-        border-left-style: solid;
+      /* Available slot styles */
+      .fc .available-slot {
+        background-color: rgba(34, 197, 94, 0.1) !important;
+        border: 1px solid rgba(34, 197, 94, 0.25) !important;
+        color: #166534 !important;
       }
 
-      /* Available status */
-      .fc .status-message-available {
-        background-color: rgba(239, 68, 68, 0.1);
-        border-left-color: rgb(239, 68, 68);
-        color: rgb(239, 68, 68);
-      }
-
-      /* Booked status */
-      .fc .status-message-booked {
-        background-color: rgba(37, 99, 235, 0.1);
-        color: rgb(37, 99, 235);
-      }
-
-      /* Confirmed status */
-      .fc .status-message-confirmed {
-        background-color: rgba(5, 150, 105, 0.1);
-        border-left-color: rgb(5, 150, 105);
-        color: rgb(5, 150, 105);
-      }
-
-      /* Available Slots */
-      .fc .availability-slot {
-        background-color: rgba(239, 68, 68, 0.15) !important;
-        border: 2px solid rgb(239, 68, 68) !important;
-        margin: 0 !important;
-        opacity: 1 !important;
-      }
-
-      .fc .availability-slot .fc-event-title,
-      .fc .availability-slot .fc-event-time {
-        color: rgb(239, 68, 68) !important;
-        font-weight: 600;
-      }
-
-      /* Booked Appointments */
-      .fc .booked-event {
-        background-color: rgb(37, 99, 235) !important;
-        border: none !important;
-        opacity: 1 !important;
-      }
-
-      .fc .booked-event .fc-event-title,
-      .fc .booked-event .fc-event-time {
-        color: white !important;
-        font-weight: 500;
-      }
-
-      /* Confirmed Appointments */
-      .fc .confirmed-event {
-        background-color: rgb(5, 150, 105) !important;
-        border: none !important;
-        opacity: 1 !important;
-      }
-
-      .fc .confirmed-event .fc-event-title,
-      .fc .confirmed-event .fc-event-time {
-        color: white !important;
-        font-weight: 500;
+      /* Booked slot styles */
+      .fc .booked-slot {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border: 1px solid rgba(239, 68, 68, 0.25) !important;
+        color: #dc2626 !important;
       }
 
       /* Base calendar styles */
@@ -111,16 +57,15 @@ export const CalendarStyles = () => {
 
       /* Dark mode adjustments */
       @media (prefers-color-scheme: dark) {
-        .fc .availability-slot {
-          background-color: rgba(239, 68, 68, 0.25) !important;
+        .fc .available-slot {
+          background-color: rgba(34, 197, 94, 0.2) !important;
         }
-        .fc .booked-event {
-          background-color: rgb(59, 130, 246) !important;
-        }
-        .fc .confirmed-event {
-          background-color: rgb(16, 185, 129) !important;
+        .fc .booked-slot {
+          background-color: rgba(239, 68, 68, 0.2) !important;
         }
       }
     `}</style>
   );
 };
+
+export default CalendarStyles;

@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import AppointmentDialog from '@/components/AppointmentDialog';
-import AvailabilitySettings from '@/components/AvailabilitySettings';
 import { CalendarStyles } from '@/components/CalenderStyles';
 import { Appointment } from '@/types/types';
 
@@ -173,10 +172,8 @@ export default function PsychologistAppointments() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background mt-5">
       {CalendarStyles()}
-
-      <AvailabilitySettings onRefresh={fetchData} />
 
       <Card>
         <CardContent className="p-4">

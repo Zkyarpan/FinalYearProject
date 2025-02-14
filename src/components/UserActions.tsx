@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { DEFAULT_AVATAR } from '@/constants';
+import { CommandMenu } from './CommandSearch';
 
 interface UserActionsProps {
   isAuthenticated: boolean;
@@ -129,18 +130,7 @@ const UserActions = ({
       <div className="flex items-center justify-end w-full relative z-40">
         <div className="flex items-center gap-x-3">
           <div className="flex items-center relative">
-            <div
-              className={`relative flex w-[209px] items-center rounded-xl border dark:border-[#333333] bg-gray-100 dark:bg-input px-4 py-1.5 transition-all duration-200 dark:shadow-sm shadow-sm ${
-                isNestedBlogRoute ? 'ml-8' : 'ml-3'
-              }`}
-            >
-              <Search className="h-5 w-5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search Mentality"
-                className="ml-2 w-full h-6 text-sm border-none outline-none focus:ring-0 placeholder:text-muted-foreground dark:bg-input bg-gray-100"
-              />
-            </div>
+            <CommandMenu router={router} />
           </div>
 
           <div className="flex items-center gap-3 px-1">

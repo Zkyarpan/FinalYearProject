@@ -1,71 +1,52 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose from 'mongoose';
+const { Schema } = mongoose;
 
-export interface IAvailability extends Document {
-  psychologistId: mongoose.Types.ObjectId;
-  daysOfWeek: number[];
-  startTime: string;
-  endTime: string;
-  isActive: boolean;
-  psychologistDetails?: {
-    name: string;
-    specialty?: string;
-    profileImage?: string;
-  };
-  toCalendarEvent(): any;
-}
+// Define the TimeSlot schema
+const TimeSlotSchema = new Schema(
+  {
+    startTime: {
+      type: Date,
+      required: true,
+    },
+    endTime: {
+      type: Date,
+      required: true,
+    },
+    isBooked: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: true }
+);
 
-const AvailabilitySchema: Schema = new Schema(
+const AvailabilitySchema = new Schema(
   {
     psychologistId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     daysOfWeek: {
       type: [Number],
       required: true,
-      validate: {
-        validator: function (v: number[]) {
-          return v.every(day => day >= 0 && day <= 6);
-        },
-        message: 'Days must be between 0 (Sunday) and 6 (Saturday)',
-      },
     },
     startTime: {
       type: String,
       required: true,
-      validate: {
-        validator: function (v: string) {
-          return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v);
-        },
-        message: 'Start time must be in HH:mm format',
-      },
     },
     endTime: {
       type: String,
       required: true,
-      validate: {
-        validator: function (v: string) {
-          return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v);
-        },
-        message: 'End time must be in HH:mm format',
-      },
+    },
+    slots: {
+      type: [TimeSlotSchema],
+      default: [],
     },
     isActive: {
       type: Boolean,
       default: true,
     },
-    bookedSlots: [
-      {
-        start: Date,
-        end: Date,
-        appointmentId: {
-          type: Schema.Types.ObjectId,
-          ref: 'Appointment',
-        },
-      },
-    ],
     psychologistDetails: {
       name: String,
       specialty: String,
@@ -77,49 +58,102 @@ const AvailabilitySchema: Schema = new Schema(
   }
 );
 
-// Add compound index for efficient queries
-AvailabilitySchema.index({ psychologistId: 1, daysOfWeek: 1, isActive: 1 });
+// Pre-save middleware to generate slots for only the next occurrence
+AvailabilitySchema.pre('save', async function (next) {
+  if (
+    this.isNew ||
+    this.isModified('startTime') ||
+    this.isModified('endTime') ||
+    this.isModified('daysOfWeek')
+  ) {
+    // Get current date
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
 
-// Validate end time is after start time
-AvailabilitySchema.pre('save', function (next) {
-  const start = new Date(`2000-01-01T${this.startTime}:00`);
-  const end = new Date(`2000-01-01T${this.endTime}:00`);
+    console.log('Starting slot generation:', {
+      currentDate: currentDate.toISOString(),
+      daysOfWeek: this.daysOfWeek,
+      startTime: this.startTime,
+      endTime: this.endTime,
+    });
 
-  if (start >= end) {
-    next(new Error('End time must be after start time'));
+    const generatedSlots: {
+      startTime: Date;
+      endTime: Date;
+      isBooked: boolean;
+    }[] = [];
+
+    // Generate slots only for the next occurrence (within one week)
+    for (const day of this.daysOfWeek) {
+      // Calculate the next occurrence of this day within the next 7 days
+      const date = new Date(currentDate);
+      const daysUntilNext = (day - currentDate.getDay() + 7) % 7;
+
+      // Only generate if it's within the next 7 days
+      if (daysUntilNext < 7) {
+        date.setDate(currentDate.getDate() + daysUntilNext);
+
+        // Parse hours
+        const [startHour] = this.startTime.split(':').map(Number);
+        const [endHour] = this.endTime.split(':').map(Number);
+
+        // Create single slot
+        const slotStart = new Date(date);
+        slotStart.setHours(startHour, 0, 0);
+
+        const slotEnd = new Date(date);
+        slotEnd.setHours(endHour, 0, 0);
+
+        console.log('Creating slot for:', {
+          day,
+          date: date.toISOString(),
+          start: slotStart.toISOString(),
+          end: slotEnd.toISOString(),
+        });
+
+        if (slotStart > currentDate) {
+          generatedSlots.push({
+            startTime: slotStart,
+            endTime: slotEnd,
+            isBooked: false,
+          });
+        }
+      }
+    }
+
+    // Clear existing slots and add new ones
+    this.set('slots', []);
+    this.slots.push(...generatedSlots);
+
+    console.log(
+      `Generated ${generatedSlots.length} slot(s) for next week only`
+    );
   }
   next();
 });
 
-// Method to convert availability to calendar event format
-AvailabilitySchema.methods.toCalendarEvent = function () {
-  return {
-    title: 'Available',
-    daysOfWeek: this.daysOfWeek,
-    startTime: this.startTime,
-    endTime: this.endTime,
-    extendedProps: {
-      type: 'availability',
-      psychologistId: this.psychologistId,
-      psychologistName: this.psychologistDetails?.name,
-      specialty: this.psychologistDetails?.specialty,
-    },
-    display: 'background',
-    color: 'rgba(59, 130, 246, 0.1)',
-  };
+// Method to get available slots
+AvailabilitySchema.methods.getAvailableSlots = function () {
+  return this.slots.filter(slot => !slot.isBooked);
 };
 
-// Add method to check if slot is available
-AvailabilitySchema.methods.isSlotAvailable = function (start: Date, end: Date) {
-  return !this.bookedSlots.some(
-    slot =>
-      (start >= slot.start && start < slot.end) ||
-      (end > slot.start && end <= slot.end)
-  );
+// Method to book a slot
+AvailabilitySchema.methods.bookSlot = function (slotId) {
+  const slot = this.slots.id(slotId);
+  if (slot && !slot.isBooked) {
+    slot.isBooked = true;
+    return true;
+  }
+  return false;
 };
 
+// Add indexes for better performance
+AvailabilitySchema.index({ psychologistId: 1, isActive: 1 });
+AvailabilitySchema.index({ 'slots.startTime': 1, 'slots.isBooked': 1 });
+
+// Create or get the model
 const Availability =
   mongoose.models.Availability ||
-  mongoose.model<IAvailability>('Availability', AvailabilitySchema);
+  mongoose.model('Availability', AvailabilitySchema);
 
 export default Availability;

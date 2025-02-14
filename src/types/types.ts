@@ -29,17 +29,15 @@ export interface User {
 
 export interface Appointment {
   _id: string;
+  patientName: string;
+  startTime: string;
+  endTime: string;
   dateTime: string;
   duration: number;
   userId: User;
   status: 'pending' | 'confirmed' | 'cancelled';
   sessionFormat: 'video' | 'in-person';
   videoCallLink?: string;
-}
-
-export interface TimeSlot {
-  startTime: string;
-  endTime: string;
 }
 
 export interface DailyAvailability {
@@ -73,8 +71,10 @@ export interface AppointmentFormData {
 }
 
 export interface TimeSlot {
-  startTime: string;
-  endTime: string;
+  _id: string;
+  startTime: Date;
+  endTime: Date;
+  isBooked: boolean;
 }
 
 export interface AvailabilitySlot {

@@ -72,9 +72,7 @@ export default async function middleware(req: NextRequest) {
         if (!session.isVerified) {
           return NextResponse.redirect(new URL('/verify', req.nextUrl));
         }
-        if (session.isVerified) {
-          return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
-        }
+        return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
       }
 
       // Handle dashboard routes
@@ -83,32 +81,22 @@ export default async function middleware(req: NextRequest) {
           return NextResponse.redirect(new URL('/verify', req.nextUrl));
         }
 
-        // Allow access to dashboard even if profile is incomplete
-        // This enables the profile completion modal to show
-        if (session.isVerified) {
-          if (session.role === 'user') {
-            if (path === '/dashboard') {
-              return NextResponse.next();
-            }
-            if (path.startsWith('/dashboard/')) {
-              return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
-            }
-          } else {
-            if (path === '/dashboard' || path !== dashboardPath) {
-              return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
-            }
+        if (session.role === 'user') {
+          if (path === '/dashboard') {
+            return NextResponse.next();
+          }
+          return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+        } else {
+          if (path === '/dashboard' || path !== dashboardPath) {
+            return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
           }
         }
-        return NextResponse.next();
       }
 
-      // Handle other protected routes
+      // Handle protected routes
       if (isProtectedRoute(path)) {
         if (!session.isVerified) {
           return NextResponse.redirect(new URL('/verify', req.nextUrl));
-        }
-        if (!session.profileComplete && !path.startsWith('/dashboard')) {
-          return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
         }
         return NextResponse.next();
       }
@@ -133,7 +121,6 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('Middleware error:', error);
-    // Clear invalid tokens and redirect to login
     const response = NextResponse.redirect(new URL('/login', req.nextUrl));
     response.cookies.delete('accessToken');
     response.cookies.delete('resetToken');

@@ -7,6 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Calendar, ListTodo } from 'lucide-react';
 import { toast } from 'sonner';
+import { EventInput } from '@fullcalendar/core';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,167 +16,167 @@ import { AppointmentCard } from '@/components/AppointmentCard';
 import AppointmentDialog from '@/components/AppointmentDialog';
 import AvailabilitySettings from '@/components/AvailabilitySettings';
 import { CalendarStyles } from '@/components/CalenderStyles';
-
 import { Appointment } from '@/types/types';
-import AvailabilitySettingsSkeleton from '@/components/AvailabilitySettingsSkeleton';
 
-interface AvailabilitySlot {
-  id: string;
-  daysOfWeek: number[];
-  startTime: string;
-  endTime: string;
+function renderEventContent(eventInfo) {
+  const event = eventInfo.event;
+  const startTime = new Date(event.start).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const endTime = new Date(event.end).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  return (
+    <div className="p-2 h-full">
+      <div className="font-medium text-sm">
+        {event.extendedProps.type === 'appointment' ? (
+          <div className="flex items-center gap-1">
+            <div
+              className={`w-2 h-2 rounded-full ${getStatusDotColor(
+                event.extendedProps.status
+              )}`}
+            />
+            {event.extendedProps.appointmentDetails.patientName}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            Available
+          </div>
+        )}
+      </div>
+      <div className="text-xs mt-1">
+        {startTime} - {endTime}
+      </div>
+    </div>
+  );
+}
+
+function getStatusDotColor(status) {
+  switch (status?.toLowerCase()) {
+    case 'confirmed':
+      return 'bg-emerald-500';
+    case 'booked':
+      return 'bg-blue-500';
+    default:
+      return 'bg-red-500';
+  }
+}
+
+function getStatusColor(status) {
+  switch (status?.toLowerCase()) {
+    case 'confirmed':
+      return {
+        bg: 'rgba(16, 185, 129, 0.1)',
+        border: 'rgb(16, 185, 129)',
+        text: 'rgb(6, 95, 70)',
+      };
+    case 'booked':
+      return {
+        bg: 'rgba(59, 130, 246, 0.1)',
+        border: 'rgb(59, 130, 246)',
+        text: 'rgb(30, 64, 175)',
+      };
+    default:
+      return {
+        bg: 'rgba(239, 68, 68, 0.1)',
+        border: 'rgb(239, 68, 68)',
+        text: 'rgb(153, 27, 27)',
+      };
+  }
 }
 
 export default function PsychologistAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [availabilitySlots, setAvailabilitySlots] = useState<
-    AvailabilitySlot[]
-  >([]);
+  const [calendarEvents, setCalendarEvents] = useState<EventInput[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [view, setView] = useState('calendar');
+  const [dateRange, setDateRange] = useState({
+    start: new Date(),
+    end: new Date(new Date().setDate(new Date().getDate() + 7)),
+  });
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    fetchData();
+  }, [dateRange]);
 
-  const fetchInitialData = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      await Promise.all([fetchAppointments(), fetchAvailability()]);
+      const [appointmentsRes, availabilityRes] = await Promise.all([
+        fetch('/api/psychologist/appointments').then(res => res.json()),
+        fetch('/api/availability').then(res => res.json()),
+      ]);
+
+      if (appointmentsRes.IsSuccess && availabilityRes.IsSuccess) {
+        const appointments = appointmentsRes.Result.appointments;
+        setAppointments(appointments);
+
+        // Combine availability slots and appointments
+        const events = [
+          ...(availabilityRes.Result.events || []).map(event => ({
+            ...event,
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderColor: 'rgb(16, 185, 129)',
+            textColor: 'rgb(6, 95, 70)',
+            display: 'block',
+          })),
+          ...appointments.map(apt => {
+            const colors = getStatusColor(apt.status);
+            return {
+              id: apt._id,
+              title: apt.patientName,
+              start: new Date(apt.startTime),
+              end: new Date(apt.endTime),
+              backgroundColor: colors.bg,
+              borderColor: colors.border,
+              textColor: colors.text,
+              extendedProps: {
+                type: 'appointment',
+                status: apt.status,
+                appointmentDetails: apt,
+              },
+            };
+          }),
+        ];
+
+        setCalendarEvents(events);
+      }
     } catch (error) {
-      toast.error('Error loading initial data');
+      toast.error('Error loading calendar data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchAppointments = async () => {
-    try {
-      const response = await fetch('/api/psychologist/appointments');
-      const data = await response.json();
-
-      if (data.IsSuccess) {
-        setAppointments(data.Result.appointments);
-      } else {
-        toast.error('Failed to fetch appointments');
-      }
-    } catch (error) {
-      toast.error('Error loading appointments');
+  const handleEventClick = info => {
+    const eventType = info.event.extendedProps.type;
+    if (eventType === 'appointment') {
+      setSelectedAppointment(info.event.extendedProps.appointmentDetails);
+      setIsAppointmentModalOpen(true);
     }
   };
 
-  const fetchAvailability = async () => {
-    try {
-      const response = await fetch('/api/availability');
-      const data = await response.json();
-
-      if (data.IsSuccess) {
-        setAvailabilitySlots(data.Result.availability);
-      }
-    } catch (error) {
-      toast.error('Error loading availability');
-    }
-  };
-
-  const formatCalendarEvents = () => {
-    const events: Array<{
-      id: string;
-      title: string;
-      start: string;
-      end: string;
-      backgroundColor: string;
-      borderColor: string;
-      textColor: string;
-      classNames: string[];
-      display?: string;
-    }> = [];
-
-    events.push(
-      ...appointments.map(apt => ({
-        id: apt._id,
-        title: `${apt.userId.profile.firstName} ${apt.userId.profile.lastName}`,
-        start: apt.dateTime,
-        end: new Date(
-          new Date(apt.dateTime).getTime() + apt.duration * 60000
-        ).toISOString(),
-        backgroundColor:
-          apt.status === 'confirmed' ? 'rgb(5, 150, 105)' : 'rgb(37, 99, 235)',
-        borderColor:
-          apt.status === 'confirmed' ? 'rgb(5, 150, 105)' : 'rgb(37, 99, 235)',
-        textColor: '#ffffff',
-        classNames: [
-          apt.status === 'confirmed' ? 'confirmed-event' : 'booked-event',
-        ],
-      }))
-    );
-
-    const currentDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30);
-
-    availabilitySlots.forEach(slot => {
-      let date = new Date(currentDate);
-
-      while (date <= endDate) {
-        if (slot.daysOfWeek.includes(date.getDay())) {
-          const [startHour, startMinute] = slot.startTime.split(':');
-          const [endHour, endMinute] = slot.endTime.split(':');
-
-          const hasAppointment = appointments.some(apt => {
-            const aptDate = new Date(apt.dateTime);
-            return (
-              aptDate.getDate() === date.getDate() &&
-              aptDate.getMonth() === date.getMonth() &&
-              aptDate.getFullYear() === date.getFullYear() &&
-              aptDate.getHours() >= parseInt(startHour) &&
-              aptDate.getHours() < parseInt(endHour)
-            );
-          });
-
-          if (!hasAppointment) {
-            const start = new Date(date);
-            start.setHours(parseInt(startHour), parseInt(startMinute), 0);
-
-            const end = new Date(date);
-            end.setHours(parseInt(endHour), parseInt(endMinute), 0);
-
-            events.push({
-              id: `availability-${slot.id}-${date.toISOString()}`,
-              title: 'Available',
-              start: start.toISOString(),
-              end: end.toISOString(),
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              borderColor: 'rgb(239, 68, 68)',
-              textColor: 'rgb(239, 68, 68)',
-              classNames: ['availability-slot'],
-              display: 'block',
-            });
-          }
-        }
-        date.setDate(date.getDate() + 1);
-      }
+  const handleDatesSet = arg => {
+    setDateRange({
+      start: arg.start,
+      end: arg.end,
     });
-
-    return events;
   };
-
-  const handleAppointmentClick = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-    setIsAppointmentModalOpen(true);
-  };
-
-  if (isLoading) {
-    return <AvailabilitySettingsSkeleton />;
-  }
 
   return (
     <div className="min-h-screen bg-background p-6">
       {CalendarStyles()}
 
-      <AvailabilitySettings onRefresh={fetchInitialData} />
+      <AvailabilitySettings onRefresh={fetchData} />
 
       <Card>
         <CardContent className="p-4">
@@ -188,7 +189,7 @@ export default function PsychologistAppointments() {
                 </TabsTrigger>
                 <TabsTrigger value="list" className="flex items-center gap-2">
                   <ListTodo className="h-4 w-4" />
-                  <span>Upcoming Patients</span>
+                  <span>Upcoming Appointments</span>
                   {appointments.length > 0 && (
                     <Badge variant="default">{appointments.length}</Badge>
                   )}
@@ -196,37 +197,17 @@ export default function PsychologistAppointments() {
               </TabsList>
               <div className="flex gap-2">
                 <Badge variant="outline" className="gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[rgb(5,150,105)]" />
-                  Confirmed
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Available
                 </Badge>
                 <Badge variant="outline" className="gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[rgb(37,99,235)]" />
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
                   Booked
                 </Badge>
                 <Badge variant="outline" className="gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[rgb(239,68,68)]" />
-                  Available
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  Cancelled
                 </Badge>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-8 mb-4">
-              <div className="flex-1 dark:bg-red-950/30 border-l-4 border-red-500 p-3">
-                <p className="text-red-500 text-sm font-medium">
-                  Available slots in red
-                </p>
-              </div>
-
-              <div className="flex-1 dark:bg-blue-950/30 border-l-4 border-blue-500 p-3">
-                <p className="text-blue-500 text-sm font-medium">
-                  Booked slots in blue
-                </p>
-              </div>
-
-              <div className="flex-1 dark:bg-emerald-950/30 border-l-4 border-emerald-500 p-3">
-                <p className="text-emerald-500 text-sm font-medium">
-                  Confirmed slots in green
-                </p>
               </div>
             </div>
 
@@ -243,18 +224,29 @@ export default function PsychologistAppointments() {
                   slotDuration="01:00:00"
                   slotMinTime="06:00:00"
                   slotMaxTime="21:00:00"
-                  events={formatCalendarEvents()}
-                  eventClick={info => {
-                    if (!info.event.id.startsWith('availability-')) {
-                      const appointment = appointments.find(
-                        apt => apt._id === info.event.id
-                      );
-                      if (appointment) handleAppointmentClick(appointment);
-                    }
-                  }}
+                  events={calendarEvents}
+                  eventClick={handleEventClick}
+                  datesSet={handleDatesSet}
                   allDaySlot={false}
                   nowIndicator
                   height="100%"
+                  expandRows={true}
+                  stickyHeaderDates={true}
+                  slotLabelFormat={{
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    meridiem: 'short',
+                  }}
+                  eventContent={renderEventContent}
+                  dayHeaderFormat={{
+                    weekday: 'short',
+                    month: 'numeric',
+                    day: 'numeric',
+                    omitCommas: true,
+                  }}
+                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
+                  slotLabelClassNames="text-sm font-medium"
+                  dayHeaderClassNames="text-sm font-medium"
                 />
               </div>
             </TabsContent>
@@ -265,9 +257,17 @@ export default function PsychologistAppointments() {
                   <AppointmentCard
                     key={appointment._id}
                     appointment={appointment}
-                    onClick={() => handleAppointmentClick(appointment)}
+                    onClick={() => {
+                      setSelectedAppointment(appointment);
+                      setIsAppointmentModalOpen(true);
+                    }}
                   />
                 ))}
+                {appointments.length === 0 && (
+                  <div className="text-center text-muted-foreground py-8">
+                    <p>No upcoming appointments</p>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
@@ -277,7 +277,10 @@ export default function PsychologistAppointments() {
       <AppointmentDialog
         appointment={selectedAppointment}
         isOpen={isAppointmentModalOpen}
-        onClose={() => setIsAppointmentModalOpen(false)}
+        onClose={() => {
+          setIsAppointmentModalOpen(false);
+          setSelectedAppointment(null);
+        }}
         onJoinSession={link => window.open(link, '_blank')}
       />
     </div>

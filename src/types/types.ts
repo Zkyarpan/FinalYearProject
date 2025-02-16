@@ -15,7 +15,6 @@ export type AppointmentStatus =
   | 'canceled'
   | 'no-show';
 
-// types.ts - Contains all type definitions
 export interface Profile {
   firstName: string;
   lastName: string;
@@ -27,19 +26,18 @@ export interface User {
   profile: Profile;
 }
 
-export interface Appointment {
-  _id: string;
-  dateTime: string;
-  duration: number;
-  userId: User;
-  status: 'pending' | 'confirmed' | 'cancelled';
+export interface AppointmentData {
+  psychologistId: string;
+  start: string | Date;
+  end: string | Date;
+  paymentIntentId: string;
   sessionFormat: 'video' | 'in-person';
-  videoCallLink?: string;
-}
-
-export interface TimeSlot {
-  startTime: string;
-  endTime: string;
+  patientName: string;
+  email: string;
+  phone: string;
+  reasonForVisit: string;
+  notes?: string;
+  insuranceProvider?: string;
 }
 
 export interface DailyAvailability {
@@ -73,8 +71,10 @@ export interface AppointmentFormData {
 }
 
 export interface TimeSlot {
-  startTime: string;
-  endTime: string;
+  _id: string;
+  startTime: Date;
+  endTime: Date;
+  isBooked: boolean;
 }
 
 export interface AvailabilitySlot {

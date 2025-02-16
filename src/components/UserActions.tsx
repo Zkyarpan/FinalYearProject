@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { DEFAULT_AVATAR } from '@/constants';
+import { CommandMenu } from './CommandSearch';
 
 interface UserActionsProps {
   isAuthenticated: boolean;
@@ -34,7 +36,7 @@ const UserActions = ({
 }: UserActionsProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showFullPageLoader, setShowFullPageLoader] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isNestedBlogRoute =
@@ -58,9 +60,10 @@ const UserActions = ({
   };
 
   const handleLogout = async () => {
-    if (isLoading || isRedirecting) return;
+    if (isLoading) return;
     setIsLoading(true);
-    setIsRedirecting(true);
+    setShowFullPageLoader(true);
+
     try {
       const response = await fetch('/api/logout', {
         method: 'POST',
@@ -69,12 +72,17 @@ const UserActions = ({
           'Content-Type': 'application/json',
         },
       });
+
       if (response.ok) {
         logout();
         toast.success('Logged out successfully!');
+
+        localStorage.clear();
+        sessionStorage.clear();
+
         setTimeout(() => {
           router.push('/login');
-        }, 500);
+        }, 300);
       } else {
         const data = await response.json();
         throw new Error(data.message || 'Failed to log out');
@@ -82,7 +90,7 @@ const UserActions = ({
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out. Please try again.');
-      setIsRedirecting(false);
+      setShowFullPageLoader(false);
     } finally {
       setIsLoading(false);
     }
@@ -95,23 +103,34 @@ const UserActions = ({
     setIsDropdownOpen(false);
   };
 
-  if (isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-end w-full relative z-50">
+        <div className="flex items-center gap-3 px-1">
+          <Link
+            href="/login"
+            className="font-medium text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/signup"
+            className="font-medium text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Create Profile
+          </Link>
+          <ThemeSwitch />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-end w-full relative z-40">
         <div className="flex items-center gap-x-3">
           <div className="flex items-center relative">
-            <div
-              className={`relative flex w-[209px] items-center rounded-xl border dark:border-[#333333] bg-gray-100 dark:bg-input px-4 py-1.5 transition-all duration-200 dark:shadow-sm shadow-sm ${
-                isNestedBlogRoute ? 'ml-8' : 'ml-3'
-              }`}
-            >
-              <Search className="h-5 w-5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search Mentality"
-                className="ml-2 w-full h-6 text-sm border-none outline-none focus:ring-0 placeholder:text-muted-foreground dark:bg-input bg-gray-100"
-              />
-            </div>
+            <CommandMenu router={router} />
           </div>
 
           <div className="flex items-center gap-3 px-1">
@@ -126,7 +145,7 @@ const UserActions = ({
                 <div className="relative w-8 h-8">
                   <div className="absolute inset-0 rounded-full overflow-hidden">
                     <img
-                      src={profileImage || '/default-avatar.jpg'}
+                      src={profileImage || DEFAULT_AVATAR}
                       alt={`${firstName}'s profile picture`}
                       className="w-full h-full object-cover opacity-90"
                     />
@@ -140,7 +159,7 @@ const UserActions = ({
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full overflow-hidden border border-border dark:border-[#333333]">
                         <Image
-                          src={profileImage || '/default-avatar.jpg'}
+                          src={profileImage || DEFAULT_AVATAR}
                           alt="Profile"
                           width={40}
                           height={40}
@@ -187,7 +206,7 @@ const UserActions = ({
                     </button>
                     <button
                       onClick={handleLogout}
-                      disabled={isLoading || isRedirecting}
+                      disabled={isLoading}
                       className="w-full text-left px-3 py-2 text-sm rounded-lg group transition-colors text-red-500 flex items-center gap-2 hover:bg-muted dark:hover:bg-input"
                     >
                       {isLoading ? (
@@ -206,27 +225,7 @@ const UserActions = ({
           </div>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-end w-full relative z-50">
-      <div className="flex items-center gap-3 px-1">
-        <Link
-          href="/login"
-          className="font-medium text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
-        >
-          Log in
-        </Link>
-        <Link
-          href="/signup"
-          className="font-medium text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Create Profile
-        </Link>
-        <ThemeSwitch />
-      </div>
-    </div>
+    </>
   );
 };
 

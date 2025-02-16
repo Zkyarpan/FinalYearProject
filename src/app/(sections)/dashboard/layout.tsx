@@ -16,31 +16,66 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     if (isAuthenticated && !profileComplete && role === 'user') {
       setShowProfileCompletion(true);
+      document.documentElement.classList.add('overflow-hidden');
     } else {
       setShowProfileCompletion(false);
+      document.documentElement.classList.remove('overflow-hidden');
     }
+
+    return () => {
+      document.documentElement.classList.remove('overflow-hidden');
+    };
   }, [isAuthenticated, profileComplete, role]);
 
   return (
     <div className="relative min-h-screen">
-      <div className={showProfileCompletion ? 'blur-[1px]' : ''}>
+      {/* Main Content */}
+      <div
+        className={`h-screen ${
+          showProfileCompletion
+            ? 'blur-sm pointer-events-none overflow-hidden'
+            : ''
+        }`}
+      >
         {children}
       </div>
 
+      {/* Modal */}
       {showProfileCompletion && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="fixed inset-0 bg-black/20 backdrop-blur-[2px]"
-            onClick={() => setShowProfileCompletion(false)}
-          />
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] overflow-hidden"
+          style={{ zIndex: 999999 }}
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              setShowProfileCompletion(false);
+            }
+          }}
+        >
+          <div className="fixed inset-0 flex items-center justify-center">
+            <div
+              className="w-full max-w-lg mx-4 bg-[#1a1a1a] rounded-2xl shadow-xl relative"
+              onClick={e => e.stopPropagation()}
+              style={{
+                isolation: 'isolate',
+                transform: 'translateZ(0)',
+              }}
+            >
+              <style jsx global>{`
+                .select-dropdown {
+                  z-index: 50 !important;
+                }
 
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-full p-4">
-              <div className="relative z-50 w-full max-w-lg mx-auto rounded-2xl shadow-xl bg-[#1a1a1a]">
-                <ProfileCompletion
-                  onComplete={() => setShowProfileCompletion(false)}
-                />
-              </div>
+                /* Ensure select component is above modal */
+                [role='listbox'],
+                [role='combobox'],
+                .select__menu,
+                .select__menu-list {
+                  z-index: 1000000 !important;
+                }
+              `}</style>
+              <ProfileCompletion
+                onComplete={() => setShowProfileCompletion(false)}
+              />
             </div>
           </div>
         </div>

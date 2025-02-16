@@ -1,18 +1,4 @@
-export interface AppointmentData {
-  psychologistId: string;
-  start: string;
-  end: string;
-  stripePaymentIntentId?: string;
-  paymentIntentId?: string;
-  sessionFormat: string;
-  patientName: string;
-  email: string;
-  phone: string;
-  reasonForVisit: string;
-  notes?: string;
-  insuranceProvider?: string;
-}
-
+import { AppointmentData } from '@/types/types';
 export interface ValidationResult {
   isValid: boolean;
   error?: string;
@@ -27,79 +13,63 @@ export const isValidEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-export const validateAppointmentData = (
-  data: Partial<AppointmentData>
-): ValidationResult => {
-  const requiredFields = [
-    'psychologistId',
-    'start',
-    'end',
-    'sessionFormat',
-    'patientName',
-    'email',
-    'phone',
-    'reasonForVisit',
-  ];
 
-  // Check for payment intent ID (either old or new field name)
-  if (!data.stripePaymentIntentId && !data.paymentIntentId) {
-    return {
-      isValid: false,
-      error: 'Payment information is required',
-    };
+export function validateAppointmentData(data: AppointmentData) {
+  const errors: string[] = [];
+
+  if (!data.psychologistId) {
+    errors.push('Psychologist ID is required');
   }
 
-  // Check for missing required fields
-  const missingFields = requiredFields.filter(field => !data[field]);
-  if (missingFields.length > 0) {
-    return {
-      isValid: false,
-      error: `Missing required fields: ${missingFields.join(', ')}`,
-    };
+  if (!data.start || !data.end) {
+    errors.push('Start and end times are required');
   }
 
-  // Validate email format
-  if (!isValidEmail(data.email!)) {
-    return {
-      isValid: false,
-      error: 'Invalid email format',
-    };
+  if (!data.paymentIntentId) {
+    errors.push('Payment intent ID is required');
   }
 
-  // Validate phone number format
-  if (!isValidPhone(data.phone!)) {
-    return {
-      isValid: false,
-      error: 'Invalid phone number format. Must be 10 digits',
-    };
+  if (
+    !data.sessionFormat ||
+    !['video', 'in-person'].includes(data.sessionFormat)
+  ) {
+    errors.push('Valid session format is required');
   }
 
-  // Validate session format
-  const validFormats = ['video', 'in-person'];
-  if (!validFormats.includes(data.sessionFormat!)) {
-    return {
-      isValid: false,
-      error: 'Invalid session format. Must be either "video" or "in-person"',
-    };
+  if (!data.patientName?.trim()) {
+    errors.push('Patient name is required');
+  }
+
+  if (!data.email?.trim()) {
+    errors.push('Email is required');
+  }
+
+  if (!data.phone?.trim()) {
+    errors.push('Phone number is required');
+  }
+
+  if (!data.reasonForVisit?.trim()) {
+    errors.push('Reason for visit is required');
   }
 
   // Validate dates
-  const startDate = new Date(data.start!);
-  const endDate = new Date(data.end!);
+  try {
+    const startDate = new Date(data.start);
+    const endDate = new Date(data.end);
 
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-    return {
-      isValid: false,
-      error: 'Invalid date format',
-    };
+    if (startDate >= endDate) {
+      errors.push('Start time must be before end time');
+    }
+
+    if (startDate < new Date()) {
+      errors.push('Cannot book appointments in the past');
+    }
+  } catch (error) {
+    errors.push('Invalid date format');
   }
 
-  if (endDate <= startDate) {
-    return {
-      isValid: false,
-      error: 'End time must be after start time',
-    };
-  }
-
-  return { isValid: true };
-};
+  return {
+    isValid: errors.length === 0,
+    error: errors.join(', '),
+  };
+}

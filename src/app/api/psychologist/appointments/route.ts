@@ -1,235 +1,283 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose, { Types } from 'mongoose';
 import connectDB from '@/db/db';
 import { withAuth } from '@/middleware/authMiddleware';
-import Appointment from '@/models/Appointment';
-import Profile from '@/models/Profile';
-import Stripe from 'stripe';
-import User from '@/models/User';
-import Psychologist from '@/models/Psychologist';
-import mongoose from 'mongoose';
-import { validateAppointmentData } from '@/utils/validations';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 
 export async function GET(req: NextRequest) {
   return withAuth(async (req: NextRequest, token: any) => {
     try {
       await connectDB();
 
-      // Ensure models are registered
-      if (!mongoose.models.User) {
-        mongoose.model('User', User.schema);
+      const url = new URL(req.url);
+      const dateParam = url.searchParams.get('date');
+      const status = url.searchParams.get('status');
+      const timeframe = url.searchParams.get('timeframe') || 'all';
+      const page = parseInt(url.searchParams.get('page') || '1');
+      const limit = parseInt(url.searchParams.get('limit') || '10');
+      const skip = (page - 1) * limit;
+
+      const matchStage: any = {};
+      const isPsychologist = token.role === 'psychologist';
+
+      if (isPsychologist) {
+        matchStage.psychologistId = new Types.ObjectId(token.id);
+      } else {
+        matchStage.userId = new Types.ObjectId(token.id);
       }
-      if (!mongoose.models.Psychologist) {
-        mongoose.model('Psychologist', Psychologist.schema);
-      }
-      if (!mongoose.models.Appointment) {
-        mongoose.model('Appointment', Appointment.schema);
-      }
 
-      // Determine query based on user role
-      const query =
-        token.role === 'psychologist'
-          ? { psychologistId: token.id }
-          : { userId: token.id };
+      const currentDate = new Date();
+      if (dateParam) {
+        const date = new Date(dateParam);
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
 
-      // Get all appointments with user and psychologist details
-      const appointments = await Appointment.find(query)
-        .populate({
-          path: 'userId',
-          model: 'User',
-          select: 'firstName lastName email profilePhotoUrl',
-        })
-        .populate({
-          path: 'psychologistId',
-          model: 'Psychologist',
-          select:
-            'firstName lastName email profilePhotoUrl specializations education city sessionFee availability',
-        })
-        .sort({ dateTime: 1 })
-        .lean();
-
-      // Fetch user profiles
-      const userIds = appointments.map(apt => apt.userId._id);
-      const userProfiles = await Profile.find({
-        user: { $in: userIds },
-      }).lean();
-
-      // Combine appointment data with profiles
-      const appointmentsWithProfiles = appointments.map(apt => {
-        const userProfile = userProfiles.find(
-          profile => profile.user.toString() === apt.userId._id.toString()
-        );
-
-        return {
-          _id: apt._id,
-          userId: {
-            ...apt.userId,
-            profile: userProfile || null,
-          },
-          psychologistId: apt.psychologistId || {
-            _id: 'placeholder',
-            firstName: 'Healthcare',
-            lastName: 'Provider',
-            email: 'provider@example.com',
-            profilePhotoUrl: '',
-            specializations: [],
-            biography: 'Information not available',
-            education: [],
-            location: 'Not specified',
-            sessionFee: 0,
-          },
-          dateTime: apt.dateTime,
-          endTime: apt.endTime,
-          duration: apt.duration,
-          sessionFormat: apt.sessionFormat,
-          patientName: apt.patientName,
-          email: apt.email,
-          phone: apt.phone,
-          reasonForVisit: apt.reasonForVisit,
-          notes: apt.notes,
-          insuranceProvider: apt.insuranceProvider,
-          status: apt.status,
-          stripePaymentIntentId: apt.stripePaymentIntentId,
-          createdAt: apt.createdAt,
-          updatedAt: apt.updatedAt,
+        matchStage.dateTime = {
+          $gte: startOfDay,
+          $lte: endOfDay,
         };
+      } else {
+        switch (timeframe) {
+          case 'upcoming':
+            matchStage.dateTime = { $gte: currentDate };
+            break;
+          case 'past':
+            matchStage.dateTime = { $lt: currentDate };
+            break;
+        }
+      }
+
+      if (status) {
+        matchStage.status = status;
+      }
+
+      const pipeline = [
+        { $match: matchStage },
+        // Lookup user details
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'userDetails',
+          },
+        },
+        {
+          $unwind: {
+            path: '$userDetails',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        // Lookup profile details
+        {
+          $lookup: {
+            from: 'profiles',
+            localField: 'userId',
+            foreignField: 'user',
+            as: 'profileDetails',
+          },
+        },
+        {
+          $unwind: {
+            path: '$profileDetails',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        // Lookup psychologist details
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'psychologistId',
+            foreignField: '_id',
+            as: 'psychologistDetails',
+          },
+        },
+        {
+          $unwind: {
+            path: '$psychologistDetails',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        // Lookup payment details
+        {
+          $lookup: {
+            from: 'payments',
+            let: { paymentIntentId: '$stripePaymentIntentId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: ['$stripePaymentIntentId', '$$paymentIntentId'],
+                  },
+                },
+              },
+            ],
+            as: 'paymentDetails',
+          },
+        },
+        {
+          $unwind: {
+            path: '$paymentDetails',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            dateTime: 1,
+            endTime: 1,
+            duration: 1,
+            stripePaymentIntentId: 1,
+            sessionFormat: 1,
+            patientName: 1,
+            email: 1,
+            phone: 1,
+            reasonForVisit: 1,
+            notes: 1,
+            insuranceProvider: 1,
+            status: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            userId: {
+              _id: '$userDetails._id',
+              email: '$userDetails.email',
+              firstName: '$userDetails.firstName',
+              lastName: '$userDetails.lastName',
+              profilePhotoUrl: '$userDetails.profilePhotoUrl',
+            },
+            // Only include detailed profile info for psychologists
+            profile: {
+              $cond: {
+                if: { $eq: [isPsychologist, true] },
+                then: {
+                  profilePhotoUrl: '$profileDetails.image',
+                  age: '$profileDetails.age',
+                  gender: '$profileDetails.gender',
+                  address: '$profileDetails.address',
+                  emergencyContact: '$profileDetails.emergencyContact',
+                  emergencyPhone: '$profileDetails.emergencyPhone',
+                  therapyHistory: '$profileDetails.therapyHistory',
+                  preferredCommunication:
+                    '$profileDetails.preferredCommunication',
+                  struggles: '$profileDetails.struggles',
+                  briefBio: '$profileDetails.briefBio',
+                },
+                else: {
+                  profilePhotoUrl: '$profileDetails.image',
+                },
+              },
+            },
+            payment: {
+              $cond: {
+                if: { $eq: [isPsychologist, true] },
+                then: {
+                  amount: {
+                    $ifNull: [
+                      '$paymentDetails.amount',
+                      '$psychologistDetails.sessionFee',
+                    ],
+                  },
+                  status: { $ifNull: ['$paymentDetails.status', 'pending'] },
+                  currency: { $ifNull: ['$paymentDetails.currency', 'usd'] },
+                  createdAt: {
+                    $ifNull: ['$paymentDetails.createdAt', '$createdAt'],
+                  },
+                },
+                else: {
+                  amount: {
+                    $ifNull: [
+                      '$paymentDetails.amount',
+                      '$psychologistDetails.sessionFee',
+                    ],
+                  },
+                  currency: { $ifNull: ['$paymentDetails.currency', 'usd'] },
+                  status: { $ifNull: ['$paymentDetails.status', 'pending'] },
+                  stripePaymentId: '$paymentDetails.stripePaymentId',
+                  stripePaymentIntentId: '$stripePaymentIntentId',
+                  refundReason: '$paymentDetails.refundReason',
+                  createdAt: {
+                    $ifNull: ['$paymentDetails.createdAt', '$createdAt'],
+                  },
+                },
+              },
+            },
+          },
+        },
+        { $sort: { dateTime: timeframe === 'past' ? -1 : 1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+
+      const appointments = await mongoose.connection
+        .collection('appointments')
+        .aggregate(pipeline)
+        .toArray();
+
+      const processedAppointments: ((typeof appointments)[0] & {
+        isPast: boolean;
+        isToday: boolean;
+        canJoin: boolean;
+      })[] = appointments.map(appointment => {
+        const appointmentDate = new Date(appointment.dateTime);
+        const processed = {
+          ...appointment,
+          isPast: appointmentDate < currentDate,
+          isToday:
+            appointmentDate.toDateString() === currentDate.toDateString(),
+          canJoin:
+            appointment.status === 'confirmed' &&
+            Math.abs(appointmentDate.getTime() - currentDate.getTime()) <=
+              5 * 60 * 1000,
+        };
+        return processed;
       });
 
-      return NextResponse.json({
-        StatusCode: 200,
-        IsSuccess: true,
-        Result: {
-          appointments: appointmentsWithProfiles,
-        },
-      });
-    } catch (error) {
+      const totalCount = await mongoose.connection
+        .collection('appointments')
+        .countDocuments(matchStage);
+
+      return NextResponse.json(
+        createSuccessResponse(200, {
+          message: processedAppointments.length
+            ? 'Appointments retrieved successfully'
+            : 'No appointments found',
+          appointments: processedAppointments,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalAppointments: totalCount,
+            hasMore: page < Math.ceil(totalCount / limit),
+            limit,
+          },
+          summary: {
+            total: totalCount,
+            upcoming: processedAppointments.filter(
+              appt => new Date(appt.dateTime) >= currentDate
+            ).length,
+            past: processedAppointments.filter(
+              appt => new Date(appt.dateTime) < currentDate
+            ).length,
+            confirmed: processedAppointments.filter(
+              appt => appt.status === 'confirmed'
+            ).length,
+            completed: processedAppointments.filter(
+              appt => appt.status === 'completed'
+            ).length,
+            cancelled: processedAppointments.filter(
+              appt => appt.status === 'cancelled'
+            ).length,
+          },
+        })
+      );
+    } catch (error: any) {
       console.error('Error fetching appointments:', error);
-      return NextResponse.json({
-        StatusCode: 500,
-        IsSuccess: false,
-        ErrorMessage: [{ message: error.message }],
-      });
+      return NextResponse.json(
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      );
     }
   }, req);
 }
-
-// export async function POST(req: NextRequest) {
-//   return withAuth(async (req: NextRequest, token: any) => {
-//     try {
-//       await connectDB();
-//       const appointmentData = await req.json();
-
-//       // Validate appointment data
-//       const validation = validateAppointmentData(appointmentData);
-//       if (!validation.isValid) {
-//         return NextResponse.json({
-//           StatusCode: 400,
-//           IsSuccess: false,
-//           ErrorMessage: [{ message: validation.error }],
-//         });
-//       }
-
-//       const {
-//         psychologistId,
-//         start,
-//         end,
-//         paymentIntentId,
-//         sessionFormat,
-//         patientName,
-//         email,
-//         phone,
-//         reasonForVisit,
-//         notes,
-//         insuranceProvider,
-//       } = appointmentData;
-
-//       // Verify the payment intent
-//       try {
-//         const paymentIntent = await stripe.paymentIntents.retrieve(
-//           paymentIntentId
-//         );
-//         if (paymentIntent.status !== 'succeeded') {
-//           return NextResponse.json({
-//             StatusCode: 400,
-//             IsSuccess: false,
-//             ErrorMessage: [{ message: 'Payment not completed' }],
-//           });
-//         }
-//       } catch (stripeError) {
-//         console.error('Stripe error:', stripeError);
-//         return NextResponse.json({
-//           StatusCode: 400,
-//           IsSuccess: false,
-//           ErrorMessage: [{ message: 'Invalid payment information' }],
-//         });
-//       }
-
-//       // Check for time slot availability
-//       const startDate = new Date(start);
-//       const endDate = new Date(end);
-
-//       const existingAppointment = await Appointment.findOne({
-//         psychologistId,
-//         $or: [
-//           {
-//             dateTime: { $lt: endDate },
-//             endTime: { $gt: startDate },
-//           },
-//         ],
-//         status: { $nin: ['canceled'] },
-//       });
-
-//       if (existingAppointment) {
-//         return NextResponse.json({
-//           StatusCode: 409,
-//           IsSuccess: false,
-//           ErrorMessage: [{ message: 'Time slot is no longer available' }],
-//         });
-//       }
-
-//       // Calculate appointment duration
-//       const duration = Math.round(
-//         (endDate.getTime() - startDate.getTime()) / (1000 * 60)
-//       );
-
-//       // Create new appointment
-//       const appointment = await Appointment.create({
-//         userId: token.id,
-//         psychologistId,
-//         dateTime: startDate,
-//         endTime: endDate,
-//         duration,
-//         stripePaymentIntentId: paymentIntentId,
-//         sessionFormat,
-//         patientName: patientName.trim(),
-//         email: email.trim(),
-//         phone: phone.replace(/\D/g, ''),
-//         reasonForVisit: reasonForVisit.trim(),
-//         notes: notes?.trim() || '',
-//         insuranceProvider: insuranceProvider?.trim() || '',
-//         status: 'confirmed',
-//       });
-
-//       // Populate appointment details for response
-//       const populatedAppointment = await Appointment.findById(appointment._id)
-//         .populate('userId', 'email')
-//         .populate('psychologistId', 'email');
-
-//       return NextResponse.json({
-//         StatusCode: 200,
-//         IsSuccess: true,
-//         Result: populatedAppointment,
-//       });
-//     } catch (error) {
-//       console.error('Error creating appointment:', error);
-//       return NextResponse.json({
-//         StatusCode: 500,
-//         IsSuccess: false,
-//         ErrorMessage: [{ message: error.message }],
-//       });
-//     }
-//   }, req);
-// }

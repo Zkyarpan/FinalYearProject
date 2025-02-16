@@ -32,83 +32,101 @@ const authFlowRoutes = {
 };
 
 export default async function middleware(req: NextRequest) {
-  const path = req.nextUrl.pathname;
+  try {
+    const path = req.nextUrl.pathname;
 
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('accessToken')?.value;
-  const resetToken = cookieStore.get('resetToken')?.value;
-  const tempToken = cookieStore.get('tempToken')?.value;
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('accessToken')?.value;
+    const resetToken = cookieStore.get('resetToken')?.value;
+    const tempToken = cookieStore.get('tempToken')?.value;
 
-  const session = sessionCookie ? await decrypt(sessionCookie) : null;
-  const resetSession = resetToken ? await decrypt(resetToken) : null;
+    const session = sessionCookie ? await decrypt(sessionCookie) : null;
+    const resetSession = resetToken ? await decrypt(resetToken) : null;
 
-  if (path === authFlowRoutes.passwordConfirmation && !resetSession) {
-    return NextResponse.redirect(
-      new URL(authFlowRoutes.forgotPassword, req.nextUrl)
-    );
-  }
-
-  if (path === authFlowRoutes.verification && !tempToken) {
-    return NextResponse.redirect(new URL('/signup', req.nextUrl));
-  }
-
-  if (path === authFlowRoutes.forgotPassword) {
-    return NextResponse.next();
-  }
-
-  if (session?.id) {
-    const dashboardPath = getDashboardByRole(session.role || '');
-
-    if (
-      path === '/' ||
-      path === '/login' ||
-      path === '/signup' ||
-      path === '/forgot-password'
-    ) {
-      if (session.isVerified && session.profileComplete) {
-        return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
-      } else if (!session.isVerified) {
-        return NextResponse.redirect(new URL('/verify', req.nextUrl));
-      }
+    // Handle auth flow routes first
+    if (path === authFlowRoutes.passwordConfirmation && !resetSession) {
+      return NextResponse.redirect(
+        new URL(authFlowRoutes.forgotPassword, req.nextUrl)
+      );
     }
 
-    if (path.startsWith('/dashboard')) {
-      if (!session.isVerified) {
-        return NextResponse.redirect(new URL('/verify', req.nextUrl));
+    if (path === authFlowRoutes.verification && !tempToken) {
+      return NextResponse.redirect(new URL('/signup', req.nextUrl));
+    }
+
+    if (path === authFlowRoutes.forgotPassword) {
+      return NextResponse.next();
+    }
+
+    // Handle authenticated users
+    if (session?.id) {
+      const dashboardPath = getDashboardByRole(session.role || '');
+
+      // Handle auth page access for logged-in users
+      if (
+        path === '/' ||
+        path === '/login' ||
+        path === '/signup' ||
+        path === '/forgot-password'
+      ) {
+        if (!session.isVerified) {
+          return NextResponse.redirect(new URL('/verify', req.nextUrl));
+        }
+        return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
       }
 
-      if (session.isVerified && session.profileComplete) {
+      // Handle dashboard routes
+      if (path.startsWith('/dashboard')) {
+        if (!session.isVerified) {
+          return NextResponse.redirect(new URL('/verify', req.nextUrl));
+        }
+
         if (session.role === 'user') {
           if (path === '/dashboard') {
             return NextResponse.next();
           }
-          if (path.startsWith('/dashboard/')) {
-            return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
-          }
+          return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
         } else {
           if (path === '/dashboard' || path !== dashboardPath) {
             return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
           }
         }
       }
-    }
 
-    if (publicRoutes.some(route => path.startsWith(route))) {
+      // Handle protected routes
+      if (isProtectedRoute(path)) {
+        if (!session.isVerified) {
+          return NextResponse.redirect(new URL('/verify', req.nextUrl));
+        }
+        return NextResponse.next();
+      }
+
+      // Allow access to public routes
+      if (publicRoutes.some(route => path.startsWith(route))) {
+        return NextResponse.next();
+      }
+
       return NextResponse.next();
     }
 
+    // Handle non-authenticated users
+    if (isProtectedRoute(path)) {
+      const searchParams = new URLSearchParams();
+      searchParams.set('from', path);
+      return NextResponse.redirect(
+        new URL(`/login?${searchParams.toString()}`, req.nextUrl)
+      );
+    }
+
     return NextResponse.next();
+  } catch (error) {
+    console.error('Middleware error:', error);
+    const response = NextResponse.redirect(new URL('/login', req.nextUrl));
+    response.cookies.delete('accessToken');
+    response.cookies.delete('resetToken');
+    response.cookies.delete('tempToken');
+    return response;
   }
-
-  if (isProtectedRoute(path)) {
-    const searchParams = new URLSearchParams();
-    searchParams.set('from', path);
-    return NextResponse.redirect(
-      new URL(`/login?${searchParams.toString()}`, req.nextUrl)
-    );
-  }
-
-  return NextResponse.next();
 }
 
 function isProtectedRoute(path: string): boolean {

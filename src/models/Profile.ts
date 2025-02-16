@@ -1,7 +1,8 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
+import { DEFAULT_AVATAR } from '@/constants';
 
 interface IProfile extends Document {
-  user: Types.ObjectId;  
+  user: Types.ObjectId;
   firstName: string;
   lastName: string;
   image: string;
@@ -22,10 +23,10 @@ interface IProfile extends Document {
 
 const profileSchema = new Schema<IProfile>(
   {
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true }, 
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
-    image: { type: String },
+    image: { type: String, default: DEFAULT_AVATAR },
     address: { type: String, trim: true },
     phone: { type: String, required: true, trim: true },
     age: { type: Number, min: 0, required: true },

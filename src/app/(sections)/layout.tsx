@@ -26,6 +26,7 @@ import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
 import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
+import { DEFAULT_AVATAR } from '@/constants';
 
 const routeTitles = {
   // User routes
@@ -43,10 +44,11 @@ const routeTitles = {
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
   '/psychologist/patients': 'My Patients',
-  '/psychologist/appointments': 'Appointments',
+  '/psychologist/appointments': 'Your Appointments',
   '/psychologist/messages': 'Messages',
   '/psychologist/articles': 'My Articles',
   '/psychologist/blog': 'My Blogs',
+  '/psychologist/availability': 'My Availability',
   // Admin routes
   '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
@@ -62,7 +64,6 @@ const RootLayout = ({ children }) => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { isAuthenticated, profileImage, role, firstName, lastName, logout } =
     useUserStore();
-  const currentYear = new Date().getFullYear();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -94,6 +95,7 @@ const RootLayout = ({ children }) => {
     '/psychologist/patients',
     '/psychologist/resources',
     '/psychologist/services',
+    '/psychologist/availability',
   ];
 
   const pathParts = pathname.split('/').filter(Boolean);
@@ -251,7 +253,7 @@ const RootLayout = ({ children }) => {
                       <AccountSection
                         firstName={firstName || 'Anonymous'}
                         profileImage={profileImage || '/default-avatar.jpg'}
-                        onNavigate={handleNavigation}
+                        role={role ?? undefined}
                       />
                     </nav>
                   </SheetContent>
@@ -286,7 +288,7 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[40]">
+        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[50]">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
@@ -320,9 +322,9 @@ const RootLayout = ({ children }) => {
               {isAuthenticated && (
                 <div className="mt-4">
                   <AccountSection
-                    firstName={firstName || 'Anonymous'}
-                    profileImage={profileImage || '/default-avatar.jpg'}
-                    onNavigate={handleNavigation}
+                    firstName={firstName || 'User'}
+                    profileImage={profileImage || DEFAULT_AVATAR}
+                    role={role ?? undefined}
                   />
                 </div>
               )}
@@ -334,16 +336,15 @@ const RootLayout = ({ children }) => {
         <div
           className={`flex-1 ${
             showRightSidebar ? 'lg:mr-[420px]' : ''
-          } lg:ml-[212px] mt-16 lg:mt-0 flex flex-col min-h-screen relative`}
+          } lg:ml-[212px] flex flex-col min-h-screen relative`}
         >
+          {/* Fixed Header */}
           <div
-            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] fixed top-0 z-[100] 
+            className={`hidden lg:block h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] fixed top-0 z-[10] 
     ${showRightSidebar ? 'w-[calc(100vw-632px)]' : 'w-[calc(100vw-212px)]'} 
     left-[212px]`}
           >
             <div className="h-full w-full flex justify-center">
-              {' '}
-              {/* Added wrapper for centering */}
               <div className="h-full w-full max-w-[1920px] px-4 lg:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-x-3">
                   {showBackButton && (
@@ -379,7 +380,7 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto hide-scrollbar relative z-[90] pt-14">
+          <div className="flex-1 overflow-auto hide-scrollbar relative mt-10">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>
@@ -388,7 +389,7 @@ const RootLayout = ({ children }) => {
 
         {/* Right Sidebar */}
         {showRightSidebar && (
-          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[40]">
+          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[50]">
             <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <UserActions
                 isAuthenticated={isAuthenticated}

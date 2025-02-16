@@ -1,113 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { Calendar, ListTodo } from 'lucide-react';
+import { Calendar, ListTodo, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { EventInput } from '@fullcalendar/core';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import AppointmentDialog from '@/components/AppointmentDialog';
-import { CalendarStyles } from '@/components/CalenderStyles';
-import { Appointment } from '@/types/types';
+import CalendarStyles from '@/components/CalenderStyles';
 
-function renderEventContent(eventInfo) {
-  const event = eventInfo.event;
-  const startTime = new Date(event.start).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-  const endTime = new Date(event.end).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-
-  return (
-    <div className="p-2 h-full">
-      <div className="font-medium text-sm">
-        {event.extendedProps.type === 'appointment' ? (
-          <div className="flex items-center gap-1">
-            <div
-              className={`w-2 h-2 rounded-full ${getStatusDotColor(
-                event.extendedProps.status
-              )}`}
-            />
-            {event.extendedProps.appointmentDetails.patientName}
-          </div>
-        ) : (
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            Available
-          </div>
-        )}
-      </div>
-      <div className="text-xs mt-1">
-        {startTime} - {endTime}
-      </div>
-    </div>
-  );
-}
-
-function getStatusDotColor(status) {
-  switch (status?.toLowerCase()) {
-    case 'confirmed':
-      return 'bg-emerald-500';
-    case 'booked':
-      return 'bg-blue-500';
-    default:
-      return 'bg-red-500';
+const PsychologistAppointments = () => {
+  interface Appointment {
+    _id: string;
+    patientName: string;
+    dateTime: string;
+    endTime: string;
+    status: string;
+    sessionFormat: string;
+    duration: number;
   }
-}
 
-function getStatusColor(status) {
-  switch (status?.toLowerCase()) {
-    case 'confirmed':
-      return {
-        bg: 'rgba(16, 185, 129, 0.1)',
-        border: 'rgb(16, 185, 129)',
-        text: 'rgb(6, 95, 70)',
-      };
-    case 'booked':
-      return {
-        bg: 'rgba(59, 130, 246, 0.1)',
-        border: 'rgb(59, 130, 246)',
-        text: 'rgb(30, 64, 175)',
-      };
-    default:
-      return {
-        bg: 'rgba(239, 68, 68, 0.1)',
-        border: 'rgb(239, 68, 68)',
-        text: 'rgb(153, 27, 27)',
-      };
-  }
-}
-
-export default function PsychologistAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [calendarEvents, setCalendarEvents] = useState<EventInput[]>([]);
+  interface CalendarEvent {
+    id: string;
+    title: string;
+    start: string;
+    end: string;
+    extendedProps: {
+      type: string;
+      status?: string;
+      appointmentDetails?: any;
+      isBooked?: boolean;
+    };
+  }
+
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [view, setView] = useState('calendar');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(),
-    end: new Date(new Date().setDate(new Date().getDate() + 7)),
-  });
 
-  useEffect(() => {
-    fetchData();
-  }, [dateRange]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [appointmentsRes, availabilityRes] = await Promise.all([
@@ -116,66 +58,136 @@ export default function PsychologistAppointments() {
       ]);
 
       if (appointmentsRes.IsSuccess && availabilityRes.IsSuccess) {
-        const appointments = appointmentsRes.Result.appointments;
-        setAppointments(appointments);
+        const appointmentsData = appointmentsRes.Result.appointments || [];
+        setAppointments(appointmentsData);
 
-        // Combine availability slots and appointments
-        const events = [
-          ...(availabilityRes.Result.events || []).map(event => ({
-            ...event,
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            borderColor: 'rgb(16, 185, 129)',
-            textColor: 'rgb(6, 95, 70)',
-            display: 'block',
-          })),
-          ...appointments.map(apt => {
-            const colors = getStatusColor(apt.status);
-            return {
-              id: apt._id,
-              title: apt.patientName,
-              start: new Date(apt.startTime),
-              end: new Date(apt.endTime),
-              backgroundColor: colors.bg,
-              borderColor: colors.border,
-              textColor: colors.text,
-              extendedProps: {
-                type: 'appointment',
-                status: apt.status,
-                appointmentDetails: apt,
-              },
-            };
-          }),
-        ];
+        // Process events by combining availability and appointments
+        const processedEvents: CalendarEvent[] = [];
 
-        setCalendarEvents(events);
+        // Add availability events first
+        if (Array.isArray(availabilityRes.Result.events)) {
+          availabilityRes.Result.events.forEach(event => {
+            // Check if there's a matching appointment
+            const matchingAppointment = appointmentsData.find(
+              apt =>
+                new Date(apt.dateTime).toISOString() ===
+                new Date(event.start).toISOString()
+            );
+
+            if (matchingAppointment) {
+              // This slot is booked - use appointment data
+              processedEvents.push({
+                id: matchingAppointment._id,
+                title: matchingAppointment.patientName,
+                start: matchingAppointment.dateTime,
+                end: matchingAppointment.endTime,
+                extendedProps: {
+                  type: 'appointment',
+                  status: matchingAppointment.status,
+                  appointmentDetails: matchingAppointment,
+                  isBooked: true,
+                },
+              });
+            } else {
+              // This slot is available
+              processedEvents.push({
+                ...event,
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                borderColor: 'rgb(16, 185, 129)',
+                textColor: 'rgb(6, 95, 70)',
+                extendedProps: {
+                  type: 'availability',
+                  isBooked: false,
+                },
+              });
+            }
+          });
+        }
+
+        setCalendarEvents(processedEvents);
+      } else {
+        toast.error('Error loading calendar data');
       }
     } catch (error) {
+      console.error('Error loading calendar data:', error);
       toast.error('Error loading calendar data');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleEventClick = info => {
-    const eventType = info.event.extendedProps.type;
-    if (eventType === 'appointment') {
+    if (info.event.extendedProps.type === 'appointment') {
       setSelectedAppointment(info.event.extendedProps.appointmentDetails);
       setIsAppointmentModalOpen(true);
     }
   };
 
-  const handleDatesSet = arg => {
-    setDateRange({
-      start: arg.start,
-      end: arg.end,
-    });
-  };
+  const renderEventContent = useCallback(eventInfo => {
+    const event = eventInfo.event;
+    const startTime = format(event.start, 'h');
+    const endTime = format(event.end, 'h');
+    const period = format(event.end, 'a');
+    const isBooked = event.extendedProps.type === 'appointment';
+
+    return (
+      <div
+        className={cn(
+          'px-2 py-1.5',
+          isBooked
+            ? 'bg-yellow-100 dark:bg-yellow-900/40'
+            : 'bg-emerald-50 dark:bg-emerald-900/40'
+        )}
+      >
+        <div className="flex items-center gap-1.5">
+          <div
+            className={cn(
+              'w-1.5 h-1.5 rounded-full shrink-0',
+              isBooked ? 'bg-yellow-500' : 'bg-emerald-500'
+            )}
+          />
+          <span
+            className={cn(
+              'text-sm font-semibold',
+              isBooked
+                ? 'text-yellow-900 dark:text-yellow-100'
+                : 'text-emerald-900 dark:text-emerald-100'
+            )}
+          >
+            {isBooked ? event.title : 'Available'}
+          </span>
+        </div>
+        <div className="flex items-center text-sm mt-0.5">
+          <CalendarIcon
+            className={cn(
+              'h-2.5 w-2.5 mr-1',
+              isBooked
+                ? 'text-yellow-800 dark:text-yellow-200'
+                : 'text-emerald-800 dark:text-emerald-200'
+            )}
+          />
+          <span
+            className={cn(
+              isBooked
+                ? 'text-yellow-800 dark:text-yellow-200'
+                : 'text-emerald-800 dark:text-emerald-200'
+            )}
+          >
+            {startTime} - {endTime} {period}
+          </span>
+        </div>
+      </div>
+    );
+  }, []);
 
   return (
     <div className="min-h-screen bg-background mt-5">
-      {CalendarStyles()}
-
       <Card>
+        {CalendarStyles()}
         <CardContent className="p-4">
           <Tabs value={view} onValueChange={setView}>
             <div className="flex items-center justify-between mb-4">
@@ -197,13 +209,10 @@ export default function PsychologistAppointments() {
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   Available
                 </Badge>
+
                 <Badge variant="outline" className="gap-1">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
                   Booked
-                </Badge>
-                <Badge variant="outline" className="gap-1">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  Cancelled
                 </Badge>
               </div>
             </div>
@@ -223,7 +232,6 @@ export default function PsychologistAppointments() {
                   slotMaxTime="21:00:00"
                   events={calendarEvents}
                   eventClick={handleEventClick}
-                  datesSet={handleDatesSet}
                   allDaySlot={false}
                   nowIndicator
                   height="100%"
@@ -241,26 +249,32 @@ export default function PsychologistAppointments() {
                     day: 'numeric',
                     omitCommas: true,
                   }}
-                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
-                  slotLabelClassNames="text-sm font-medium"
-                  dayHeaderClassNames="text-sm font-medium"
+                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity rounded-md overflow-hidden border"
+                  slotLabelClassNames="text-sm font-medium text-gray-600 dark:text-gray-300"
+                  dayHeaderClassNames="text-sm font-medium text-gray-700 dark:text-gray-200"
                 />
               </div>
             </TabsContent>
 
             <TabsContent value="list" className="mt-4">
               <div className="space-y-4">
-                {appointments.map(appointment => (
-                  <AppointmentCard
-                    key={appointment._id}
-                    appointment={appointment}
-                    onClick={() => {
-                      setSelectedAppointment(appointment);
-                      setIsAppointmentModalOpen(true);
-                    }}
-                  />
-                ))}
-                {appointments.length === 0 && (
+                {isLoading ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
+                    Loading appointments...
+                  </div>
+                ) : appointments.length > 0 ? (
+                  appointments.map(appointment => (
+                    <AppointmentCard
+                      key={appointment._id}
+                      appointment={appointment}
+                      onClick={() => {
+                        setSelectedAppointment(appointment);
+                        setIsAppointmentModalOpen(true);
+                      }}
+                    />
+                  ))
+                ) : (
                   <div className="text-center text-muted-foreground py-8">
                     <p>No upcoming appointments</p>
                   </div>
@@ -282,4 +296,6 @@ export default function PsychologistAppointments() {
       />
     </div>
   );
-}
+};
+
+export default PsychologistAppointments;

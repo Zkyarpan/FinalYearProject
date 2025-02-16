@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, isPast, isFuture, parseISO } from 'date-fns';
+import { format, isPast, isFuture, parseISO, isToday } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Loader2,
   User,
+  MapPin,
 } from 'lucide-react';
 import {
   Dialog,
@@ -28,14 +29,15 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { useUserStore } from '@/store/userStore';
+import AvailabilitySettingsSkeleton from './AvailabilitySettingsSkeleton';
 
-// Updated Interfaces
 interface PsychologistProfile {
   _id: string;
   firstName?: string;
   lastName?: string;
   email: string;
   profilePhotoUrl?: string;
+  sessionFee?: number;
 }
 
 interface Appointment {
@@ -43,7 +45,7 @@ interface Appointment {
   dateTime: string;
   endTime: string;
   duration: number;
-  psychologistId: PsychologistProfile | null;
+  psychologistId: PsychologistProfile;
   stripePaymentIntentId: string;
   sessionFormat: 'video' | 'in-person';
   patientName: string;
@@ -51,23 +53,19 @@ interface Appointment {
   phone: string;
   reasonForVisit: string;
   notes?: string;
-  status: 'confirmed' | 'pending' | 'canceled' | 'completed';
-  sessionFee?: number;
+  status: 'confirmed' | 'canceled' | 'completed';
+  insuranceProvider?: string;
+  isPast: boolean;
+  isToday: boolean;
+  canJoin: boolean;
 }
 
-// Helper Components
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center h-64">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
-
 const EmptyState = ({ type }: { type: 'upcoming' | 'past' }) => (
-  <Card className="bg-muted/50">
+  <Card className="bg-muted/50 dark:bg-input">
     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="rounded-full bg-primary/10 p-3 mb-4">
+      <div className="rounded-full bg-primary/10 p-3 mb-4 dark:bg-black">
         {type === 'upcoming' ? (
-          <CalendarCheck className="h-6 w-6 text-primary" />
+          <CalendarCheck className="h-6 w-6 text-primary dark:text-white" />
         ) : (
           <History className="h-6 w-6 text-primary" />
         )}
@@ -82,26 +80,31 @@ const EmptyState = ({ type }: { type: 'upcoming' | 'past' }) => (
   </Card>
 );
 
-// Appointment Card Component
-const AppointmentCard: React.FC<{
+const AppointmentCard = ({
+  appointment,
+  onCancelAppointment,
+}: {
   appointment: Appointment;
   onCancelAppointment: (appointment: Appointment) => Promise<void>;
-}> = ({ appointment, onCancelAppointment }) => {
+}) => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const startTime = parseISO(appointment.dateTime);
   const endTime = parseISO(appointment.endTime);
-  const isPastAppointment = isPast(endTime);
 
-  // Handle cases where psychologistId might be null
-  const psychologistName = appointment.psychologistId
-    ? `${appointment.psychologistId.firstName || ''} ${
-        appointment.psychologistId.lastName || ''
-      }`.trim() || 'Healthcare Provider'
-    : 'Healthcare Provider';
+  const psychologistName =
+    `${appointment.psychologistId?.firstName || ''} ${
+      appointment.psychologistId?.lastName || ''
+    }`.trim() || 'Healthcare Provider';
 
   const handleJoinClick = () => {
-    toast.info('Video call functionality coming soon');
+    if (!appointment.canJoin) {
+      toast.info(
+        'Session is not available to join yet. Please wait until 5 minutes before the appointment.'
+      );
+      return;
+    }
+    toast.info('Joining video session...');
   };
 
   const handleCancelClick = async () => {
@@ -129,9 +132,9 @@ const AppointmentCard: React.FC<{
   return (
     <>
       <Card className="group hover:shadow-md transition-shadow">
-        <CardContent className="p-4">
+        <CardContent className="p-6">
           <div className="flex items-start space-x-4">
-            <Avatar className="h-12 w-12 border">
+            <Avatar className="h-14 w-14 border">
               {appointment.psychologistId?.profilePhotoUrl ? (
                 <AvatarImage
                   src={appointment.psychologistId.profilePhotoUrl}
@@ -145,23 +148,21 @@ const AppointmentCard: React.FC<{
               )}
             </Avatar>
 
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="font-medium leading-none">
-                    {psychologistName}
-                  </h4>
+                  <h4 className="font-medium text-lg">{psychologistName}</h4>
                   <p className="text-sm text-muted-foreground">
                     {appointment.email}
                   </p>
-                  {appointment.sessionFee && (
+                  {appointment.psychologistId?.sessionFee && (
                     <p className="text-sm text-muted-foreground">
-                      Session Fee: ${appointment.sessionFee}
+                      Session Fee: ${appointment.psychologistId.sessionFee}
                     </p>
                   )}
                 </div>
 
-                {!isPastAppointment && appointment.status !== 'canceled' && (
+                {!appointment.isPast && appointment.status !== 'canceled' && (
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -175,9 +176,10 @@ const AppointmentCard: React.FC<{
                       <Button
                         size="sm"
                         onClick={handleJoinClick}
+                        disabled={!appointment.canJoin}
                         className="whitespace-nowrap"
                       >
-                        Join Session
+                        {appointment.canJoin ? 'Join Session' : 'Join Soon'}
                       </Button>
                     )}
                   </div>
@@ -185,24 +187,27 @@ const AppointmentCard: React.FC<{
               </div>
 
               <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   <span>{format(startTime, 'EEE, MMM d, yyyy')}</span>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   <span>
                     {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
                   </span>
                 </div>
-                <Badge variant="secondary" className="flex items-center gap-1">
+                <Badge variant="secondary" className="flex items-center gap-2">
                   {appointment.sessionFormat === 'video' ? (
                     <>
                       <Video className="h-3 w-3" />
-                      <span>Video Call</span>
+                      <span>Video Session</span>
                     </>
                   ) : (
-                    <span>In-Person</span>
+                    <>
+                      <MapPin className="h-3 w-3" />
+                      <span>In-Person</span>
+                    </>
                   )}
                 </Badge>
                 <Badge
@@ -215,9 +220,23 @@ const AppointmentCard: React.FC<{
                       : ''
                   }
                 >
-                  {appointment.status}
+                  {appointment.status.charAt(0).toUpperCase() +
+                    appointment.status.slice(1)}
                 </Badge>
               </div>
+
+              {appointment.reasonForVisit && (
+                <div className="text-sm text-muted-foreground">
+                  <strong>Reason for Visit:</strong>{' '}
+                  {appointment.reasonForVisit}
+                </div>
+              )}
+
+              {appointment.notes && (
+                <div className="text-sm text-muted-foreground">
+                  <strong>Notes:</strong> {appointment.notes}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -271,9 +290,8 @@ const AppointmentCard: React.FC<{
   );
 };
 
-// Main Component
 const AppointmentManager = () => {
-  const { firstName } = useUserStore();
+  const { isAuthenticated, profileImage, firstName, lastName } = useUserStore();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
@@ -323,36 +341,61 @@ const AppointmentManager = () => {
     }
   };
 
-  const filterAppointments = (filterFn: (apt: Appointment) => boolean) => {
-    return appointments.filter(filterFn);
-  };
+  const upcomingAppointments = appointments
+    .filter(apt => !apt.isPast)
+    .sort(
+      (a, b) => parseISO(a.dateTime).getTime() - parseISO(b.dateTime).getTime()
+    );
 
-  const upcomingAppointments = filterAppointments(apt =>
-    isFuture(parseISO(apt.dateTime))
-  ).sort(
-    (a, b) => parseISO(a.dateTime).getTime() - parseISO(b.dateTime).getTime()
-  );
+  const pastAppointments = appointments
+    .filter(apt => apt.isPast)
+    .sort(
+      (a, b) => parseISO(b.dateTime).getTime() - parseISO(a.dateTime).getTime()
+    );
 
-  const pastAppointments = filterAppointments(apt =>
-    isPast(parseISO(apt.endTime))
-  ).sort(
-    (a, b) => parseISO(b.dateTime).getTime() - parseISO(a.dateTime).getTime()
-  );
+  if (!isAuthenticated) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <Alert>
+            <AlertDescription>
+              Please log in to view your appointments.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <AvailabilitySettingsSkeleton />;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {firstName ? `${firstName}'s Appointments` : 'My Appointments'}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            View and manage your therapy sessions
-          </p>
+        <div className="flex items-center space-x-4">
+          <Avatar className="h-12 w-12">
+            {profileImage ? (
+              <AvatarImage
+                src={profileImage}
+                alt={`${firstName} ${lastName}`}
+              />
+            ) : (
+              <AvatarFallback>
+                {firstName?.charAt(0)}
+                {lastName?.charAt(0)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {firstName ? `${firstName}'s Appointments` : 'My Appointments'}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              View and manage your therapy sessions
+            </p>
+          </div>
         </div>
       </div>
 

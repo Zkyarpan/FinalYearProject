@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Clock3,
@@ -9,9 +9,10 @@ import {
   Calendar,
   Info,
   CalendarClock,
+  ChevronRight,
+  Users,
+  CalendarDays,
 } from 'lucide-react';
-import Add from '@/icons/Add';
-import Delete from '@/icons/Delete';
 
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -41,8 +43,9 @@ import {
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import Add from '@/icons/Add';
+import Delete from '@/icons/Delete';
 
-// Types remain the same as your original code...
 interface TimeSlot {
   value: string;
   label: string;
@@ -119,7 +122,7 @@ const DAYS_OF_WEEK = [
   'Saturday',
 ] as const;
 
-const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
+export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
   onRefresh,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -138,7 +141,6 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     slotId: null,
   });
 
-  // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -200,18 +202,15 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     const [startHour, startMinutes] = startTime.split(':').map(Number);
     const [endHour, endMinutes] = endTime.split(':').map(Number);
 
-    // Validate end time is after start time
     if (startHour >= endHour) {
       toast.error('End time must be after start time');
       return false;
     }
 
-    // Check if any selected day is before current day in the current week
     const hasInvalidDay = selectedDays.some(day => {
       if (day < currentDay) {
         return true;
       } else if (day === currentDay) {
-        // For current day, check if selected time is in the past
         if (
           startHour < currentHour ||
           (startHour === currentHour && startMinutes <= currentMinutes)
@@ -227,7 +226,6 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       return false;
     }
 
-    // Validate that slots are exactly 1 hour
     const startTimeInMinutes = startHour * 60 + startMinutes;
     const endTimeInMinutes = endHour * 60 + endMinutes;
     const durationInHours = (endTimeInMinutes - startTimeInMinutes) / 60;
@@ -300,12 +298,10 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
   const groupSlotsByDay = (): DaySlot[] => {
     const daysMap = new Map<number, DaySlot>();
 
-    // Initialize map with empty slots for each day
     DAYS_OF_WEEK.forEach((_, index) => {
       daysMap.set(index, { day: index, slots: [] });
     });
 
-    // Populate with available slots
     availabilitySlots.forEach(slot => {
       slot.daysOfWeek.forEach(day => {
         const daySlot = daysMap.get(day)!;
@@ -317,7 +313,6 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       });
     });
 
-    // Sort slots within each day by start time
     daysMap.forEach(daySlot => {
       daySlot.slots.sort((a, b) => {
         const timeA = a.startTime.split(':').map(Number);
@@ -329,7 +324,6 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       });
     });
 
-    // Convert map to array and sort by day
     return Array.from(daysMap.values()).sort((a, b) => a.day - b.day);
   };
 
@@ -376,115 +370,171 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
   const { dayName, date, time } = getCurrentDayInfo();
 
   return (
-    <div className="space-y-6 mt-5">
-      <Card className="bg-primary/5 border-primary/50 dark:border-primary/50">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <CalendarClock className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">{dayName}</h3>
+    <div className="space-y-6 mt-5 max-w-7xl mx-auto">
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Time Zone Card */}
+        <Card className="dark:bg-input">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 rounded-lg">
+                <Clock3 className="h-6 w-6 " />
               </div>
-              <p className="text-sm">{date}</p>
-              <p className="text-2xl font-bold main-font">{time}</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Current Time Zone
+                </p>
+                <p className="text-2xl font-extrabold tracking-tight main-font">
+                  {currentTime.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-medium">Current Time Zone</p>
-              <p className="font-medium">
-                {Intl.DateTimeFormat().resolvedOptions().timeZone}
-              </p>
+          </CardContent>
+        </Card>
+
+        {/* Current Date Card */}
+        <Card className="dark:bg-input">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-secondary/10 rounded-lg">
+                <CalendarDays className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Current Date
+                </p>
+                <p className="text-2xl font-bold tracking-tight">{dayName}</p>
+                <p className="text-sm text-muted-foreground">{date}</p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats Card */}
+        <Card className="dark:bg-input">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-accent/10 rounded-lg">
+                <Users className="h-6 w-6 text-accent-foreground" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Available Slots
+                </p>
+                <p className="text-2xl font-bold tracking-tight">
+                  {availabilitySlots.reduce(
+                    (acc, slot) => acc + slot.daysOfWeek.length,
+                    0
+                  )}
+                </p>
+                <p className="text-sm text-muted-foreground">Across all days</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="w-full">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="space-y-1">
-            <CardTitle className="text-xl font-semibold flex items-center gap-2">
-              <Clock3 className="h-6 w-6" />
+            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+              <Clock3 className="h-7 w-7" />
               Consultation Hours
             </CardTitle>
-            <CardDescription>
-              Set your weekly availability for patient consultations
+            <CardDescription className="text-base">
+              Manage your weekly availability for patient consultations
             </CardDescription>
           </div>
           <Button
             onClick={() => setIsAddingSlot(true)}
-            className="gap-2 bg-primary hover:bg-primary/90"
+            className="gap-2 bg-primary hover:bg-primary/90 shadow-sm"
+            size="lg"
           >
             <Add />
             Add Time Slot
           </Button>
         </CardHeader>
 
+        <Separator />
+
         <CardContent className="pt-6">
           <Tabs defaultValue="weekly" className="space-y-6">
-            <TabsContent value="weekly" className="space-y-4">
+            <TabsContent value="weekly" className="space-y-6">
               <Alert
                 variant="default"
-                className="border bg-primary/5 dark:bg-input"
+                className="border dark:bg-input max-w-[350px]"
               >
-                <AlertDescription className="flex gap-2">
-                  Your schedule automatically repeats weekly. All times are
-                  shown in your local timezone (
-                  {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+                <AlertDescription className="flex items-center gap-2 text-sm ">
+                  <Info className="h-4 w-4" />
+                  All times are shown in your local timezone.
                 </AlertDescription>
               </Alert>
 
               {groupSlotsByDay().length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed rounded-lg bg-muted/30">
-                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                <div className="flex flex-col items-center justify-center py-16 px-4 border-2 border-dashed rounded-lg bg-muted/30">
+                  <div className="p-4 bg-primary/5 rounded-full mb-4">
+                    <Calendar className="h-12 w-12 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
                     No Availability Set
                   </h3>
-                  <p className="text-sm text-muted-foreground text-center mb-4 max-w-md">
+                  <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">
                     You haven't set any consultation hours yet. Add your
                     available time slots to start accepting appointments.
                   </p>
                   <Button
                     onClick={() => setIsAddingSlot(true)}
                     className="gap-2"
+                    size="lg"
                   >
-                    <Add />
+                    <Clock3 className="h-5 w-5" />
                     Set Your Hours
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {groupSlotsByDay().map(({ day, slots }) => (
                     <Card
                       key={day}
-                      className={`bg-card hover:bg-accent/5 transition-colors ${
-                        day === currentTime.getDay() ? 'border-primary/50' : ''
+                      className={`group hover:shadow-md transition-all duration-200 ${
+                        day === currentTime.getDay()
+                          ? 'border-primary/50 bg-primary/5'
+                          : 'hover:border-primary/30'
                       }`}
                     >
-                      <CardHeader className="py-3 px-4">
-                        <h3 className="font-semibold text-sm flex items-center gap-2">
-                          <div
-                            className={`h-2 w-2 rounded-full ${
-                              day === currentTime.getDay()
-                                ? 'bg-primary animate-pulse'
-                                : 'bg-primary/50'
-                            }`}
-                          />
-                          {getDayName(day)}
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-lg flex items-center gap-2">
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                day === currentTime.getDay()
+                                  ? 'bg-primary animate-pulse'
+                                  : 'bg-muted-foreground'
+                              }`}
+                            />
+                            {getDayName(day)}
+                          </h3>
                           {day === currentTime.getDay() && (
-                            <Badge variant="outline" className="ml-2">
+                            <Badge variant="default" className="font-medium">
                               Today
                             </Badge>
                           )}
-                        </h3>
+                        </div>
                       </CardHeader>
-                      <CardContent className="py-2 px-4">
+                      <CardContent className="pb-4">
                         <div className="space-y-2">
                           {slots.map((slot, index) => (
                             <div
                               key={`${slot.id}-${index}`}
-                              className="flex items-center justify-between bg-background rounded-lg p-3 border border-border/50 hover:border-primary/30 transition-colors"
+                              className="flex items-center justify-between p-3 rounded-lg bg-background/80 border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all group"
                             >
                               <div className="flex items-center gap-3">
-                                <Clock className="h-4 w-4 text-primary" />
+                                <Clock className="h-4 w-4" />
                                 <span className="font-medium">
                                   {formatTime(slot.startTime)} -{' '}
                                   {formatTime(slot.endTime)}
@@ -493,7 +543,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                className="group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                                 onClick={() =>
                                   setDeleteDialog({
                                     isOpen: true,
@@ -507,6 +557,13 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                           ))}
                         </div>
                       </CardContent>
+                      {slots.length === 0 && (
+                        <CardFooter className="pt-0 pb-4">
+                          <p className="text-sm text-muted-foreground text-center w-full">
+                            No slots available
+                          </p>
+                        </CardFooter>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -514,6 +571,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
             </TabsContent>
           </Tabs>
 
+          {/* Add Time Slot Dialog */}
           <Dialog
             open={isAddingSlot}
             onOpenChange={isOpen => {
@@ -527,21 +585,20 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
               }
             }}
           >
-            <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-auto">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-auto">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Clock3 className="h-5 w-5 text-primary" />
+                <DialogTitle className="flex items-center gap-2 text-2xl">
+                  <Clock3 className="h-6 w-6 text-primary" />
                   Set Weekly Hours
                 </DialogTitle>
-                <DialogDescription className="pt-2">
-                  Set your recurring weekly consultation hours. These hours will
-                  repeat every week.
+                <DialogDescription className="pt-2 text-base">
+                  Set your recurring weekly consultation hours.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="border rounded-md p-4 my-4 bg-muted/30">
+              <div className="bg-muted/30 border rounded-lg p-4 my-4">
                 <div className="flex items-center gap-2 text-sm mb-2">
-                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <Info className="h-4 w-4 text-primary" />
                   <span className="font-medium">Current Time:</span>
                   <span>{currentTime.toLocaleTimeString()}</span>
                 </div>
@@ -559,26 +616,26 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                     {DAYS_OF_WEEK.map((day, index) => {
                       const isPastDay = index < currentTime.getDay();
                       const isToday = index === currentTime.getDay();
+                      const isSelected =
+                        newAvailability.daysOfWeek.includes(index);
 
                       return (
                         <Badge
                           key={day}
-                          variant={
-                            newAvailability.daysOfWeek.includes(index)
-                              ? 'default'
-                              : 'outline'
-                          }
-                          className={`cursor-pointer transition-colors px-3 py-1.5 ${
-                            isPastDay ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
+                          variant={isSelected ? 'default' : 'outline'}
+                          className={`
+                            cursor-pointer transition-all duration-200 px-4 py-1.5
+                            ${isPastDay ? 'opacity-50 cursor-not-allowed' : ''}
+                            ${isSelected ? 'shadow-sm' : ''}
+                            hover:shadow-sm
+                          `}
                           onClick={() => {
                             if (!isPastDay) {
-                              const updatedDays =
-                                newAvailability.daysOfWeek.includes(index)
-                                  ? newAvailability.daysOfWeek.filter(
-                                      d => d !== index
-                                    )
-                                  : [...newAvailability.daysOfWeek, index];
+                              const updatedDays = isSelected
+                                ? newAvailability.daysOfWeek.filter(
+                                    d => d !== index
+                                  )
+                                : [...newAvailability.daysOfWeek, index];
                               setNewAvailability(prev => ({
                                 ...prev,
                                 daysOfWeek: updatedDays,
@@ -596,7 +653,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Start Time</Label>
                     <Select
@@ -604,7 +661,6 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                       onValueChange={value => {
                         const [hour] = value.split(':').map(Number);
                         const endHour = (hour + 1).toString().padStart(2, '0');
-
                         setNewAvailability(prev => ({
                           ...prev,
                           startTime: value,
@@ -615,16 +671,14 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[300px] dark:bg-input">
+                      <SelectContent className="max-h-[300px]">
                         {timeSlots.map(slot => {
                           const [hour] = slot.value.split(':').map(Number);
-
                           const isLastHour = hour >= 21;
                           const isPastTime =
                             newAvailability.daysOfWeek.includes(
                               currentTime.getDay()
                             ) && hour <= currentTime.getHours();
-
                           const isDisabled = isLastHour || isPastTime;
 
                           return (
@@ -632,7 +686,10 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                               key={slot.value}
                               value={slot.value}
                               disabled={isDisabled}
-                              className={isDisabled ? 'opacity-50' : ''}
+                              className={`
+                                ${isDisabled ? 'opacity-50' : ''}
+                                ${isPastTime ? 'text-muted-foreground' : ''}
+                              `}
                             >
                               {slot.label}
                               {isPastTime && ' (Past)'}
@@ -650,10 +707,10 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                       value={newAvailability.endTime}
                       disabled={!newAvailability.startTime}
                     >
-                      <SelectTrigger className="w-full ">
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Auto-set to 1 hour later" />
                       </SelectTrigger>
-                      <SelectContent className="dark:bg-input">
+                      <SelectContent>
                         {newAvailability.startTime && (
                           <SelectItem value={newAvailability.endTime}>
                             {(() => {
@@ -671,9 +728,12 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   </div>
                 </div>
 
-                <Alert variant="default" className="mt-4">
+                <Alert
+                  variant="default"
+                  className="bg-primary/5 border-primary/20"
+                >
                   <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 flex-shrink-0" />
+                    <Info className="h-4 w-4 text-primary" />
                     <AlertDescription>
                       Slots must be exactly 1 hour long and cannot be scheduled
                       in the past.
@@ -681,11 +741,12 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   </div>
                 </Alert>
 
-                <DialogFooter>
+                <DialogFooter className="gap-2 sm:gap-0">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddingSlot(false)}
+                    className="flex-1 sm:flex-none"
                   >
                     Cancel
                   </Button>
@@ -697,7 +758,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                       !newAvailability.endTime ||
                       newAvailability.daysOfWeek.length === 0
                     }
-                    className="gap-2"
+                    className="gap-2 flex-1 sm:flex-none"
                   >
                     {isLoading ? (
                       <>
@@ -705,7 +766,10 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                         Saving...
                       </>
                     ) : (
-                      'Save Hours'
+                      <>
+                        <Clock3 className="h-4 w-4" />
+                        Save Hours
+                      </>
                     )}
                   </Button>
                 </DialogFooter>
@@ -722,11 +786,11 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
           >
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-destructive">
+                <DialogTitle className="flex items-center gap-2  mb-5">
                   <AlertCircle className="h-5 w-5" />
                   Remove Time Slot
                 </DialogTitle>
-                <div className="border-l-4 border-destructive bg-destructive/5 p-4 mt-2 rounded-md">
+                <div className="border-l-4 border-destructive bg-destructive/5 p-4 mt-2">
                   <DialogDescription asChild>
                     <div className="space-y-4">
                       <div className="space-y-2">
@@ -738,17 +802,17 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                           from your weekly schedule.
                         </div>
                       </div>
-                      <ul className="text-sm text-muted-foreground space-y-1">
+                      <ul className="text-xs text-muted-foreground space-y-2">
                         <li className="flex items-center gap-2">
-                          <span className="h-1 w-1 rounded-full bg-muted-foreground"></span>
+                          <ChevronRight className="h-3 w-3" />
                           Any pending appointments will need to be rescheduled
                         </li>
                         <li className="flex items-center gap-2">
-                          <span className="h-1 w-1 rounded-full bg-muted-foreground"></span>
+                          <ChevronRight className="h-3 w-3" />
                           This change will affect all future weeks
                         </li>
                         <li className="flex items-center gap-2">
-                          <span className="h-1 w-1 rounded-full bg-muted-foreground"></span>
+                          <ChevronRight className="h-3 w-3" />
                           This action cannot be undone
                         </li>
                       </ul>
@@ -762,7 +826,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   onClick={() =>
                     setDeleteDialog({ isOpen: false, slotId: null })
                   }
-                  className="w-full sm:w-auto"
+                  className="flex-1 sm:flex-none"
                 >
                   Keep Slot
                 </Button>
@@ -770,7 +834,7 @@ const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   variant="destructive"
                   onClick={handleDeleteAvailability}
                   disabled={isLoading}
-                  className="w-full sm:w-auto gap-2"
+                  className="gap-2 flex-1 sm:flex-none"
                 >
                   {isLoading ? (
                     <>

@@ -44,6 +44,7 @@
     "@tiptap/starter-kit": "^2.11.2",
     "@types/formidable": "^3.4.5",
     "@types/mongoose": "^5.11.97",
+    "@types/validator": "^13.12.2",
     "add": "^2.0.6",
     "bcryptjs": "^2.4.3",
     "busboy": "^1.6.0",
@@ -87,6 +88,7 @@
     "tailwind-scrollbar": "^3.1.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.0.4",
+    "validator": "^13.12.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.3"
   },

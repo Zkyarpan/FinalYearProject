@@ -217,7 +217,7 @@ export default function AppointmentScheduler() {
     if (!selectedSlot) return;
 
     try {
-      const response = await fetch('/api/appointments', {
+      const appointmentResponse = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -235,20 +235,51 @@ export default function AppointmentScheduler() {
         }),
       });
 
-      const data = await response.json();
+      const appointmentData = await appointmentResponse.json();
 
-      if (data.IsSuccess) {
-        toast.success('Appointment booked successfully');
-        handleCloseDialog();
-        fetchAppointments();
-        fetchAvailability();
+      if (appointmentData.IsSuccess) {
+        const appointmentId =
+          appointmentData.Result?.appointment?._id ||
+          appointmentData.Result?.appointment?.insertedId ||
+          appointmentData.Result?.insertedId;
+
+        if (!appointmentId) {
+          toast.error('Error processing appointment');
+          return;
+        }
+
+        const paymentResponse = await fetch('/api/payments/update-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId,
+            status: 'completed',
+            appointmentId: appointmentId.toString(),
+          }),
+        });
+
+        const paymentData = await paymentResponse.json();
+
+        if (paymentData.IsSuccess) {
+          toast.success('Appointment booked successfully');
+          handleCloseDialog();
+          await Promise.all([fetchAppointments(), fetchAvailability()]);
+        } else {
+          toast.warning(
+            'Appointment booked, but payment status update delayed'
+          );
+          handleCloseDialog();
+          await Promise.all([fetchAppointments(), fetchAvailability()]);
+        }
       } else {
-        if (data.StatusCode === 409) {
+        if (appointmentData.StatusCode === 409) {
           toast.error(
             'This time slot is no longer available. Please select another time.'
           );
         } else {
-          toast.error(data.ErrorMessage?.[0]?.message || 'Booking failed');
+          toast.error(
+            appointmentData.ErrorMessage?.[0]?.message || 'Booking failed'
+          );
         }
       }
     } catch (error) {
@@ -258,7 +289,6 @@ export default function AppointmentScheduler() {
   };
 
   const handleEventClick = info => {
-    console.log('Event clicked:', info.event); // Debug log
     setSelectedSlot(info.event);
     setShowBookingDialog(true);
   };

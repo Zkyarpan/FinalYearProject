@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Users,
   CalendarDays,
+  Globe2,
 } from 'lucide-react';
 
 import {
@@ -49,6 +50,7 @@ import Delete from '@/icons/Delete';
 interface TimeSlot {
   value: string;
   label: string;
+  period: string;
 }
 
 interface AvailabilitySlot {
@@ -90,20 +92,79 @@ interface AvailabilitySettingsProps {
   onRefresh?: () => void;
 }
 
+interface WeekDate {
+  date: Date;
+  dayName: (typeof DAYS_OF_WEEK)[number];
+  dayIndex: number;
+  isToday: boolean;
+  formattedDate: string;
+}
+
+const getNextWeekDates = () => {
+  const dates: WeekDate[] = [];
+  const today = new Date();
+
+  // Get today and next 6 days
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    dates.push({
+      date,
+      dayName: DAYS_OF_WEEK[date.getDay()],
+      dayIndex: date.getDay(),
+      isToday: i === 0,
+      formattedDate: date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      }),
+    });
+  }
+
+  return dates;
+};
+
+const TIME_PERIODS = {
+  MORNING: { start: 0, end: 11, icon: '☀️', label: 'Morning' },
+  AFTERNOON: { start: 12, end: 16, icon: '🌤️', label: 'Afternoon' },
+  EVENING: { start: 17, end: 20, icon: '🌅', label: 'Evening' },
+  NIGHT: { start: 21, end: 23, icon: '🌙', label: 'Night' },
+} as const;
+
 const generateTimeSlots = () => {
   const slots: TimeSlot[] = [];
-  const startHour = 6; // 6 AM
-  const endHour = 21; // 9 PM
 
-  for (let i = startHour; i <= endHour; i++) {
+  // Generate slots for all 24 hours
+  for (let i = 0; i < 24; i++) {
     const hour = i;
     const time = `${hour.toString().padStart(2, '0')}:00`;
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
 
+    // Determine time period
+    let periodLabel = '';
+    if (
+      hour >= TIME_PERIODS.MORNING.start &&
+      hour <= TIME_PERIODS.MORNING.end
+    ) {
+      periodLabel = TIME_PERIODS.MORNING.icon;
+    } else if (
+      hour >= TIME_PERIODS.AFTERNOON.start &&
+      hour <= TIME_PERIODS.AFTERNOON.end
+    ) {
+      periodLabel = TIME_PERIODS.AFTERNOON.icon;
+    } else if (
+      hour >= TIME_PERIODS.EVENING.start &&
+      hour <= TIME_PERIODS.EVENING.end
+    ) {
+      periodLabel = TIME_PERIODS.EVENING.icon;
+    } else {
+      periodLabel = TIME_PERIODS.NIGHT.icon;
+    }
+
     slots.push({
       value: time,
       label: `${displayHour}:00 ${period}`,
+      period: periodLabel,
     });
   }
 
@@ -588,160 +649,402 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-2xl">
-                  <Clock3 className="h-6 w-6 text-primary" />
-                  Set Weekly Hours
+                  <CalendarClock className="h-6 w-6" />
+                  Set Availability
                 </DialogTitle>
                 <DialogDescription className="pt-2 text-base">
-                  Set your recurring weekly consultation hours.
+                  Choose your available time slots for the next 7 days
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="bg-muted/30 border rounded-lg p-4 my-4">
-                <div className="flex items-center gap-2 text-sm mb-2">
-                  <Info className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Current Time:</span>
-                  <span>{currentTime.toLocaleTimeString()}</span>
+              <div className="bg-muted/30 dark:bg-input border rounded-lg p-4 my-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4" />
+                  <span className="font-medium">Current Date & Time:</span>
+                  <span>
+                    {currentTime.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Time slots must be scheduled for future times only
-                </p>
               </div>
 
-              <form onSubmit={handleSetAvailability} className="space-y-6">
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">
-                    Available Days
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DAYS_OF_WEEK.map((day, index) => {
-                      const isPastDay = index < currentTime.getDay();
-                      const isToday = index === currentTime.getDay();
-                      const isSelected =
-                        newAvailability.daysOfWeek.includes(index);
+              <form onSubmit={handleSetAvailability} className="space-y-8">
+                {/* Day Selection Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-lg font-semibold">
+                        Select Days
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Choose days for your consultation hours
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="font-medium">
+                      <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                      Next 7 days
+                    </Badge>
+                  </div>
 
-                      return (
-                        <Badge
-                          key={day}
-                          variant={isSelected ? 'default' : 'outline'}
-                          className={`
-                            cursor-pointer transition-all duration-200 px-4 py-1.5
-                            ${isPastDay ? 'opacity-50 cursor-not-allowed' : ''}
-                            ${isSelected ? 'shadow-sm' : ''}
-                            hover:shadow-sm
-                          `}
-                          onClick={() => {
-                            if (!isPastDay) {
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {getNextWeekDates().map(
+                      ({ dayName, dayIndex, isToday, formattedDate }) => {
+                        const isSelected =
+                          newAvailability.daysOfWeek.includes(dayIndex);
+                        const isWeekend = dayIndex === 0 || dayIndex === 6;
+
+                        return (
+                          <div
+                            key={dayIndex}
+                            onClick={() => {
                               const updatedDays = isSelected
                                 ? newAvailability.daysOfWeek.filter(
-                                    d => d !== index
+                                    d => d !== dayIndex
                                   )
-                                : [...newAvailability.daysOfWeek, index];
+                                : [...newAvailability.daysOfWeek, dayIndex];
                               setNewAvailability(prev => ({
                                 ...prev,
                                 daysOfWeek: updatedDays,
                               }));
-                            }
-                          }}
+                            }}
+                            className={`
+              relative rounded-xl border p-4 cursor-pointer
+              transition-all duration-200 
+              ${isSelected ? 'bg-primary/5 shadow-sm' : 'hover:bg-primary/5'}
+              ${isToday ? 'ring-1 ring-primary ' : ''}
+              ${isWeekend ? 'bg-muted/30' : ''}
+            `}
+                          >
+                            {isSelected && (
+                              <div className="absolute top-2 right-2">
+                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                              </div>
+                            )}
+
+                            <div className="flex flex-col items-center gap-2 select-none">
+                              <span
+                                className={`text-base font-semibold ${
+                                  isSelected ? 'text-primary' : ''
+                                }`}
+                              >
+                                {dayName}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {formattedDate}
+                              </span>
+                              {isToday && (
+                                <Badge variant="default" className="mt-1">
+                                  Today
+                                </Badge>
+                              )}
+                              {isWeekend && !isToday && (
+                                <Badge variant="outline" className="mt-1">
+                                  Weekend
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+
+                {/* Time Selection Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-lg font-semibold">
+                        Consultation Hours
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Set your available time slots
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        1-hour slots
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        Start Time
+                        <span className="text-xs text-muted-foreground">
+                          (Select when you start)
+                        </span>
+                      </Label>
+                      <Select
+                        value={newAvailability.startTime}
+                        onValueChange={value => {
+                          const [hour] = value.split(':').map(Number);
+                          const endHour = (hour + 1)
+                            .toString()
+                            .padStart(2, '0');
+                          setNewAvailability(prev => ({
+                            ...prev,
+                            startTime: value,
+                            endTime: `${endHour}:00`,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger
+                          className="w-full h-10 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
                         >
-                          {day}
-                          {isToday && (
-                            <span className="ml-1 text-xs">(Today)</span>
-                          )}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
+                          <SelectValue placeholder="Choose start time" />
+                        </SelectTrigger>
+                        <SelectContent className="h-64 dark:bg-input">
+                          <div className="grid grid-cols-1 divide-y">
+                            {Object.values(TIME_PERIODS).map(period => (
+                              <div key={period.label} className="relative">
+                                <div className="sticky top-0 px-3 py-1.5 text-sm font-semibold bg-background border-b z-10">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">
+                                      {period.icon}
+                                    </span>
+                                    <span>{period.label}</span>
+                                  </div>
+                                </div>
+                                <div className="py-0.5">
+                                  {timeSlots
+                                    .filter(slot => {
+                                      const hour = parseInt(slot.value);
+                                      return (
+                                        hour >= period.start &&
+                                        hour <= period.end
+                                      );
+                                    })
+                                    .map(slot => {
+                                      const [hour] = slot.value
+                                        .split(':')
+                                        .map(Number);
+                                      const isPastTime =
+                                        newAvailability.daysOfWeek.includes(
+                                          currentTime.getDay()
+                                        ) && hour <= currentTime.getHours();
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Start Time</Label>
-                    <Select
-                      value={newAvailability.startTime}
-                      onValueChange={value => {
-                        const [hour] = value.split(':').map(Number);
-                        const endHour = (hour + 1).toString().padStart(2, '0');
-                        setNewAvailability(prev => ({
-                          ...prev,
-                          startTime: value,
-                          endTime: `${endHour}:00`,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select time" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
-                        {timeSlots.map(slot => {
-                          const [hour] = slot.value.split(':').map(Number);
-                          const isLastHour = hour >= 21;
-                          const isPastTime =
-                            newAvailability.daysOfWeek.includes(
-                              currentTime.getDay()
-                            ) && hour <= currentTime.getHours();
-                          const isDisabled = isLastHour || isPastTime;
+                                      return (
+                                        <SelectItem
+                                          key={slot.value}
+                                          value={slot.value}
+                                          disabled={isPastTime}
+                                          className="rounded-md transition-colors"
+                                        >
+                                          <div className="flex items-center gap-3 py-0.5">
+                                            <span className="text-base">
+                                              {slot.period}
+                                            </span>
+                                            <Clock className="h-4 w-4 text-muted-foreground" />
+                                            <span
+                                              className={
+                                                isPastTime
+                                                  ? 'text-muted-foreground'
+                                                  : ''
+                                              }
+                                            >
+                                              {slot.label}
+                                            </span>
+                                            {isPastTime && (
+                                              <Badge
+                                                variant="outline"
+                                                className="ml-auto text-xs"
+                                              >
+                                                Past
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </SelectItem>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                          return (
-                            <SelectItem
-                              key={slot.value}
-                              value={slot.value}
-                              disabled={isDisabled}
-                              className={`
-                                ${isDisabled ? 'opacity-50' : ''}
-                                ${isPastTime ? 'text-muted-foreground' : ''}
-                              `}
-                            >
-                              {slot.label}
-                              {isPastTime && ' (Past)'}
-                              {isLastHour && ' (Last hour)'}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        End Time
+                        <span className="text-xs text-muted-foreground">
+                          (Automatically set to 1 hour later)
+                        </span>
+                      </Label>
+                      <Select
+                        value={newAvailability.endTime}
+                        disabled={!newAvailability.startTime}
+                      >
+                        <SelectTrigger
+                          className="w-full h-10 dark:bg-input border border-input rounded-md 
+        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+        data-[state=open]:border-input dark:border-foreground/30"
+                        >
+                          <SelectValue placeholder="End time (1 hour slot)" />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-input">
+                          {newAvailability.startTime && (
+                            <SelectItem value={newAvailability.endTime}>
+                              <div className="flex items-center gap-3">
+                                {(() => {
+                                  const [hour] = newAvailability.endTime
+                                    .split(':')
+                                    .map(Number);
+                                  const period = Object.values(
+                                    TIME_PERIODS
+                                  ).find(p => hour >= p.start && hour <= p.end);
+                                  const displayHour = hour % 12 || 12;
+                                  const ampm = hour >= 12 ? 'PM' : 'AM';
+
+                                  return (
+                                    <>
+                                      <span className="text-base">
+                                        {period?.icon}
+                                      </span>
+                                      <Clock className="h-4 w-4 text-muted-foreground" />
+                                      <span>{`${displayHour}:00 ${ampm}`}</span>
+                                    </>
+                                  );
+                                })()}
+                              </div>
                             </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">End Time</Label>
-                    <Select
-                      value={newAvailability.endTime}
-                      disabled={!newAvailability.startTime}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Auto-set to 1 hour later" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {newAvailability.startTime && (
-                          <SelectItem value={newAvailability.endTime}>
-                            {(() => {
-                              const [hour] = newAvailability.endTime
-                                .split(':')
-                                .map(Number);
-                              const displayHour = hour % 12 || 12;
-                              const period = hour >= 12 ? 'PM' : 'AM';
-                              return `${displayHour}:00 ${period}`;
-                            })()}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
 
-                <Alert
-                  variant="default"
-                  className="bg-primary/5 border-primary/20"
-                >
-                  <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    <AlertDescription>
-                      Slots must be exactly 1 hour long and cannot be scheduled
-                      in the past.
-                    </AlertDescription>
+                {/* Time Periods Legend */}
+                <div className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span>Time Periods Guide</span>
                   </div>
-                </Alert>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {Object.values(TIME_PERIODS).map(period => (
+                      <div
+                        key={period.label}
+                        className="flex items-center gap-3 p-2 rounded-md bg-muted/30 dark:bg-input border"
+                      >
+                        <span className="text-lg">{period.icon}</span>
+                        <div className="space-y-0.5">
+                          <div className="text-sm font-medium">
+                            {period.label}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {`${period.start % 12 || 12}${
+                              period.start >= 12 ? 'PM' : 'AM'
+                            } - ${period.end % 12 || 12}${
+                              period.end >= 12 ? 'PM' : 'AM'
+                            }`}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                <DialogFooter className="gap-2 sm:gap-0">
+                {/* Important Rules */}
+                <div className="rounded-xl border p-6 space-y-4">
+                  <div className="flex items-center gap-3 border-b pb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold tracking-tight">
+                        Important Scheduling Rules
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Please review these guidelines for consultation
+                        scheduling
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Duration Rule */}
+                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-primary/5 border border-primary/10 hover:shadow-sm transition-all">
+                      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary " />
+                      <div className="flex items-start gap-3">
+                        <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">Fixed Duration</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            All consultation slots are standardized to 1-hour
+                            sessions
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Past Slots Rule */}
+                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-orange-500/5 border border-orange-500/10 hover:shadow-sm transition-all">
+                      <div className="absolute left-0 top-0 h-full w-1.5 bg-orange-500 " />
+                      <div className="flex items-start gap-3">
+                        <Clock className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">Past Time Slots</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Past time slots for today are automatically disabled
+                            for scheduling
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schedule Range Rule */}
+                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-blue-500/5 border border-blue-500/10 hover:shadow-sm transition-all">
+                      <div className="absolute left-0 top-0 h-full w-1.5 bg-blue-500 " />
+                      <div className="flex items-start gap-3">
+                        <CalendarDays className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">Scheduling Window</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Schedule slots for the next 7 days, including
+                            weekends
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timezone Rule */}
+                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-green-500/5 border border-green-500/10 hover:shadow-sm transition-all">
+                      <div className="absolute left-0 top-0 h-full w-1.5 bg-green-500 " />
+                      <div className="flex items-start gap-3">
+                        <Globe2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">Time Zone</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            All times are shown in your local timezone for
+                            convenience
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Info className="h-4 w-4" />
+                      <span className="text-xs">
+                        These rules ensure consistent and reliable scheduling
+                        for both you and your patients.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <DialogFooter className="gap-3 sm:gap-0">
                   <Button
                     type="button"
                     variant="outline"
@@ -758,17 +1061,17 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                       !newAvailability.endTime ||
                       newAvailability.daysOfWeek.length === 0
                     }
-                    className="gap-2 flex-1 sm:flex-none"
+                    className="gap-2 flex-1 sm:flex-none bg-primary hover:bg-primary/90"
                   >
                     {isLoading ? (
                       <>
                         <Clock className="h-4 w-4 animate-spin" />
-                        Saving...
+                        Saving Changes...
                       </>
                     ) : (
                       <>
-                        <Clock3 className="h-4 w-4" />
-                        Save Hours
+                        <CalendarClock className="h-4 w-4" />
+                        Save Availability
                       </>
                     )}
                   </Button>

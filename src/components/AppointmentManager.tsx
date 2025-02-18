@@ -67,7 +67,7 @@ const EmptyState = ({ type }: { type: 'upcoming' | 'past' }) => (
         {type === 'upcoming' ? (
           <CalendarCheck className="h-6 w-6 text-primary dark:text-white" />
         ) : (
-          <History className="h-6 w-6 text-primary" />
+          <History className="h-6 w-6" />
         )}
       </div>
       <h3 className="font-medium mb-2">No {type} appointments</h3>

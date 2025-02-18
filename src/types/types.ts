@@ -87,3 +87,5 @@ export interface AvailabilitySlot {
 export interface AvailabilitySettingsProps {
   onRefresh?: () => Promise<void>;
 }
+
+

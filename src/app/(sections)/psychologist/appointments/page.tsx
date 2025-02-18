@@ -5,7 +5,15 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { Calendar, ListTodo, CalendarIcon } from 'lucide-react';
+import {
+  Calendar,
+  ListTodo,
+  CalendarIcon,
+  Sun,
+  Cloud,
+  Sunset,
+  Moon,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -16,6 +24,24 @@ import { Badge } from '@/components/ui/badge';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import AppointmentDialog from '@/components/AppointmentDialog';
 import CalendarStyles from '@/components/CalenderStyles';
+import { getAppointmentCountByPeriod } from '@/utils/getAppointmentCountByPeriod';
+
+const TIME_PERIODS = {
+  MORNING: { start: '00:00:00', end: '11:59:59', icon: Sun, label: 'Morning' },
+  AFTERNOON: {
+    start: '12:00:00',
+    end: '16:59:59',
+    icon: Cloud,
+    label: 'Afternoon',
+  },
+  EVENING: {
+    start: '17:00:00',
+    end: '20:59:59',
+    icon: Sunset,
+    label: 'Evening',
+  },
+  NIGHT: { start: '21:00:00', end: '23:59:59', icon: Moon, label: 'Night' },
+};
 
 const PsychologistAppointments = () => {
   interface Appointment {
@@ -28,7 +54,6 @@ const PsychologistAppointments = () => {
     duration: number;
   }
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   interface CalendarEvent {
     id: string;
     title: string;
@@ -42,12 +67,14 @@ const PsychologistAppointments = () => {
     };
   }
 
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [view, setView] = useState('calendar');
+  const [selectedPeriod, setSelectedPeriod] = useState('MORNING');
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,13 +88,10 @@ const PsychologistAppointments = () => {
         const appointmentsData = appointmentsRes.Result.appointments || [];
         setAppointments(appointmentsData);
 
-        // Process events by combining availability and appointments
         const processedEvents: CalendarEvent[] = [];
 
-        // Add availability events first
         if (Array.isArray(availabilityRes.Result.events)) {
           availabilityRes.Result.events.forEach(event => {
-            // Check if there's a matching appointment
             const matchingAppointment = appointmentsData.find(
               apt =>
                 new Date(apt.dateTime).toISOString() ===
@@ -75,7 +99,6 @@ const PsychologistAppointments = () => {
             );
 
             if (matchingAppointment) {
-              // This slot is booked - use appointment data
               processedEvents.push({
                 id: matchingAppointment._id,
                 title: matchingAppointment.patientName,
@@ -89,7 +112,6 @@ const PsychologistAppointments = () => {
                 },
               });
             } else {
-              // This slot is available
               processedEvents.push({
                 ...event,
                 backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -200,7 +222,12 @@ const PsychologistAppointments = () => {
                   <ListTodo className="h-4 w-4" />
                   <span>Upcoming Appointments</span>
                   {appointments.length > 0 && (
-                    <Badge variant="default">{appointments.length}</Badge>
+                    <Badge
+                      variant="default"
+                      className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
+                    >
+                      {appointments.length}
+                    </Badge>
                   )}
                 </TabsTrigger>
               </TabsList>
@@ -209,7 +236,6 @@ const PsychologistAppointments = () => {
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   Available
                 </Badge>
-
                 <Badge variant="outline" className="gap-1">
                   <div className="w-2 h-2 rounded-full bg-yellow-500" />
                   Booked
@@ -218,6 +244,47 @@ const PsychologistAppointments = () => {
             </div>
 
             <TabsContent value="calendar" className="mt-4">
+              <div className="mb-4">
+                <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <div className="mx-auto max-w-3xl">
+                    <TabsList className="w-full grid grid-cols-4 bg-card/50 dark:bg-card/50 p-1 rounded-lg">
+                      {Object.entries(TIME_PERIODS).map(
+                        ([key, { label, icon: Icon }]) => {
+                          const appointmentCount = getAppointmentCountByPeriod(
+                            calendarEvents,
+                            key
+                          );
+                          return (
+                            <TabsTrigger
+                              key={key}
+                              value={key}
+                              className={cn(
+                                'flex items-center justify-center gap-2 py-2 relative',
+                                'data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input',
+                                'rounded-md transition-all duration-200'
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4" />
+                                <span>{label}</span>
+                              </div>
+                              {appointmentCount > 0 && (
+                                <Badge
+                                  variant="default"
+                                  className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
+                                >
+                                  {appointmentCount}
+                                </Badge>
+                              )}
+                            </TabsTrigger>
+                          );
+                        }
+                      )}
+                    </TabsList>
+                  </div>
+                </Tabs>
+              </div>
+
               <div className="h-[700px]">
                 <FullCalendar
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -228,8 +295,8 @@ const PsychologistAppointments = () => {
                     right: 'timeGridWeek,timeGridDay',
                   }}
                   slotDuration="01:00:00"
-                  slotMinTime="06:00:00"
-                  slotMaxTime="21:00:00"
+                  slotMinTime={TIME_PERIODS[selectedPeriod].start}
+                  slotMaxTime={TIME_PERIODS[selectedPeriod].end}
                   events={calendarEvents}
                   eventClick={handleEventClick}
                   allDaySlot={false}

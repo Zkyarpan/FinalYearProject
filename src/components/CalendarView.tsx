@@ -1,13 +1,36 @@
+'use client';
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CalendarIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarIcon, Sun, Cloud, Sunset, Moon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Badge } from './ui/badge';
+import { getAppointmentCountByPeriod } from '@/utils/getAppointmentCountByPeriod';
+import { CalendarEvent } from '@/types/calendar';
+
+const TIME_PERIODS = {
+  MORNING: { start: '00:00:00', end: '11:59:59', icon: Sun, label: 'Morning' },
+  AFTERNOON: {
+    start: '12:00:00',
+    end: '16:59:59',
+    icon: Cloud,
+    label: 'Afternoon',
+  },
+  EVENING: {
+    start: '17:00:00',
+    end: '20:59:59',
+    icon: Sunset,
+    label: 'Evening',
+  },
+  NIGHT: { start: '21:00:00', end: '23:59:59', icon: Moon, label: 'Night' },
+};
 
 interface CalendarViewProps {
   appointments: Event[];
@@ -24,6 +47,9 @@ export function CalendarView({
 }: CalendarViewProps) {
   const [currentEvents, setCurrentEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedPeriod, setSelectedPeriod] = useState('MORNING');
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState('timeGridWeek');
@@ -45,45 +71,20 @@ export function CalendarView({
     []
   );
 
+  // Update the mergeAndProcessEvents function
   const mergeAndProcessEvents = useCallback(
     (availabilityEvents, appointmentEvents) => {
-      // Create a map of appointments by time slot
-      const appointmentMap = new Map();
-      appointmentEvents.forEach(apt => {
-        const key = `${new Date(apt.start).toISOString()}-${new Date(
-          apt.end
-        ).toISOString()}`;
-        appointmentMap.set(key, apt);
-      });
-
-      // Process availability events, marking them as booked if there's a matching appointment
+      // Process availability events, using the isBooked status from the API
       const processedEvents = availabilityEvents.map(event => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-        const timeKey = `${eventStart.toISOString()}-${eventEnd.toISOString()}`;
-        const hasAppointment = appointmentMap.has(timeKey);
+        // Check if the slot is booked directly from the API response
+        const isBooked = event.extendedProps?.isBooked || false;
 
-        // If there's an appointment for this slot, use appointment data
-        if (hasAppointment) {
-          const appointment = appointmentMap.get(timeKey);
-          return {
-            ...event,
-            title: appointment.title,
-            ...eventColors.booked,
-            extendedProps: {
-              ...event.extendedProps,
-              isBooked: true,
-            },
-          };
-        }
-
-        // Otherwise, keep it as an available slot
         return {
           ...event,
-          ...eventColors.available,
+          ...(isBooked ? eventColors.booked : eventColors.available),
           extendedProps: {
             ...event.extendedProps,
-            isBooked: false,
+            isBooked,
           },
         };
       });
@@ -93,6 +94,7 @@ export function CalendarView({
     [eventColors]
   );
 
+  // Update the fetchSlots function to handle the API response properly
   const fetchSlots = useCallback(
     async date => {
       setIsLoading(true);
@@ -171,11 +173,58 @@ export function CalendarView({
       </div>
     );
   }, []);
+
   return (
     <div className={cn('space-y-4', className)}>
+      <Tabs
+        defaultValue={selectedPeriod}
+        onValueChange={setSelectedPeriod}
+        className="w-full"
+      >
+        <div className="mb-4">
+          <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <div className="mx-auto max-w-3xl">
+              <TabsList className="w-full grid grid-cols-4 bg-card/50 dark:bg-card/50 p-1 rounded-lg">
+                {Object.entries(TIME_PERIODS).map(
+                  ([key, { label, icon: Icon }]) => {
+                    const appointmentCount = getAppointmentCountByPeriod(
+                      calendarEvents,
+                      key
+                    );
+                    return (
+                      <TabsTrigger
+                        key={key}
+                        value={key}
+                        className={cn(
+                          'flex items-center justify-center gap-2 py-2 relative',
+                          'data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input',
+                          'rounded-md transition-all duration-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          <span>{label}</span>
+                        </div>
+                        {appointmentCount > 0 && (
+                          <Badge
+                            variant="default"
+                            className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
+                          >
+                            {appointmentCount}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    );
+                  }
+                )}
+              </TabsList>
+            </div>
+          </Tabs>
+        </div>
+      </Tabs>
+
       <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
           <span className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-600" />
             Available
@@ -184,7 +233,7 @@ export function CalendarView({
             <div className="w-3 h-3 rounded-full bg-red-500" />
             Booked
           </span>
-        </AlertDescription>
+        </div>
       </Alert>
 
       <Card>
@@ -198,8 +247,8 @@ export function CalendarView({
               right: '',
             }}
             slotDuration="01:00:00"
-            slotMinTime="06:00:00"
-            slotMaxTime="21:00:00"
+            slotMinTime={TIME_PERIODS[selectedPeriod].start}
+            slotMaxTime={TIME_PERIODS[selectedPeriod].end}
             eventClick={handleEventClick}
             events={currentEvents}
             allDaySlot={false}
@@ -234,4 +283,3 @@ export function CalendarView({
     </div>
   );
 }
-

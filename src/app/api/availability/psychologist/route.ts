@@ -15,13 +15,14 @@ export async function GET(req: NextRequest) {
         const availability = await Availability.find({
           psychologistId: token.id,
           isActive: true,
-        }).select('daysOfWeek startTime endTime');
+        }).select('daysOfWeek startTime endTime timePeriods');
 
         const availabilityEvents = availability.map(slot => ({
           id: slot._id,
           daysOfWeek: slot.daysOfWeek,
           startTime: slot.startTime,
           endTime: slot.endTime,
+          timePeriods: slot.timePeriods,
         }));
 
         return NextResponse.json(
@@ -52,7 +53,6 @@ export async function DELETE(req: NextRequest) {
       try {
         await connectDB();
 
-        // Get availability ID from the URL
         const url = new URL(req.url);
         const availabilityId = url.searchParams.get('id');
 

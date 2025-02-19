@@ -77,7 +77,8 @@ export interface CreateAvailabilityData {
   daysOfWeek: number[];
   startTime: string;
   endTime: string;
-  duration: number;
+  duration?: number;
+  timePeriods?: string[];
 }
 
 export interface AuthToken {

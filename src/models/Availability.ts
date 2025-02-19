@@ -35,17 +35,19 @@ export interface ITimeSlot {
   userId?: mongoose.Types.ObjectId;
   appointmentId?: mongoose.Types.ObjectId;
   lastUpdated: Date;
-  sessionStartedAt?: Date; // Track when session actually started
-  sessionEndedAt?: Date; // Track when session actually ended
-  notes?: string; // Optional notes about the session
+  sessionStartedAt?: Date;
+  sessionEndedAt?: Date;
+  notes?: string;
+  timePeriods?: string[];
 }
 
 export interface IAvailability {
   psychologistId: mongoose.Types.ObjectId;
   daysOfWeek: number[];
-  startTime: string; // Format: "HH:MM"
-  endTime: string; // Format: "HH:MM"
-  duration: number; // Duration in minutes
+  startTime: string;
+  endTime: string;
+  timePeriods?: string[];
+  duration: number;
   slots: ITimeSlot[];
   historicalSlots: ITimeSlot[];
   isActive: boolean;
@@ -53,7 +55,7 @@ export interface IAvailability {
   lastCleanup: Date;
   createdAt: Date;
   updatedAt: Date;
-  maxSessionOvertime?: number; // Maximum minutes a session can run over (optional)
+  maxSessionOvertime?: number;
 }
 
 interface IAvailabilityDocument extends IAvailability, Document {
@@ -102,6 +104,11 @@ const TimeSlotSchema = new Schema<ITimeSlot>(
           `${props.value} is not a valid session duration. Valid values are: 30, 45, 60, 90, 120 minutes`,
       },
       default: 60,
+    },
+    timePeriods: {
+      type: [String],
+      enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
+      default: [],
     },
     isBooked: {
       type: Boolean,
@@ -190,6 +197,11 @@ const AvailabilitySchema = new Schema<
           `${props.value} is not a valid session duration. Valid values are: 30, 45, 60, 90, 120 minutes`,
       },
       default: 60,
+    },
+    timePeriods: {
+      type: [String],
+      enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
+      default: [],
     },
     slots: {
       type: [TimeSlotSchema],

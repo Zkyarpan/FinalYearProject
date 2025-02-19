@@ -2,21 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import {
-  Video,
-  MessageCircle,
-  Link as LinkIcon,
-  Users,
-  Clock,
-  GraduationCap,
-  Phone,
-  Loader2,
-  ArrowLeft,
-  Mail,
-} from 'lucide-react';
+import { MessageCircle, Link as LinkIcon, Clock, Phone } from 'lucide-react';
 import Location from '@/icons/Location';
+import Videos from '@/icons/Video';
+import Dollar from '@/icons/Dollar';
+import Graduate from '@/icons/Graudate';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
+import Messages from '@/icons/Messages';
+import ExperienceEducationSection from '@/components/ExperienceEducationSection';
 
 interface PsychologistProfile {
   id: string;
@@ -106,9 +99,7 @@ const PsychologistProfileView = () => {
 
   return (
     <div className="flex flex-col gap-4 py-10 px-4 sm:px-6">
-      {/* Profile Header Section */}
       <div className="flex flex-col gap-4 sm:items-center justify-center">
-        {/* Mobile Header */}
         <div className="sm:hidden flex justify-between">
           <div className="relative">
             <div className="w-16 h-16 relative">
@@ -143,7 +134,6 @@ const PsychologistProfileView = () => {
           </div>
         </div>
 
-        {/* Desktop Avatar */}
         <div className="hidden sm:block relative">
           <div className="w-20 h-20 relative">
             <div className="w-20 h-20 rounded-full overflow-hidden">
@@ -156,7 +146,6 @@ const PsychologistProfileView = () => {
           </div>
         </div>
 
-        {/* Name and Title */}
         <div className="flex flex-col gap-2 sm:items-center justify-center">
           <h1 className="font-semibold text-lg">
             Dr. {psychologist.firstName} {psychologist.lastName}
@@ -166,7 +155,6 @@ const PsychologistProfileView = () => {
           </h2>
         </div>
 
-        {/* Location and Experience */}
         <div className="flex flex-wrap sm:justify-center sm:gap-4 gap-2">
           <div className="flex gap-2 items-center">
             <Location />
@@ -175,14 +163,13 @@ const PsychologistProfileView = () => {
             </p>
           </div>
           <div className="flex gap-2 items-center">
-            <GraduationCap className="w-4 h-4" />
+            <Graduate />
             <p className="text-gray-600 dark:text-gray-400 text-xs">
               {psychologist.yearsOfExperience} years exp.
             </p>
           </div>
         </div>
 
-        {/* Specializations */}
         <div className="w-full flex sm:flex-wrap sm:overflow-x-hidden overflow-x-auto items-center gap-2 hide-scrollbar sm:justify-center">
           {psychologist.specializations.map((spec, index) => (
             <div key={index} className="flex-shrink-0">
@@ -194,45 +181,40 @@ const PsychologistProfileView = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="px-4 sm:px-6">
         <div className="flex items-center justify-center border-b dark:border-[#333333]">
           <ul className="flex items-center text-sm gap-6 overflow-x-auto">
-            {['overview', 'experience', 'education', 'availability'].map(
-              tab => (
-                <li key={tab} className="flex items-center">
-                  <button
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex whitespace-nowrap text-center items-center py-2.5 text-xs font-medium border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? 'font-semibold text-blue-500 border-blue-500'
-                        : 'text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-900 dark:hover:text-gray-100'
-                    }`}
-                  >
-                    {tab.toUpperCase()}
-                  </button>
-                </li>
-              )
-            )}
+            {['overview', 'experience', 'availability'].map(tab => (
+              <li key={tab} className="flex items-center">
+                <button
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex whitespace-nowrap text-center items-center py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === tab
+                      ? 'font-semibold text-blue-500 border-blue-500'
+                      : 'text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
 
-      {/* Content Sections */}
       <div className="mt-6 px-4 sm:px-6">
         {activeTab === 'overview' && (
           <section className="space-y-6">
             <div className="prose dark:prose-invert max-w-none">
-              <p className="dark:text-muted-foreground text-sm whitespace-pre-line text-justify">
+              <p className="dark:text-muted-foreground text-sm text-justify">
                 {psychologist.about}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-              {/* Session Info */}
-              <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="p-4 border dark:border-[#333333]  rounded-lg">
                 <div className="flex items-center gap-2 mb-4">
-                  <Video className="w-4 h-4" />
+                  <Videos />
                   <span className="text-sm font-medium">Session Info</span>
                 </div>
                 <div className="space-y-3">
@@ -246,7 +228,10 @@ const PsychologistProfileView = () => {
                     <span className="text-gray-600 dark:text-gray-400">
                       Fee
                     </span>
-                    <span>${psychologist.sessionFee}/session</span>
+                    <span className="flex">
+                      <Dollar />
+                      {psychologist.sessionFee}USD
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
@@ -256,7 +241,7 @@ const PsychologistProfileView = () => {
                       {psychologist.sessionFormats.map((format, index) => (
                         <span key={index} className="flex items-center gap-1">
                           {format === 'video' ? (
-                            <Video className="w-3 h-3" />
+                            <Videos />
                           ) : (
                             <Phone className="w-3 h-3" />
                           )}
@@ -268,10 +253,9 @@ const PsychologistProfileView = () => {
                 </div>
               </div>
 
-              {/* Languages */}
-              <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="p-4 border dark:border-[#333333]  rounded-lg">
                 <div className="flex items-center gap-2 mb-4">
-                  <MessageCircle className="w-4 h-4" />
+                  <Messages />
                   <span className="text-sm font-medium">Languages</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -289,51 +273,54 @@ const PsychologistProfileView = () => {
           </section>
         )}
 
-        {activeTab === 'education' && (
+        {activeTab === 'experience' && (
           <section className="space-y-4">
-            {psychologist.education.map((edu, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-              >
-                <GraduationCap className="w-5 h-5 mt-1 text-blue-500" />
-                <div>
-                  <h4 className="font-medium">{edu.degree}</h4>
-                  <p className="text-sm text-gray-500">
-                    {edu.university}, {edu.graduationYear}
-                  </p>
-                </div>
-              </div>
-            ))}
+            <ExperienceEducationSection psychologist={psychologist} />
           </section>
         )}
 
         {activeTab === 'availability' && (
           <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {Object.entries(psychologist.availability).map(
-              ([day, schedule]) => (
-                <div
-                  key={day}
-                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-                >
-                  <h4 className="font-medium capitalize mb-3">{day}</h4>
-                  {schedule.available ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                        <Clock className="w-4 h-4 mr-2" />
-                        {schedule.startTime} - {schedule.endTime}
+              ([day, schedule]) => {
+                // Convert 24-hour format to 12-hour format with AM/PM
+                const formatTime = time24 => {
+                  if (!time24) return '';
+                  const [hours, minutes] = time24.split(':').map(Number);
+                  const period = hours >= 12 ? 'PM' : 'AM';
+                  const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+                  return `${hours12}:${minutes
+                    .toString()
+                    .padStart(2, '0')} ${period}`;
+                };
+
+                const startTime = formatTime(schedule.startTime);
+                const endTime = formatTime(schedule.endTime);
+
+                return (
+                  <div
+                    key={day}
+                    className="p-4 border dark:border-[#333333] rounded-lg"
+                  >
+                    <h4 className="font-medium capitalize mb-3">{day}</h4>
+                    {schedule.available ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                          <Clock className="w-4 h-4 mr-2" />
+                          {startTime} - {endTime}
+                        </div>
+                        <span className="inline-block px-2 py-1 text-xs text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 rounded-full">
+                          Available
+                        </span>
                       </div>
-                      <span className="inline-block px-2 py-1 text-xs text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 rounded-full">
-                        Available
+                    ) : (
+                      <span className="inline-block px-2 py-1 text-xs text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 rounded-full">
+                        Not Available
                       </span>
-                    </div>
-                  ) : (
-                    <span className="inline-block px-2 py-1 text-xs text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 rounded-full">
-                      Not Available
-                    </span>
-                  )}
-                </div>
-              )
+                    )}
+                  </div>
+                );
+              }
             )}
           </section>
         )}

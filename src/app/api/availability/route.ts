@@ -16,6 +16,7 @@ import {
   CreateAvailabilityData,
 } from '@/types/avaibality';
 import { getEventStyle } from '@/helpers/getEventStyle';
+import { determineTimePeriods } from '@/helpers/determineTimePeriods';
 
 export async function GET(req: NextRequest) {
   try {
@@ -234,21 +235,15 @@ export async function POST(req: NextRequest) {
         await connectDB();
         const data: CreateAvailabilityData = await req.json();
 
-        console.log('Creating availability with data:', data);
-
         const {
           daysOfWeek,
           startTime,
           endTime,
           duration: durationInput = SessionDuration.ONE_HOUR,
         } = data;
-        console.log('Duration input:', durationInput);
-        console.log('Parsed duration:', Number(durationInput));
-        console.log('Parsed duration type:', typeof Number(durationInput));
 
         const duration = Number(durationInput);
 
-        // Add validation to ensure it's a valid number
         if (isNaN(duration)) {
           return NextResponse.json(
             createErrorResponse(400, 'Duration must be a valid number'),
@@ -256,7 +251,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Validation
         if (!daysOfWeek?.length || !startTime || !endTime) {
           return NextResponse.json(
             createErrorResponse(400, 'Missing required fields'),
@@ -264,7 +258,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Validate duration is one of the allowed values
         const allowedDurations = Object.values(SessionDuration).filter(
           value => typeof value === 'number'
         );
@@ -281,23 +274,25 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Parse time strings to validate duration fits within time range
+        // Convert startTime and endTime to Date objects
+        const startDate = new Date();
         const [startHour, startMinute] = startTime.split(':').map(Number);
+        startDate.setHours(startHour, startMinute, 0, 0);
+
+        const endDate = new Date();
         const [endHour, endMinute] = endTime.split(':').map(Number);
+        endDate.setHours(endHour, endMinute, 0, 0);
 
-        // Convert to minutes for comparison
-        const startTotalMinutes = startHour * 60 + startMinute;
-        const endTotalMinutes = endHour * 60 + endMinute;
-        const timeSlotDuration = endTotalMinutes - startTotalMinutes;
-
-        if (endTotalMinutes <= startTotalMinutes) {
+        if (endDate <= startDate) {
           return NextResponse.json(
             createErrorResponse(400, 'End time must be after start time'),
             { status: 400 }
           );
         }
 
-        if (timeSlotDuration < duration) {
+        const timeSlotDuration = endDate.getTime() - startDate.getTime();
+
+        if (timeSlotDuration < duration * 60 * 1000) {
           return NextResponse.json(
             createErrorResponse(
               400,
@@ -308,7 +303,7 @@ export async function POST(req: NextRequest) {
         }
 
         const psychologist = await Psychologist.findById(token.id).select(
-          'firstName lastName specialty profileImage'
+          'firstName lastName specialty profileImage sessionFee'
         );
 
         if (!psychologist) {
@@ -318,24 +313,111 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        const TIME_PERIODS = {
+          MORNING: { start: 0, end: 11 },
+          AFTERNOON: { start: 12, end: 16 },
+          EVENING: { start: 17, end: 20 },
+          NIGHT: { start: 21, end: 23 },
+        };
+
+        const periods = new Set<string>();
+        for (
+          let hour = startDate.getHours();
+          hour <= endDate.getHours();
+          hour++
+        ) {
+          if (
+            hour >= TIME_PERIODS.MORNING.start &&
+            hour <= TIME_PERIODS.MORNING.end
+          ) {
+            periods.add('MORNING');
+          } else if (
+            hour >= TIME_PERIODS.AFTERNOON.start &&
+            hour <= TIME_PERIODS.AFTERNOON.end
+          ) {
+            periods.add('AFTERNOON');
+          } else if (
+            hour >= TIME_PERIODS.EVENING.start &&
+            hour <= TIME_PERIODS.EVENING.end
+          ) {
+            periods.add('EVENING');
+          } else if (
+            hour >= TIME_PERIODS.NIGHT.start &&
+            hour <= TIME_PERIODS.NIGHT.end
+          ) {
+            periods.add('NIGHT');
+          }
+        }
+        const determinedTimePeriods = Array.from(periods);
+
         const availability = new Availability({
           psychologistId: token.id,
           daysOfWeek,
-          startTime,
-          endTime,
+          startTime: startDate,
+          endTime: endDate,
           duration,
+          timePeriods: determinedTimePeriods,
           psychologistDetails: {
             name: `${psychologist.firstName} ${psychologist.lastName}`,
-            specialty: psychologist.specialty,
-            profileImage: psychologist.profileImage,
+            specialty: psychologist.specialty || '',
+            profilePhotoUrl: psychologist.profileImage || '',
+            sessionFee: psychologist.sessionFee || 0,
           },
+          isActive: true,
         });
 
+        // Check for overlapping slots
+        const overlappingSlots = await Availability.findOne({
+          psychologistId: token.id,
+          'slots.startTime': { $lt: availability.endTime },
+          'slots.endTime': { $gt: availability.startTime },
+        });
+
+        if (overlappingSlots) {
+          return NextResponse.json(
+            createErrorResponse(400, 'Overlapping slots already exist'),
+            { status: 400 }
+          );
+        }
+
         const savedAvailability = await availability.save();
-        console.log(
-          'Created availability with slots:',
-          savedAvailability.slots.length
-        );
+
+        if (savedAvailability.slots && savedAvailability.slots.length > 0) {
+          for (const slot of savedAvailability.slots) {
+            const slotPeriods = new Set<string>();
+            for (
+              let hour = slot.startTime.getHours();
+              hour <= slot.endTime.getHours();
+              hour++
+            ) {
+              if (
+                hour >= TIME_PERIODS.MORNING.start &&
+                hour <= TIME_PERIODS.MORNING.end
+              ) {
+                slotPeriods.add('MORNING');
+              } else if (
+                hour >= TIME_PERIODS.AFTERNOON.start &&
+                hour <= TIME_PERIODS.AFTERNOON.end
+              ) {
+                slotPeriods.add('AFTERNOON');
+              } else if (
+                hour >= TIME_PERIODS.EVENING.start &&
+                hour <= TIME_PERIODS.EVENING.end
+              ) {
+                slotPeriods.add('EVENING');
+              } else if (
+                hour >= TIME_PERIODS.NIGHT.start &&
+                hour <= TIME_PERIODS.NIGHT.end
+              ) {
+                slotPeriods.add('NIGHT');
+              }
+            }
+
+            slot.timePeriods = Array.from(slotPeriods);
+          }
+
+          await savedAvailability.save();
+        }
 
         const verifiedAvailability = await Availability.findById(
           savedAvailability._id
@@ -345,19 +427,13 @@ export async function POST(req: NextRequest) {
           throw new Error('Failed to verify created availability');
         }
 
-        console.log('Verified slots count:', verifiedAvailability.slots.length);
-        console.log(
-          'Session duration:',
-          verifiedAvailability.duration,
-          'minutes'
-        );
-
         return NextResponse.json(
           createSuccessResponse(201, {
             message: 'Availability created successfully',
             availability: verifiedAvailability,
             slotsCreated: verifiedAvailability.slots.length,
             sessionDuration: verifiedAvailability.duration,
+            timePeriods: verifiedAvailability.timePeriods,
           }),
           { status: 201 }
         );

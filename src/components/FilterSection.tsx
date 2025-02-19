@@ -128,7 +128,7 @@ const FilterSection = ({ onFilter }) => {
   };
 
   return (
-    <div className="w-[300px] bg-gray-00 duration-200 h-full border-primaryBorder px-6 pt-6 -mt-10 translate-x-full lg:block lg:w-full lg:translate-x-0 right-0 lg:right-auto">
+    <div className="">
       <div>
         <p className="text-gray-1k font-semibold text-sm">Filter by</p>
 

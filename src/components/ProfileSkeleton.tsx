@@ -28,27 +28,6 @@ export const ProfileSkeleton = () => {
           <Skeleton className="h-8 w-24 rounded-full" />
         </div>
 
-        <div className="border-b border-gray-800 mt-8">
-          <div className="max-w-2xl mx-auto">
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="overview" disabled>
-                  OVERVIEW
-                </TabsTrigger>
-                <TabsTrigger value="experience" disabled>
-                  EXPERIENCE
-                </TabsTrigger>
-                <TabsTrigger value="education" disabled>
-                  EDUCATION
-                </TabsTrigger>
-                <TabsTrigger value="availability" disabled>
-                  AVAILABILITY
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
-
         <div className="space-y-4 mt-8">
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-full" />

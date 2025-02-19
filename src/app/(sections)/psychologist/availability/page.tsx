@@ -100,7 +100,7 @@ interface ApiResponse<T> {
   Result: {
     availability: T;
   };
-  ErrorMessage?: string;
+  ErrorMessage?: { message: string }[];
 }
 
 interface AvailabilitySettingsProps {
@@ -253,10 +253,14 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       const data: ApiResponse<AvailabilitySlot[]> = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.ErrorMessage || 'Failed to fetch availability');
+        if (data.ErrorMessage && data.ErrorMessage.length > 0) {
+          throw new Error(data.ErrorMessage[0].message);
+        } else {
+          throw new Error('Failed to fetch availability');
+        }
       }
 
-      if (data.IsSuccess) {
+      if (data.IsSuccess && data.Result) {
         setAvailabilitySlots(data.Result.availability);
       }
     } catch (error) {
@@ -387,7 +391,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       const data: ApiResponse<unknown> = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.ErrorMessage || 'Failed to set availability');
+        if (data.ErrorMessage && data.ErrorMessage.length > 0) {
+          throw new Error(data.ErrorMessage[0].message);
+        } else {
+          throw new Error('Failed to set availability');
+        }
       }
 
       if (data.IsSuccess) {
@@ -462,7 +470,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       const data: ApiResponse<unknown> = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.ErrorMessage || 'Failed to delete availability');
+        if (data.ErrorMessage && data.ErrorMessage.length > 0) {
+          throw new Error(data.ErrorMessage[0].message);
+        } else {
+          throw new Error('Failed to delete availability');
+        }
       }
 
       if (data.IsSuccess) {

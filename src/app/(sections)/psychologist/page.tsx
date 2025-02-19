@@ -104,7 +104,6 @@ const PsychologistDirectory = () => {
   return (
     <div className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Psychologists List */}
         <div className="space-y-4">
           {filteredPsychologists.map(psych => (
             <Card
@@ -116,7 +115,6 @@ const PsychologistDirectory = () => {
                   href={`/psychologist/${psych.firstName}-${psych.lastName}`}
                 >
                   <div className="flex items-start p-6 gap-4">
-                    {/* Avatar Section */}
                     <div className="flex-shrink-0">
                       <div className="relative">
                         <Avatar className="w-16 h-16">
@@ -136,7 +134,6 @@ const PsychologistDirectory = () => {
                       </div>
                     </div>
 
-                    {/* Main Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div>
@@ -164,7 +161,6 @@ const PsychologistDirectory = () => {
                         </div>
                       </div>
 
-                      {/* Location & Experience */}
                       <div className="mt-2 flex items-center gap-4 dark:text-muted-foreground">
                         <div className="flex items-center text-sm">
                           <Location />
@@ -176,7 +172,6 @@ const PsychologistDirectory = () => {
                         </div>
                       </div>
 
-                      {/* Specializations */}
                       <div className="mt-3 flex flex-wrap gap-2 uppercase dark:text-muted">
                         {psych.specializations.map((spec, index) => (
                           <Badge
@@ -189,7 +184,6 @@ const PsychologistDirectory = () => {
                         ))}
                       </div>
 
-                      {/* Session Info */}
                       <div className="mt-4 flex items-center gap-4 text-sm dark:text-muted-foreground">
                         <div className="flex items-center gap-1">
                           {psych.sessionFormats.includes('video') && <Video />}
@@ -206,7 +200,6 @@ const PsychologistDirectory = () => {
                         </div>
                       </div>
 
-                      {/* Languages */}
                       <div className="flex flex-wrap items-center mt-2 gap-2">
                         <div className="flex items-center text-sm dark:text-muted-foreground gap-1">
                           <Message />

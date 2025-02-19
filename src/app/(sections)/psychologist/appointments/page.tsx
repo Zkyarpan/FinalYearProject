@@ -151,47 +151,71 @@ const PsychologistAppointments = () => {
 
   const renderEventContent = useCallback(eventInfo => {
     const event = eventInfo.event;
-    const startTime = format(event.start, 'h');
-    const endTime = format(event.end, 'h');
+    const startTime = format(event.start, 'h:mm');
+    const endTime = format(event.end, 'h:mm');
     const period = format(event.end, 'a');
     const isBooked = event.extendedProps.type === 'appointment';
+    const isNewOrChanged = event.extendedProps.isNewOrChanged;
+
+    // Calculate duration for display
+    const durationMs = event.end.getTime() - event.start.getTime();
+    const durationMinutes = Math.round(durationMs / (1000 * 60));
+
+    // Format duration nicely
+    let durationText;
+    if (durationMinutes === 30) {
+      durationText = '30 min';
+    } else if (durationMinutes === 45) {
+      durationText = '45 min';
+    } else if (durationMinutes === 60) {
+      durationText = '1 hr';
+    } else if (durationMinutes === 90) {
+      durationText = '1.5 hrs';
+    } else if (durationMinutes === 120) {
+      durationText = '2 hrs';
+    } else {
+      durationText = `${durationMinutes} min`;
+    }
 
     return (
       <div
-        className={cn(
-          'px-2 py-1.5',
-          isBooked
-            ? 'bg-yellow-100 dark:bg-yellow-900/40'
-            : 'bg-emerald-50 dark:bg-emerald-900/40'
-        )}
+        className={`
+              p-3 rounded-lg shadow-sm 
+              ${
+                isBooked
+                  ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
+                  : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
+              } 
+              transition-all hover:shadow-md
+            `}
       >
-        <div className="flex items-center gap-1.5">
-          <div
-            className={cn(
-              'w-1.5 h-1.5 rounded-full shrink-0',
-              isBooked ? 'bg-yellow-500' : 'bg-emerald-500'
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <div
+              className={`
+                    w-3 h-3 rounded-full shrink-0
+                    ${isBooked ? 'bg-red-500' : 'bg-green-500'}
+                  `}
+            />
+            {!isBooked && (
+              <span className="absolute inset-0 rounded-full bg-green-400 opacity-75 animate-ping"></span>
             )}
-          />
+          </div>
           <span
-            className={cn(
-              'text-sm font-semibold',
-              isBooked
-                ? 'text-yellow-900 dark:text-yellow-100'
-                : 'text-emerald-900 dark:text-emerald-100'
-            )}
+            className={`
+                  text-sm font-medium
+                  ${
+                    isBooked
+                      ? 'text-red-700 dark:text-red-300'
+                      : 'text-green-700 dark:text-green-300'
+                  }
+                `}
           >
-            {isBooked ? event.title : 'Available'}
+            {isBooked ? 'Booked' : 'Available'}
           </span>
         </div>
+
         <div className="flex items-center text-sm mt-0.5">
-          <CalendarIcon
-            className={cn(
-              'h-2.5 w-2.5 mr-1',
-              isBooked
-                ? 'text-yellow-800 dark:text-yellow-200'
-                : 'text-emerald-800 dark:text-emerald-200'
-            )}
-          />
           <span
             className={cn(
               isBooked
@@ -294,7 +318,8 @@ const PsychologistAppointments = () => {
                     center: 'title',
                     right: 'timeGridWeek,timeGridDay',
                   }}
-                  slotDuration="01:00:00"
+                  slotDuration="00:15:00"
+                  slotLabelInterval="01:00:00"
                   slotMinTime={TIME_PERIODS[selectedPeriod].start}
                   slotMaxTime={TIME_PERIODS[selectedPeriod].end}
                   events={calendarEvents}
@@ -316,7 +341,12 @@ const PsychologistAppointments = () => {
                     day: 'numeric',
                     omitCommas: true,
                   }}
-                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity rounded-md overflow-hidden border"
+                  eventClassNames={info => [
+                    'cursor-pointer hover:opacity-90 transition-opacity rounded-md overflow-hidden border',
+                    info.event.extendedProps.duration
+                      ? `duration-${info.event.extendedProps.duration}`
+                      : '',
+                  ]}
                   slotLabelClassNames="text-sm font-medium text-gray-600 dark:text-gray-300"
                   dayHeaderClassNames="text-sm font-medium text-gray-700 dark:text-gray-200"
                 />

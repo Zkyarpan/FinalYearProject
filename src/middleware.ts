@@ -34,24 +34,39 @@ const authFlowRoutes = {
 export default async function middleware(req: NextRequest) {
   try {
     const path = req.nextUrl.pathname;
-
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('accessToken')?.value;
     const resetToken = cookieStore.get('resetToken')?.value;
     const tempToken = cookieStore.get('tempToken')?.value;
 
+    // Check if we're on the verification page
+    if (path === '/verify') {
+      // If we have tempToken, allow access
+      if (tempToken) {
+        return NextResponse.next();
+      }
+
+      // If we have sessionCookie but user isn't verified, allow access
+      if (sessionCookie) {
+        const session = await decrypt(sessionCookie);
+        if (session && !session.isVerified) {
+          return NextResponse.next();
+        }
+      }
+
+      // Otherwise redirect to signup
+      return NextResponse.redirect(new URL('/signup', req.nextUrl));
+    }
+
+    // Regular session handling
     const session = sessionCookie ? await decrypt(sessionCookie) : null;
     const resetSession = resetToken ? await decrypt(resetToken) : null;
 
-    // Handle auth flow routes first
+    // Handle password reset flow
     if (path === authFlowRoutes.passwordConfirmation && !resetSession) {
       return NextResponse.redirect(
         new URL(authFlowRoutes.forgotPassword, req.nextUrl)
       );
-    }
-
-    if (path === authFlowRoutes.verification && !tempToken) {
-      return NextResponse.redirect(new URL('/signup', req.nextUrl));
     }
 
     if (path === authFlowRoutes.forgotPassword) {
@@ -61,6 +76,11 @@ export default async function middleware(req: NextRequest) {
     // Handle authenticated users
     if (session?.id) {
       const dashboardPath = getDashboardByRole(session.role || '');
+
+      // If user isn't verified and trying to access protected routes
+      if (!session.isVerified && isProtectedRoute(path)) {
+        return NextResponse.redirect(new URL('/verify', req.nextUrl));
+      }
 
       // Handle auth page access for logged-in users
       if (
@@ -93,14 +113,6 @@ export default async function middleware(req: NextRequest) {
         }
       }
 
-      // Handle protected routes
-      if (isProtectedRoute(path)) {
-        if (!session.isVerified) {
-          return NextResponse.redirect(new URL('/verify', req.nextUrl));
-        }
-        return NextResponse.next();
-      }
-
       // Allow access to public routes
       if (publicRoutes.some(route => path.startsWith(route))) {
         return NextResponse.next();
@@ -121,6 +133,10 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('Middleware error:', error);
+    // Don't redirect to login if we're on the verify page
+    if (req.nextUrl.pathname === '/verify') {
+      return NextResponse.next();
+    }
     const response = NextResponse.redirect(new URL('/login', req.nextUrl));
     response.cookies.delete('accessToken');
     response.cookies.delete('resetToken');

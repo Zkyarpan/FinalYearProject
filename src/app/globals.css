@@ -177,6 +177,34 @@ select:-webkit-autofill:focus {
   --fc-now-indicator-color: hsl(var(--destructive));
 }
 
+
+
+/* Add these styles to your CSS */
+.duration-30 {
+  border-left-width: 4px !important;
+  border-left-color: #10b981 !important;
+}
+
+.duration-45 {
+  border-left-width: 4px !important;
+  border-left-color: #3b82f6 !important;
+}
+
+.duration-60 {
+  border-left-width: 4px !important;
+  border-left-color: #8b5cf6 !important;
+}
+
+.duration-90 {
+  border-left-width: 4px !important;
+  border-left-color: #ec4899 !important;
+}
+
+.duration-120 {
+  border-left-width: 4px !important;
+  border-left-color: #f97316 !important;
+}
+
 .fc .fc-button {
   @apply shadow-sm hover:bg-accent hover:text-accent-foreground;
 }

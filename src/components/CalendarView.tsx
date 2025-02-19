@@ -147,26 +147,57 @@ export function CalendarView({
 
   const renderEventContent = useCallback(eventInfo => {
     const isBooked = eventInfo.event.extendedProps.isBooked;
-    const startTime = format(eventInfo.event.start, 'h');
-    const endTime = format(eventInfo.event.end, 'h');
+
+    const startTime = format(eventInfo.event.start, 'h:mm');
+    const endTime = format(eventInfo.event.end, 'h:mm');
     const period = format(eventInfo.event.end, 'a');
 
     return (
-      <div className="px-2 py-1.5">
-        <div className="flex items-center gap-1.5">
-          <div
-            className={cn(
-              'w-1.5 h-1.5 rounded-full shrink-0',
-              isBooked ? 'bg-red-500' : 'bg-green-500'
+      <div
+        className={`
+          p-3 rounded-lg shadow-sm 
+          ${
+            isBooked
+              ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
+              : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
+          } 
+          transition-all hover:shadow-md
+        `}
+      >
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <div
+              className={`
+                w-3 h-3 rounded-full shrink-0
+                ${isBooked ? 'bg-red-500' : 'bg-green-500'}
+              `}
+            />
+            {!isBooked && (
+              <span className="absolute inset-0 rounded-full bg-green-400 opacity-75 animate-ping"></span>
             )}
-          />
-          <span className="text-sm font-semibold main-font">
+          </div>
+          <span
+            className={`
+              text-sm font-medium
+              ${
+                isBooked
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-green-700 dark:text-green-300'
+              }
+            `}
+          >
             {isBooked ? 'Booked' : 'Available'}
           </span>
         </div>
-        <div className="flex items-center text-sm mt-0.5 text-black dark:text-white main-font">
-          <CalendarIcon className="h-2.5 w-2.5 mr-1 text-black dark:text-white" />
-          <span>
+
+        <div className="flex items-center text-sm mt-0.5">
+          <span
+            className={cn(
+              isBooked
+                ? 'text-yellow-800 dark:text-yellow-200'
+                : 'text-emerald-800 dark:text-emerald-200'
+            )}
+          >
             {startTime} - {endTime} {period}
           </span>
         </div>
@@ -246,7 +277,8 @@ export function CalendarView({
               center: 'title',
               right: '',
             }}
-            slotDuration="01:00:00"
+            slotDuration="00:15:00"
+            slotLabelInterval="01:00:00"
             slotMinTime={TIME_PERIODS[selectedPeriod].start}
             slotMaxTime={TIME_PERIODS[selectedPeriod].end}
             eventClick={handleEventClick}
@@ -274,6 +306,8 @@ export function CalendarView({
               arg.event.extendedProps.isBooked
                 ? 'booked-slot'
                 : 'available-slot',
+
+              `duration-${arg.event.extendedProps.sessionDuration || 60}`,
             ]}
             slotLabelClassNames="text-sm font-medium"
             dayHeaderClassNames="text-sm font-medium"

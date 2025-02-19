@@ -20,9 +20,20 @@ const VerifyEmail = () => {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    const email = localStorage.getItem('email') || '';
-    setStoredEmail(email);
-  }, []);
+    const checkVerificationState = () => {
+      const token = localStorage.getItem('verificationToken');
+      const email = localStorage.getItem('email');
+
+      if (!token || !email) {
+        router.push('/signup');
+        return;
+      }
+
+      setStoredEmail(email);
+    };
+
+    checkVerificationState();
+  }, [router]);
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -41,9 +52,13 @@ const VerifyEmail = () => {
     }
     setIsLoading(true);
     try {
+      const token = localStorage.getItem('verificationToken');
       const response = await fetch('/api/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ code }),
       });
 
@@ -53,14 +68,20 @@ const VerifyEmail = () => {
         const errorMessage =
           data.ErrorMessage?.[0]?.message || 'Verification failed.';
         toast.error(errorMessage);
-        setIsLoading(false);
+
+        // If the error indicates expired session, redirect to signup
+        if (errorMessage.toLowerCase().includes('expired')) {
+          localStorage.removeItem('verificationToken');
+          localStorage.removeItem('email');
+          router.push('/signup');
+        }
         return;
       }
 
       setUser({
         _id: data.Result.user.id,
         email: storedEmail,
-        role: 'user',
+        role: data.Result.user.role,
         isVerified: true,
         profileComplete: false,
         firstName: null,
@@ -73,8 +94,14 @@ const VerifyEmail = () => {
       localStorage.removeItem('verificationToken');
       localStorage.removeItem('email');
       setIsRedirecting(true);
+
+      // Redirect based on user role
       setTimeout(() => {
-        router.push('/dashboard');
+        const redirectPath =
+          data.Result.user.role === 'psychologist'
+            ? '/dashboard/psychologist'
+            : '/dashboard';
+        router.push(redirectPath);
       }, 500);
     } catch (error) {
       console.error('Verification error:', error);
@@ -109,7 +136,12 @@ const VerifyEmail = () => {
       if (!response.ok) {
         const message = data.message || 'Failed to resend verification code.';
         toast.error(message);
-        setIsResending(false);
+
+        if (message.toLowerCase().includes('expired')) {
+          localStorage.removeItem('verificationToken');
+          localStorage.removeItem('email');
+          router.push('/signup');
+        }
         return;
       }
 
@@ -152,16 +184,16 @@ const VerifyEmail = () => {
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value)}
-                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                maxLength={6}
+                placeholder="Enter 6-digit code"
+                className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 required
               />
             </div>
 
             <Button
               type="submit"
-              className={`w-full mt-5 font-semibold shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 ${
-                isLoading ? 'cursor-not-allowed opacity-75' : ''
-              }`}
+              className="w-full mt-5 font-semibold shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
               disabled={isLoading}
             >
               {isLoading ? (

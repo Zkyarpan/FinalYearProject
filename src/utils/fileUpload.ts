@@ -14,24 +14,36 @@ export async function uploadToCloudinary({
 }: {
   fileBuffer: Buffer;
   folder: string;
-  filename: string;
+  filename?: string;
   mimetype: string;
 }): Promise<string> {
-  // Create a unique filename using timestamp and sanitized original filename
+  // Generate a default filename if none provided
   const timestamp = new Date().getTime();
-  const sanitizedFilename = filename
-    .replace(/[^a-zA-Z0-9.]/g, '') // Remove special characters
-    .replace(/\s+/g, '-'); // Replace spaces with hyphens
-  const uniqueFilename = `${timestamp}-${sanitizedFilename}`;
+
+  // Safely process the filename with fallbacks
+  const processedFilename = filename
+    ? filename
+        .toString()
+        .toLowerCase()
+        .split('.')[0]
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+    : 'upload';
+
+  const uniqueFilename = `${timestamp}-${processedFilename || 'upload'}`;
+
+  // Safely extract format from mimetype
+  const format = mimetype?.split('/')[1] || 'auto';
 
   return new Promise((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
         {
           folder,
-          public_id: uniqueFilename.split('.')[0], // Remove file extension from public_id
+          public_id: uniqueFilename,
           resource_type: 'auto',
-          format: mimetype.split('/')[1], // Extract format from mimetype
+          format,
           transformation: [
             {
               quality: 'auto:good',
@@ -48,11 +60,7 @@ export async function uploadToCloudinary({
             });
             reject(new Error(`Upload failed: ${error.message}`));
           } else if (result) {
-            console.info('Cloudinary Upload Success:', {
-              publicId: result.public_id,
-              url: result.secure_url,
-              folder,
-            });
+            console.info('Cloudinary Upload Success');
             resolve(result.secure_url);
           } else {
             console.error('Cloudinary Upload Failed: No result returned');

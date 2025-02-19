@@ -40,6 +40,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       try {
         const currentPath = window.location.pathname;
         const token = Cookies.get('accessToken');
+        const tempToken = localStorage.getItem('verificationToken');
+        const verificationEmail = localStorage.getItem('email');
+
+        if (currentPath === '/verify') {
+          if (!tempToken) {
+            router.push('/signup');
+            return;
+          }
+          setIsChecking(false);
+          return;
+        }
 
         const isValidPath = validRoutes.some(
           route =>
@@ -54,6 +65,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         if (publicRoutes.includes(currentPath) || currentPath === '/') {
           setIsChecking(false);
+          return;
+        }
+
+        if (tempToken && verificationEmail) {
+          router.push('/verify');
           return;
         }
 
@@ -149,7 +165,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Auth check failed:', error);
         Cookies.remove('accessToken');
-        router.push('/login');
+        const tempToken = localStorage.getItem('verificationToken');
+        if (tempToken) {
+          router.push('/verify');
+        } else {
+          router.push('/login');
+        }
       } finally {
         setIsChecking(false);
       }

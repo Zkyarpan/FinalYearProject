@@ -10,7 +10,7 @@ const Calendar = () => {
         height={24}
         color={'#000000'}
         fill={'none'}
-        className="text-black dark:text-white"
+        className="text-black dark:text-white/80"
 
       >
         <path

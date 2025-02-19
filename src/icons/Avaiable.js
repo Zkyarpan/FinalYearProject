@@ -1,26 +1,25 @@
 import React from 'react';
 
-const Clock = () => {
+const Avaiable = () => {
   return (
     <div>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        width={20}
-        height={20}
+        width={24}
+        height={24}
         color={'#000000'}
         fill={'none'}
         className="text-black dark:text-white/80"
       >
         <path
-          d="M5.04798 8.60657L2.53784 8.45376C4.33712 3.70477 9.503 0.999914 14.5396 2.34474C19.904 3.77711 23.0904 9.26107 21.6565 14.5935C20.2227 19.926 14.7116 23.0876 9.3472 21.6553C5.36419 20.5917 2.58192 17.2946 2 13.4844"
+          d="M15 2.5H12C7.52166 2.5 5.28249 2.5 3.89124 3.89124C2.5 5.28249 2.5 7.52166 2.5 12C2.5 16.4783 2.5 18.7175 3.89124 20.1088C5.28249 21.5 7.52166 21.5 12 21.5C16.4783 21.5 18.7175 21.5 20.1088 20.1088C21.5 18.7175 21.5 16.4783 21.5 12V10"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
-          strokeLinejoin="round"
         />
         <path
-          d="M12 8V12L14 14"
+          d="M8.5 10L12 13.5L21.0002 3.5"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
@@ -31,4 +30,4 @@ const Clock = () => {
   );
 };
 
-export default Clock;
+export default Avaiable;

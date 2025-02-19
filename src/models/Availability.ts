@@ -1,7 +1,6 @@
 import mongoose, { Document, Model } from 'mongoose';
 const { Schema } = mongoose;
 
-// Enum for slot status
 export enum SlotStatus {
   AVAILABLE = 'available',
   BOOKED = 'booked',
@@ -11,7 +10,14 @@ export enum SlotStatus {
   MISSED = 'missed',
 }
 
-// Interface for psychologist details
+export enum SessionDuration {
+  THIRTY_MIN = 30,
+  FORTY_FIVE_MIN = 45,
+  ONE_HOUR = 60,
+  NINETY_MIN = 90,
+  TWO_HOURS = 120,
+}
+
 interface IPsychologistDetails {
   name?: string;
   specialty?: string;
@@ -19,11 +25,11 @@ interface IPsychologistDetails {
   sessionFee?: number;
 }
 
-// Interface for time slots
 export interface ITimeSlot {
   _id: mongoose.Types.ObjectId;
   startTime: Date;
   endTime: Date;
+  duration: number;
   isBooked: boolean;
   status: SlotStatus;
   userId?: mongoose.Types.ObjectId;
@@ -34,12 +40,12 @@ export interface ITimeSlot {
   notes?: string; // Optional notes about the session
 }
 
-// Main availability interface
 export interface IAvailability {
   psychologistId: mongoose.Types.ObjectId;
   daysOfWeek: number[];
   startTime: string; // Format: "HH:MM"
   endTime: string; // Format: "HH:MM"
+  duration: number; // Duration in minutes
   slots: ITimeSlot[];
   historicalSlots: ITimeSlot[];
   isActive: boolean;
@@ -50,7 +56,6 @@ export interface IAvailability {
   maxSessionOvertime?: number; // Maximum minutes a session can run over (optional)
 }
 
-// Document interface for instance methods
 interface IAvailabilityDocument extends IAvailability, Document {
   getAvailableSlots(): ITimeSlot[];
   bookSlot(
@@ -82,6 +87,21 @@ const TimeSlotSchema = new Schema<ITimeSlot>(
     endTime: {
       type: Date,
       required: true,
+    },
+    duration: {
+      type: Number,
+      required: true,
+      validate: {
+        validator: function (value: number) {
+          const validDurations = Object.values(SessionDuration)
+            .filter(v => typeof v === 'number')
+            .map(v => Number(v));
+          return validDurations.includes(Number(value));
+        },
+        message: props =>
+          `${props.value} is not a valid session duration. Valid values are: 30, 45, 60, 90, 120 minutes`,
+      },
+      default: 60,
     },
     isBooked: {
       type: Boolean,
@@ -156,6 +176,21 @@ const AvailabilitySchema = new Schema<
         message: 'End time must be in HH:MM format',
       },
     },
+    duration: {
+      type: Number,
+      required: true,
+      validate: {
+        validator: function (value: number) {
+          const validDurations = Object.values(SessionDuration)
+            .filter(v => typeof v === 'number')
+            .map(v => Number(v));
+          return validDurations.includes(Number(value));
+        },
+        message: props =>
+          `${props.value} is not a valid session duration. Valid values are: 30, 45, 60, 90, 120 minutes`,
+      },
+      default: 60,
+    },
     slots: {
       type: [TimeSlotSchema],
       default: [],
@@ -193,11 +228,19 @@ const AvailabilitySchema = new Schema<
   }
 );
 
-// Utility function to generate slots
+// Helper function to calculate end time based on start time and duration
+const calculateEndTime = (startTime: Date, durationMinutes: number): Date => {
+  const endTime = new Date(startTime);
+  endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+  return endTime;
+};
+
+// Utility function to generate slots with durations
 const generateWeeklySlots = (
   daysOfWeek: number[],
   startTimeStr: string,
   endTimeStr: string,
+  duration: number,
   currentDate: Date
 ): ITimeSlot[] => {
   const slots: ITimeSlot[] = [];
@@ -215,14 +258,18 @@ const generateWeeklySlots = (
     const slotStart = new Date(date);
     slotStart.setHours(startHour, startMinute, 0, 0);
 
-    const slotEnd = new Date(date);
-    slotEnd.setHours(endHour, endMinute, 0, 0);
+    const slotEnd = calculateEndTime(slotStart, duration);
 
-    if (slotStart >= currentDate) {
+    // Ensure slot end time doesn't exceed the specified end time
+    const maxEndTime = new Date(date);
+    maxEndTime.setHours(endHour, endMinute, 0, 0);
+
+    if (slotStart >= currentDate && slotEnd <= maxEndTime) {
       slots.push({
         _id: new mongoose.Types.ObjectId(),
         startTime: slotStart,
         endTime: slotEnd,
+        duration: duration,
         isBooked: false,
         status: SlotStatus.AVAILABLE,
         lastUpdated: new Date(),
@@ -237,11 +284,13 @@ const generateWeeklySlots = (
 AvailabilitySchema.statics.cleanupPastSlots =
   async function (): Promise<mongoose.UpdateWriteOpResult> {
     const currentDate = new Date();
+    const oneWeekAgo = new Date(currentDate);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7); // Set to 7 days ago
 
-    // First update status of expired slots
+    // Only update status of slots older than a week
     const result = await this.updateMany(
       {
-        'slots.endTime': { $lt: currentDate },
+        'slots.endTime': { $lt: oneWeekAgo }, // Changed from currentDate to oneWeekAgo
         'slots.status': {
           $in: [SlotStatus.AVAILABLE, SlotStatus.BOOKED],
         },
@@ -257,7 +306,7 @@ AvailabilitySchema.statics.cleanupPastSlots =
                   $cond: [
                     {
                       $and: [
-                        { $lt: ['$$slot.endTime', currentDate] },
+                        { $lt: ['$$slot.endTime', oneWeekAgo] },
                         {
                           $in: [
                             '$$slot.status',
@@ -291,7 +340,7 @@ AvailabilitySchema.statics.cleanupPastSlots =
       ]
     );
 
-    // Then move completed/cancelled/missed slots to historical
+    // Move only slots older than a week to historical
     await this.updateMany({}, [
       {
         $set: {
@@ -304,7 +353,7 @@ AvailabilitySchema.statics.cleanupPastSlots =
                   as: 'slot',
                   cond: {
                     $and: [
-                      { $lt: ['$$slot.endTime', currentDate] },
+                      { $lt: ['$$slot.endTime', oneWeekAgo] }, // Changed to oneWeekAgo
                       {
                         $in: [
                           '$$slot.status',
@@ -327,7 +376,7 @@ AvailabilitySchema.statics.cleanupPastSlots =
               as: 'slot',
               cond: {
                 $or: [
-                  { $gte: ['$$slot.endTime', currentDate] },
+                  { $gte: ['$$slot.endTime', oneWeekAgo] }, // Keep slots newer than a week
                   { $eq: ['$$slot.status', SlotStatus.IN_PROGRESS] },
                 ],
               },
@@ -347,16 +396,18 @@ AvailabilitySchema.pre('save', async function (next) {
       this.isNew ||
       this.isModified('startTime') ||
       this.isModified('endTime') ||
-      this.isModified('daysOfWeek')
+      this.isModified('daysOfWeek') ||
+      this.isModified('duration')
     ) {
       const currentDate = new Date();
       currentDate.setSeconds(0, 0);
 
-      // Generate slots for the current week
+      // Generate slots for the current week with the specified duration
       const generatedSlots = generateWeeklySlots(
         this.daysOfWeek,
         this.startTime,
         this.endTime,
+        this.duration,
         currentDate
       );
 
@@ -381,14 +432,44 @@ AvailabilitySchema.pre('save', async function (next) {
   }
 });
 
+// Pre-validate middleware to ensure end time is after start time
+AvailabilitySchema.pre('validate', function (next) {
+  // Parse the time strings into hours and minutes
+  const [startHours, startMinutes] = this.startTime.split(':').map(Number);
+  const [endHours, endMinutes] = this.endTime.split(':').map(Number);
+
+  // Convert to total minutes for easy comparison
+  const startTimeMinutes = startHours * 60 + startMinutes;
+  const endTimeMinutes = endHours * 60 + endMinutes;
+
+  // Check if end time is after start time
+  if (endTimeMinutes <= startTimeMinutes) {
+    return next(new Error('End time must be after start time'));
+  }
+
+  // Check if the time slot is long enough for the selected duration
+  const timeSlotDuration = endTimeMinutes - startTimeMinutes;
+  if (timeSlotDuration < this.duration) {
+    return next(
+      new Error(
+        `Time slot must be at least ${this.duration} minutes long for the selected session duration`
+      )
+    );
+  }
+
+  next();
+});
+
 // Pre-find middleware
 AvailabilitySchema.pre('find', function (next) {
   const currentDate = new Date();
+  const oneWeekFromNow = new Date(currentDate);
+  oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
 
   this.where({
     isActive: true,
     $or: [
-      { 'slots.endTime': { $gte: currentDate } },
+      { 'slots.endTime': { $lte: oneWeekFromNow } },
       { 'slots.status': { $in: [SlotStatus.BOOKED, SlotStatus.IN_PROGRESS] } },
     ],
   });
@@ -493,11 +574,13 @@ AvailabilitySchema.methods.markMissed = async function (
 // Indexes
 AvailabilitySchema.index({ psychologistId: 1, isActive: 1 });
 AvailabilitySchema.index({ 'slots.startTime': 1, 'slots.status': 1 });
+AvailabilitySchema.index({ 'slots.duration': 1 });
 AvailabilitySchema.index({ 'slots.lastUpdated': 1 });
 AvailabilitySchema.index({
   'historicalSlots.startTime': 1,
   'historicalSlots.status': 1,
 });
+AvailabilitySchema.index({ duration: 1 });
 
 // Create model
 const Availability =

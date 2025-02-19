@@ -2,7 +2,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
-import Availability, { SlotStatus } from '@/models/Availability';
+import Availability, {
+  SessionDuration,
+  SlotStatus,
+} from '@/models/Availability';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { withAuth } from '@/middleware/authMiddleware';
 import Psychologist from '@/models/Psychologist';
@@ -233,12 +236,73 @@ export async function POST(req: NextRequest) {
 
         console.log('Creating availability with data:', data);
 
-        const { daysOfWeek, startTime, endTime } = data;
+        const {
+          daysOfWeek,
+          startTime,
+          endTime,
+          duration: durationInput = SessionDuration.ONE_HOUR,
+        } = data;
+        console.log('Duration input:', durationInput);
+        console.log('Parsed duration:', Number(durationInput));
+        console.log('Parsed duration type:', typeof Number(durationInput));
+
+        const duration = Number(durationInput);
+
+        // Add validation to ensure it's a valid number
+        if (isNaN(duration)) {
+          return NextResponse.json(
+            createErrorResponse(400, 'Duration must be a valid number'),
+            { status: 400 }
+          );
+        }
 
         // Validation
         if (!daysOfWeek?.length || !startTime || !endTime) {
           return NextResponse.json(
             createErrorResponse(400, 'Missing required fields'),
+            { status: 400 }
+          );
+        }
+
+        // Validate duration is one of the allowed values
+        const allowedDurations = Object.values(SessionDuration).filter(
+          value => typeof value === 'number'
+        );
+
+        if (!allowedDurations.includes(duration)) {
+          return NextResponse.json(
+            createErrorResponse(
+              400,
+              `Invalid session duration. Allowed values are: ${allowedDurations.join(
+                ', '
+              )} minutes`
+            ),
+            { status: 400 }
+          );
+        }
+
+        // Parse time strings to validate duration fits within time range
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+
+        // Convert to minutes for comparison
+        const startTotalMinutes = startHour * 60 + startMinute;
+        const endTotalMinutes = endHour * 60 + endMinute;
+        const timeSlotDuration = endTotalMinutes - startTotalMinutes;
+
+        if (endTotalMinutes <= startTotalMinutes) {
+          return NextResponse.json(
+            createErrorResponse(400, 'End time must be after start time'),
+            { status: 400 }
+          );
+        }
+
+        if (timeSlotDuration < duration) {
+          return NextResponse.json(
+            createErrorResponse(
+              400,
+              `Time slot must be at least ${duration} minutes long for the selected session duration`
+            ),
             { status: 400 }
           );
         }
@@ -259,6 +323,7 @@ export async function POST(req: NextRequest) {
           daysOfWeek,
           startTime,
           endTime,
+          duration,
           psychologistDetails: {
             name: `${psychologist.firstName} ${psychologist.lastName}`,
             specialty: psychologist.specialty,
@@ -281,12 +346,18 @@ export async function POST(req: NextRequest) {
         }
 
         console.log('Verified slots count:', verifiedAvailability.slots.length);
+        console.log(
+          'Session duration:',
+          verifiedAvailability.duration,
+          'minutes'
+        );
 
         return NextResponse.json(
           createSuccessResponse(201, {
             message: 'Availability created successfully',
             availability: verifiedAvailability,
             slotsCreated: verifiedAvailability.slots.length,
+            sessionDuration: verifiedAvailability.duration,
           }),
           { status: 201 }
         );

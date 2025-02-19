@@ -27,6 +27,7 @@ import LoginModal from '@/components/LoginModel';
 import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
 import { DEFAULT_AVATAR } from '@/constants';
+import FilterSection from '@/components/FilterSection';
 
 const routeTitles = {
   // User routes
@@ -126,13 +127,12 @@ const RootLayout = ({ children }) => {
 
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
-      (isAuthenticated &&
-        !isDashboardPage &&
-        role === 'user' &&
-        !pathname.startsWith('/psychologist'))) &&
+      (isAuthenticated && !isDashboardPage && role === 'user')) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
       pathname === '/psychologist' ||
+      (pathname.startsWith('/psychologist/') &&
+        !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
       pathname === '/' ||
       isAccountPage);
 
@@ -180,7 +180,8 @@ const RootLayout = ({ children }) => {
 
     const sections = {
       '/blogs': BlogRightSection,
-      '/psychologist': PsychologistSection,
+      '/psychologist': FilterSection,
+      '/psychologist/:path*': FilterSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
@@ -188,7 +189,14 @@ const RootLayout = ({ children }) => {
       '/': StoriesSection,
     };
 
-    const SectionComponent = sections[pathname];
+    let SectionComponent = sections[pathname];
+
+    if (
+      pathname.startsWith('/psychologist/') &&
+      !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))
+    ) {
+      SectionComponent = FilterSection;
+    }
 
     if (SectionComponent) {
       return (

@@ -39,6 +39,9 @@ export interface ITimeSlot {
   sessionEndedAt?: Date;
   notes?: string;
   timePeriods?: string[];
+  timezone?: string;
+  rawStartTime?: string;
+  rawEndTime?: string;
 }
 
 export interface IAvailability {
@@ -56,6 +59,7 @@ export interface IAvailability {
   createdAt: Date;
   updatedAt: Date;
   maxSessionOvertime?: number;
+  timezone: string;
 }
 
 interface IAvailabilityDocument extends IAvailability, Document {
@@ -109,6 +113,10 @@ const TimeSlotSchema = new Schema<ITimeSlot>(
       type: [String],
       enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
       default: [],
+    },
+    timezone: {
+      type: String,
+      required: true,
     },
     isBooked: {
       type: Boolean,
@@ -202,6 +210,10 @@ const AvailabilitySchema = new Schema<
       type: [String],
       enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
       default: [],
+    },
+    timezone: {
+      type: String,
+      required: true,
     },
     slots: {
       type: [TimeSlotSchema],

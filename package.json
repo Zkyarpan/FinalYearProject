@@ -56,6 +56,7 @@
     "cross-env": "^7.0.3",
     "crypto-js": "^4.2.0",
     "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.7",
     "dropdown-menu": "^0.1.1",
     "formidable": "^3.5.2",

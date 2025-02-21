@@ -8,6 +8,7 @@ interface Slot {
   status: SlotStatus;
   isBooked?: boolean;
   appointmentId?: Types.ObjectId;
+  timePeriods?: string[];
   userId?: Types.ObjectId;
   sessionStartedAt?: Date;
   sessionEndedAt?: Date;
@@ -33,9 +34,18 @@ export interface PsychologistDetails {
 }
 
 export interface AvailabilityDocument {
+  _id?: string;
   psychologistId: PsychologistDetails;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  timePeriods?: string[];
+  isActive?: boolean;
   slots?: Slot[];
   daysOfWeek: number[];
+  maxSessionOvertime: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface CalendarEvent {
@@ -65,6 +75,9 @@ export interface CalendarEvent {
     appointmentId?: string;
     dayOfWeek: number;
     status: SlotStatus;
+    timePeriods: string[];
+    originalStartTime: string;
+    originalEndTime: string;
   };
   display: string;
   backgroundColor: string;
@@ -79,6 +92,7 @@ export interface CreateAvailabilityData {
   endTime: string;
   duration?: number;
   timePeriods?: string[];
+  timezone?: string;
 }
 
 export interface AuthToken {

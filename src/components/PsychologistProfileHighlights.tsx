@@ -115,7 +115,7 @@ const PsychologistProfileHighlightsSimple: React.FC<
   }
 
   return (
-    <div className="flex flex-col px-6 gap-6 z-10">
+    <div className="">
       <div
         className="relative flex flex-col gap-4 rounded-xl 
   bg-white bg-[linear-gradient(204deg,rgba(209,213,218,0.70)0%,rgba(255,255,255,0.00)50.85%)] 

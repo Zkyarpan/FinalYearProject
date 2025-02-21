@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -15,22 +15,41 @@ export const BookingForm = ({
   onCancel,
   isLoading,
 }) => {
+  // Convert string times to Date objects
+  const currentDate = new Date();
+  const startTime = parse(
+    selectedSlot.originalStartTime,
+    'h:mm a',
+    currentDate
+  );
+  const endTime = parse(selectedSlot.originalEndTime, 'h:mm a', currentDate);
+
+  // Format the date from selectedSlot.date
+  const slotDate = new Date(selectedSlot.date);
+
+  // Set the correct hours and minutes on the slot date
+  const startDateTime = new Date(slotDate);
+  startDateTime.setHours(startTime.getHours(), startTime.getMinutes());
+
+  const endDateTime = new Date(slotDate);
+  endDateTime.setHours(endTime.getHours(), endTime.getMinutes());
+
   return (
     <div className="space-y-4">
       <div className="bg-secondary/20 dark:bg-input border p-2 rounded-lg space-y-1 text-sm">
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-4 w-4" />
-          <span>{format(selectedSlot.start, 'EEEE, MMMM d, yyyy')}</span>
+          <span>{format(startDateTime, 'EEEE, MMMM d, yyyy')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4" />
           <span>
-            {format(selectedSlot.start, 'h:mm a')} -{' '}
-            {format(selectedSlot.end, 'h:mm a')}
+            {selectedSlot.originalStartTime} - {selectedSlot.originalEndTime}
           </span>
         </div>
       </div>
 
+      {/* Rest of your form remains the same */}
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -81,7 +100,7 @@ export const BookingForm = ({
               }
               className="flex gap-3"
             >
-              {selectedSlot.sessionFormats.map(format => (
+              {selectedSlot.sessionFormats?.map(format => (
                 <div key={format} className="flex items-center space-x-1">
                   <RadioGroupItem value={format} id={format} />
                   <Label htmlFor={format} className="text-sm">

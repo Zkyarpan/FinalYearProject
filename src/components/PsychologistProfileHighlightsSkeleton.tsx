@@ -1,10 +1,10 @@
 import React from 'react';
-import { Skeleton } from '@/components/ui/skeleton'; // Ensure this path is correct
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PsychologistProfileHighlightsSkeleton: React.FC = () => {
   return (
-    <div className="flex flex-col px-6 gap-6 animate-pulse">
-      <div className="relative flex flex-col gap-4 rounded-xl p-4 border shadow-sm">
+    <div className="">
+      <div className="relative flex flex-col gap-4 rounded-xl p-4 border shadow-sm dark:border-[#333333]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2 items-center">

@@ -111,8 +111,8 @@ const UserActions = ({
 
   return (
     <>
-      <div className="flex items-center justify-end w-full relative z-[9999]">
-        <div className="flex items-center gap-x-3">
+      <div className="flex items-center justify-end w-full relative ">
+        <div className="flex items-center gap-x-3 z-[100]">
           <div className="flex items-center relative">
             <CommandMenu router={router} />
           </div>

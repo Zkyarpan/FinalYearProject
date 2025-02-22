@@ -43,6 +43,7 @@ import { useUserStore } from '@/store/userStore';
 import { PsychologistProfile, Slot, BookingDetails } from '@/types/slug';
 import { SelectedSlot } from '@/types/appointment';
 import { checkAvailability } from '@/helpers/checkAvailability';
+import { BookingSuccessDialog } from '@/components/BookingSuccessDialog';
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
@@ -109,6 +110,8 @@ const PsychologistProfileView = () => {
   const [paymentStep, setPaymentStep] = useState('details');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [bookedAppointmentId, setBookedAppointmentId] = useState<string>('');
 
   // User state from store
   const { isAuthenticated, firstName, lastName, email } = useUserStore();
@@ -158,6 +161,21 @@ const PsychologistProfileView = () => {
         }
 
         setPsychologist(data.Result.psychologist);
+
+        if (selectedDay) {
+          const daySlots =
+            data.Result.psychologist.availability[selectedDay]?.slots || [];
+          if (selectedTimeSlot) {
+            // Check if the selected slot is still available
+            const slotStillAvailable = daySlots.some(
+              slot => slot.id === selectedTimeSlot.id && !slot.isBooked
+            );
+            if (!slotStillAvailable) {
+              setSelectedTimeSlot(null);
+              setSelectedSlot(null);
+            }
+          }
+        }
       } catch (error) {
         setError(
           error instanceof Error
@@ -297,12 +315,37 @@ const PsychologistProfileView = () => {
     return targetDate;
   };
 
-  // Event handlers
-  // When selecting a time slot
+  const refreshAvailability = async () => {
+    try {
+      const response = await fetch(`/api/psychologist/${params.slug}`);
+      const data = await response.json();
+
+      if (!data.IsSuccess || !data.Result?.psychologist) {
+        throw new Error(
+          data.ErrorMessage?.[0]?.message || 'Failed to refresh availability'
+        );
+      }
+
+      setPsychologist(prev =>
+        prev
+          ? {
+              ...prev,
+              availability: data.Result.psychologist.availability,
+            }
+          : null
+      );
+
+      setSelectedTimeSlot(null);
+      setSelectedSlot(null);
+    } catch (error) {
+      console.error('Error refreshing availability:', error);
+      toast.error('Failed to refresh availability');
+    }
+  };
+
   const handleSelectTimeSlot = (slot: Slot) => {
     setSelectedTimeSlot(slot);
 
-    // Also create a formatted slot for the booking components
     const formatted: SelectedSlot = {
       id: slot.id,
       psychologistId: psychologist?.id || '',
@@ -465,9 +508,28 @@ const PsychologistProfileView = () => {
       const appointmentData = await appointmentResponse.json();
 
       if (appointmentData.IsSuccess) {
-        toast.success('Appointment booked successfully');
+        const appointmentId = appointmentData.Result.appointment._id;
+        setBookedAppointmentId(appointmentId);
+
         handleCloseDialog();
-        router.push('/appointments');
+
+        await refreshAvailability();
+
+        setShowSuccessDialog(true);
+
+        setSelectedTimeSlot(null);
+        setSelectedSlot(null);
+
+        setBookingDetails({
+          title: '',
+          notes: '',
+          patientName: '',
+          email: '',
+          phone: '',
+          sessionFormat: 'video',
+          insuranceProvider: '',
+          reasonForVisit: '',
+        });
       } else {
         if (appointmentData.StatusCode === 409) {
           toast.error('This time slot is no longer available');
@@ -494,9 +556,13 @@ const PsychologistProfileView = () => {
         onClose={() => setShowLoginModal(false)}
       />
 
-      {/* Profile Header */}
+      <BookingSuccessDialog
+        isOpen={showSuccessDialog}
+        onClose={() => setShowSuccessDialog(false)}
+        appointmentId={bookedAppointmentId}
+      />
+
       <div className="flex flex-col gap-4 sm:items-center justify-center">
-        {/* Mobile Profile Header */}
         <div className="sm:hidden flex justify-between">
           <div className="w-16 h-16 relative rounded-full overflow-hidden">
             <img
@@ -698,12 +764,15 @@ const PsychologistProfileView = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Select Date</h3>
-                <Badge variant="outline" className="font-medium">
-                  {userTimezone}
-                </Badge>
+                <div className="flex items-center gap-2 px-3 py-1.5 border  rounded-full ">
+                  <Clock className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-500 ">
+                    {userTimezone}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 overflow-x-auto pb-2">
+              <div className="flex flex-wrap gap-3 overflow-x-auto">
                 {weekDates.map((date, index) => {
                   const day = getDayName(date.getDay());
                   const schedule = psychologist.availability[day];
@@ -721,23 +790,27 @@ const PsychologistProfileView = () => {
                       key={day}
                       onClick={() => isAvailable && setSelectedDay(day)}
                       className={`
-                flex flex-col items-center justify-center p-4 rounded-xl
-                w-[110px] h-[110px] cursor-pointer transition-all duration-200
-                ${
-                  isToday
-                    ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900'
-                    : ''
-                }
-                ${
-                  isSelected && isAvailable
-                    ? 'bg-blue-500 text-white shadow-lg scale-105'
-                    : isAvailable
-                    ? 'bg-card hover:bg-blue-50 dark:hover:bg-blue-900/20 border shadow-sm'
-                    : 'bg-muted/40 text-muted-foreground cursor-not-allowed border'
-                }
-              `}
+             flex flex-col items-center justify-center p-4 rounded-xl
+             w-[110px] h-[110px] cursor-pointer transition-all duration-200 dark:bg-[#1c1c1c] 
+             ${isToday ? 'dark:bg-[#1c1c1c]  dark:border-gray-700' : ''}
+             ${
+               isSelected && isAvailable
+                 ? 'bg-blue-500 dark:bg-blue-600 text-white shadow-lg'
+                 : isAvailable
+                 ? 'bg-card dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 border dark:border-gray-700 shadow-sm'
+                 : 'bg-muted/40 dark:bg-gray-800/50 text-muted-foreground dark:text-gray-400 cursor-not-allowed border dark:border-gray-700'
+             }
+           `}
                     >
                       <div className="flex flex-col items-center gap-1">
+                        {isToday && (
+                          <Badge
+                            variant="outline"
+                            className="absolute -top-2 right-2 text-xs bg-background/80 dark:bg-gray-800/80 backdrop-blur-sm"
+                          >
+                            Today
+                          </Badge>
+                        )}
                         <span className={`text-sm font-medium`}>
                           {getFormattedDay(date)}
                         </span>
@@ -763,9 +836,6 @@ const PsychologistProfileView = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Available Time Slots</h3>
-                <Badge variant="outline" className="font-medium">
-                  {psychologist.sessionDuration} min sessions
-                </Badge>
               </div>
 
               <div className="grid gap-6">
@@ -799,16 +869,16 @@ const PsychologistProfileView = () => {
                                   !isPast && handleSelectTimeSlot(slot)
                                 }
                                 className={`
-                        relative flex flex-col items-center justify-center p-4
-                        rounded-xl border transition-all duration-200
-                        ${
-                          isPast
-                            ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                            : isSelected
-                            ? 'bg-blue-500 text-white border-blue-500 shadow-lg scale-105'
-                            : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500/50'
-                        }
-                      `}
+                     relative flex flex-col items-center justify-center p-4
+                     rounded-xl border transition-all duration-200
+                     ${
+                       isPast
+                         ? 'bg-muted/30 dark:bg-gray-800/30 text-muted-foreground dark:text-gray-400 cursor-not-allowed dark:border-gray-700'
+                         : isSelected
+                         ? 'bg-blue-500 dark:bg-blue-600 text-white border-blue-500 dark:border-blue-600 shadow-lg scale-105'
+                         : 'hover:bg-blue-50 dark:hover:bg-blue-900/40 dark:bg-gray-800 dark:border-gray-700 hover:border-blue-500/50 dark:hover:border-blue-500/30'
+                     }
+                   `}
                               >
                                 <div className="flex flex-col items-center gap-1">
                                   <span className="text-sm font-medium">
@@ -822,7 +892,7 @@ const PsychologistProfileView = () => {
                                 {isPast && (
                                   <Badge
                                     variant="outline"
-                                    className="absolute -top-2 right-2 text-xs bg-background/80 backdrop-blur-sm"
+                                    className="absolute -top-2 right-2 text-xs bg-background/80 dark:bg-gray-800/80 backdrop-blur-sm"
                                   >
                                     Past
                                   </Badge>
@@ -838,7 +908,7 @@ const PsychologistProfileView = () => {
 
                 {/* No slots message */}
                 {getAllSlotsForDay(selectedDay).length === 0 && (
-                  <div className="py-12 text-center bg-muted/30 rounded-xl border border-dashed">
+                  <div className="py-12 text-center bg-muted/30 dark:bg-gray-800/30 rounded-xl border border-dashed dark:border-gray-700">
                     <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-lg font-medium text-muted-foreground">
                       No available slots for {selectedDay}
@@ -851,28 +921,29 @@ const PsychologistProfileView = () => {
               </div>
 
               {/* Bottom Section */}
-              <div className="flex flex-col sm:flex-row justify-between items-center pt-6 mt-6 border-t gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-6 mt-6 border-t dark:border-gray-700 gap-4">
                 <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 mt-0.5 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium">Session Duration</p>
                     <p className="text-sm text-muted-foreground">
-                      Consultation with Dr. {psychologist.firstName} takes{' '}
-                      {psychologist.sessionDuration} minutes
+                      Consultation with
+                      <span className="font-bold">
+                        {' '}
+                        Dr. {psychologist.firstName}
+                      </span>
                     </p>
                   </div>
                 </div>
 
                 <button
                   className={`
-            flex items-center justify-center gap-2 px-6 py-2.5
-            font-medium rounded-xl transition-all duration-200
-            ${
-              selectedTimeSlot
-                ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }
-          `}
+         flex items-center justify-center gap-2 px-6 py-2.5
+         font-medium rounded-xl transition-all duration-200
+         ${
+           selectedTimeSlot
+             ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 shadow-lg'
+             : 'bg-muted dark:bg-gray-800 text-muted-foreground cursor-not-allowed'
+         }
+       `}
                   disabled={!selectedTimeSlot}
                   onClick={handleBooking}
                 >

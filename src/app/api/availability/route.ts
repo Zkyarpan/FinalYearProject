@@ -265,6 +265,18 @@ export async function POST(req: NextRequest) {
             'Asia/Kathmandu',
         } = data;
 
+        const hour = parseInt(startTime.split(':')[0]);
+        let timePeriod;
+        if (hour >= 0 && hour <= 11) {
+          timePeriod = 'MORNING';
+        } else if (hour >= 12 && hour <= 16) {
+          timePeriod = 'AFTERNOON';
+        } else if (hour >= 17 && hour <= 20) {
+          timePeriod = 'EVENING';
+        } else {
+          timePeriod = 'NIGHT';
+        }
+
         const formattedStartTime = formatTimeToHHMM(startTime);
         const formattedEndTime = formatTimeToHHMM(endTime);
 
@@ -351,6 +363,7 @@ export async function POST(req: NextRequest) {
           endTime: formattedEndTime,
           duration,
           timezone,
+          timePeriods: [timePeriod],
           psychologistDetails: {
             name: `${psychologist.firstName} ${psychologist.lastName}`,
             profilePhotoUrl: psychologist.profileImage,
@@ -358,6 +371,11 @@ export async function POST(req: NextRequest) {
           },
           isActive: true,
         });
+
+        availability.slots = availability.slots.map(slot => ({
+          ...slot,
+          timePeriods: [timePeriod],
+        }));
 
         const savedAvailability = await availability.save();
 

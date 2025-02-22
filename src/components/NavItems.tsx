@@ -24,6 +24,7 @@ export const USER_NAV_ITEMS = [
     text: 'Appointments',
     href: '/appointments',
   },
+
   {
     icon: <StoriesIcon />,
     text: 'Stories',

@@ -212,60 +212,69 @@ export function CalendarView({
         onValueChange={setSelectedPeriod}
         className="w-full"
       >
-        <div className="mb-4">
-          <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <div className="mx-auto max-w-3xl">
-              <TabsList className="w-full grid grid-cols-4 bg-card/50 dark:bg-card/50 p-1 rounded-lg">
-                {Object.entries(TIME_PERIODS).map(
-                  ([key, { label, icon: Icon }]) => {
-                    const appointmentCount = getAppointmentCountByPeriod(
-                      calendarEvents,
-                      key
-                    );
-                    return (
-                      <TabsTrigger
-                        key={key}
-                        value={key}
-                        className={cn(
-                          'flex items-center justify-center gap-2 py-2 relative',
-                          'data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input',
-                          'rounded-md transition-all duration-200'
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          <span>{label}</span>
-                        </div>
-                        {appointmentCount > 0 && (
-                          <Badge
-                            variant="default"
-                            className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
-                          >
-                            {appointmentCount}
-                          </Badge>
-                        )}
-                      </TabsTrigger>
-                    );
-                  }
-                )}
-              </TabsList>
-            </div>
+        <div className="flex w-full mb-4">
+          <Tabs
+            value={selectedPeriod}
+            onValueChange={setSelectedPeriod}
+            className="w-full max-w-3xl"
+          >
+            <TabsList className="w-full grid grid-cols-4 p-1 h-12 dark:bg-input">
+              {Object.entries(TIME_PERIODS).map(
+                ([key, { label, icon: Icon }]) => {
+                  const appointmentCount = getAppointmentCountByPeriod(
+                    calendarEvents,
+                    key
+                  );
+                  return (
+                    <TabsTrigger
+                      key={key}
+                      value={key}
+                      className={cn(
+                        'flex items-center justify-center gap-2 h-full',
+                        'rounded-md transition-all duration-200'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        <span>{label}</span>
+                      </div>
+                      {appointmentCount > 0 && (
+                        <Badge
+                          variant="default"
+                          className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
+                        >
+                          {appointmentCount}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  );
+                }
+              )}
+            </TabsList>
           </Tabs>
         </div>
       </Tabs>
 
-      <Alert>
+      <div className="py-3">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-600" />
-            Available
-          </span>
-          <span className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
-            Booked
-          </span>
+          <div className="flex-1 border dark:border-[#333333]  rounded-lg overflow-hidden flex">
+            <div className="w-2 bg-green-600" />
+            <div className="px-4 py-2">
+              <span className="text-sm">
+                Available slots: Ready for new appointments
+              </span>
+            </div>
+          </div>
+          <div className="flex-1 border dark:border-[#333333]  rounded-lg overflow-hidden flex">
+            <div className="w-2 bg-red-500" />
+            <div className="px-4 py-2">
+              <span className="text-sm">
+                Booked slots: Already scheduled appointments
+              </span>
+            </div>
+          </div>
         </div>
-      </Alert>
+      </div>
 
       <Card>
         <CardContent className="p-6 relative">

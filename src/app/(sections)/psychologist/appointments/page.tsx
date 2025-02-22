@@ -161,7 +161,6 @@ const PsychologistAppointments = () => {
     const durationMs = event.end.getTime() - event.start.getTime();
     const durationMinutes = Math.round(durationMs / (1000 * 60));
 
-    // Format duration nicely
     let durationText;
     if (durationMinutes === 30) {
       durationText = '30 min';
@@ -270,8 +269,8 @@ const PsychologistAppointments = () => {
             <TabsContent value="calendar" className="mt-4">
               <div className="mb-4">
                 <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <div className="mx-auto max-w-3xl">
-                    <TabsList className="w-full grid grid-cols-4 bg-card/50 dark:bg-card/50 p-1 rounded-lg">
+                  <div className="max-w-3xl">
+                    <TabsList className="w-full grid grid-cols-4 p-1 h-12 dark:bg-input">
                       {Object.entries(TIME_PERIODS).map(
                         ([key, { label, icon: Icon }]) => {
                           const appointmentCount = getAppointmentCountByPeriod(
@@ -283,8 +282,7 @@ const PsychologistAppointments = () => {
                               key={key}
                               value={key}
                               className={cn(
-                                'flex items-center justify-center gap-2 py-2 relative',
-                                'data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input',
+                                'flex items-center justify-center gap-2 h-full',
                                 'rounded-md transition-all duration-200'
                               )}
                             >

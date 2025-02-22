@@ -78,6 +78,7 @@ interface NewAvailability {
   startTime: string;
   endTime: string;
   duration: number;
+  timePeriods: string[];
 }
 
 interface DeleteDialogState {
@@ -211,7 +212,8 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     daysOfWeek: [],
     startTime: '',
     endTime: '',
-    duration: 60, // Default to 1 hour
+    duration: 60,
+    timePeriods: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({
     isOpen: false,
@@ -347,6 +349,77 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     return true;
   };
 
+  const DaySelectionCard = ({
+    dayName,
+    dayIndex,
+    isToday,
+    formattedDate,
+    isSelected,
+    onClick,
+  }) => {
+    const currentDate = new Date();
+    const isPastDay =
+      dayIndex < currentDate.getDay() ||
+      (dayIndex === currentDate.getDay() && currentDate.getHours() >= 23);
+    const isWeekend = dayIndex === 0 || dayIndex === 6;
+
+    return (
+      <div
+        onClick={() => !isPastDay && onClick()}
+        className={`
+          relative rounded-xl border p-4 transition-all duration-200 
+          ${
+            isPastDay
+              ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800'
+              : 'cursor-pointer hover:bg-primary/5'
+          }
+          ${isSelected && !isPastDay ? 'bg-primary/5 shadow-sm' : ''}
+          ${isToday ? 'ring-1 ring-primary' : ''}
+          ${isWeekend && !isPastDay ? 'bg-muted/30' : ''}
+        `}
+      >
+        {isPastDay && (
+          <div className="absolute inset-0 bg-background/60 rounded-xl backdrop-blur-[1px]" />
+        )}
+
+        {isSelected && !isPastDay && (
+          <div className="absolute top-2 right-2">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          </div>
+        )}
+
+        <div className="flex flex-col items-center gap-2 select-none">
+          <span
+            className={`text-base font-semibold ${
+              isSelected && !isPastDay ? 'text-primary' : ''
+            }`}
+          >
+            {dayName}
+          </span>
+          <span className="text-sm text-muted-foreground">{formattedDate}</span>
+          {isToday && (
+            <Badge variant="default" className="mt-1">
+              Today
+            </Badge>
+          )}
+          {isWeekend && !isToday && (
+            <Badge variant="outline" className="mt-1">
+              Weekend
+            </Badge>
+          )}
+          {isPastDay && (
+            <Badge
+              variant="outline"
+              className="mt-1 bg-muted text-muted-foreground"
+            >
+              Past
+            </Badge>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const handleSetAvailability = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
@@ -361,16 +434,35 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
         return;
       }
 
+      // Calculate time period based on start time
+      const hour = parseInt(newAvailability.startTime.split(':')[0]);
+      let timePeriod: string;
+
+      if (hour >= 0 && hour <= 11) {
+        timePeriod = 'MORNING';
+      } else if (hour >= 12 && hour <= 16) {
+        timePeriod = 'AFTERNOON';
+      } else if (hour >= 17 && hour <= 20) {
+        timePeriod = 'EVENING';
+      } else {
+        timePeriod = 'NIGHT';
+      }
+
       // Calculate end time based on start time and duration
       const endTime = calculateEndTime(
         newAvailability.startTime,
         newAvailability.duration
       );
+
+      // Create availability data with time period
       const availabilityWithEndTime = {
         ...newAvailability,
         endTime,
+        timePeriods: [timePeriod],
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
 
+      // Validate time slot
       if (
         !validateTimeSlot(
           newAvailability.startTime,
@@ -382,35 +474,50 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       }
 
       setIsLoading(true);
+
+      // Make API request
       const response = await fetch('/api/availability', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
         body: JSON.stringify(availabilityWithEndTime),
       });
 
       const data: ApiResponse<unknown> = await response.json();
 
+      // Handle API errors
       if (!response.ok) {
-        if (data.ErrorMessage && data.ErrorMessage.length > 0) {
-          throw new Error(data.ErrorMessage[0].message);
-        } else {
-          throw new Error('Failed to set availability');
-        }
+        const errorMessage =
+          data.ErrorMessage && data.ErrorMessage.length > 0
+            ? data.ErrorMessage[0].message
+            : 'Failed to set availability';
+        throw new Error(errorMessage);
       }
 
+      // Handle success
       if (data.IsSuccess) {
         toast.success('Availability set successfully');
+
+        // Refresh data and reset form
         void fetchAvailability();
         onRefresh?.();
         setIsAddingSlot(false);
+
+        // Reset form state with all fields including timePeriods
         setNewAvailability({
           daysOfWeek: [],
           startTime: '',
           endTime: '',
           duration: 60,
+          timePeriods: [],
         });
+      } else {
+        throw new Error('Failed to set availability');
       }
     } catch (error) {
+      console.error('Error setting availability:', error);
       toast.error(
         error instanceof Error ? error.message : 'Error setting availability'
       );
@@ -684,11 +791,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                                     {formatTime(slot.endTime)}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-2 ml-7">
-                                  <Badge variant="outline" className="text-xs">
-                                    {formatDuration(slot.duration)}
-                                  </Badge>
-                                </div>
+                                <div className="flex items-center gap-2 ml-7"></div>
                               </div>
                               <Button
                                 variant="ghost"
@@ -732,6 +835,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   startTime: '',
                   endTime: '',
                   duration: 60,
+                  timePeriods: [],
                 });
               }
             }}
@@ -784,64 +888,30 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {getNextWeekDates().map(
-                      ({ dayName, dayIndex, isToday, formattedDate }) => {
-                        const isSelected =
-                          newAvailability.daysOfWeek.includes(dayIndex);
-                        const isWeekend = dayIndex === 0 || dayIndex === 6;
-
-                        return (
-                          <div
-                            key={dayIndex}
-                            onClick={() => {
-                              const updatedDays = isSelected
+                      ({ dayName, dayIndex, isToday, formattedDate }) => (
+                        <DaySelectionCard
+                          key={dayIndex}
+                          dayName={dayName}
+                          dayIndex={dayIndex}
+                          isToday={isToday}
+                          formattedDate={formattedDate}
+                          isSelected={newAvailability.daysOfWeek.includes(
+                            dayIndex
+                          )}
+                          onClick={() => {
+                            const updatedDays =
+                              newAvailability.daysOfWeek.includes(dayIndex)
                                 ? newAvailability.daysOfWeek.filter(
                                     d => d !== dayIndex
                                   )
                                 : [...newAvailability.daysOfWeek, dayIndex];
-                              setNewAvailability(prev => ({
-                                ...prev,
-                                daysOfWeek: updatedDays,
-                              }));
-                            }}
-                            className={`
-              relative rounded-xl border p-4 cursor-pointer
-              transition-all duration-200 
-              ${isSelected ? 'bg-primary/5 shadow-sm' : 'hover:bg-primary/5'}
-              ${isToday ? 'ring-1 ring-primary ' : ''}
-              ${isWeekend ? 'bg-muted/30' : ''}
-            `}
-                          >
-                            {isSelected && (
-                              <div className="absolute top-2 right-2">
-                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                              </div>
-                            )}
-
-                            <div className="flex flex-col items-center gap-2 select-none">
-                              <span
-                                className={`text-base font-semibold ${
-                                  isSelected ? 'text-primary' : ''
-                                }`}
-                              >
-                                {dayName}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {formattedDate}
-                              </span>
-                              {isToday && (
-                                <Badge variant="default" className="mt-1">
-                                  Today
-                                </Badge>
-                              )}
-                              {isWeekend && !isToday && (
-                                <Badge variant="outline" className="mt-1">
-                                  Weekend
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }
+                            setNewAvailability(prev => ({
+                              ...prev,
+                              daysOfWeek: updatedDays,
+                            }));
+                          }}
+                        />
+                      )
                     )}
                   </div>
                 </div>
@@ -1053,93 +1123,6 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* Important Rules */}
-                <div className="rounded-xl border p-6 space-y-4">
-                  <div className="flex items-center gap-3 border-b pb-4">
-                    <div>
-                      <h4 className="text-lg font-semibold tracking-tight">
-                        Important Scheduling Rules
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Please review these guidelines for consultation
-                        scheduling
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {/* Duration Rule */}
-                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-primary/5 border border-primary/10 hover:shadow-sm transition-all">
-                      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary " />
-                      <div className="flex items-start gap-3">
-                        <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="font-medium">Fixed Duration</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            All consultation slots are standardized to 1-hour
-                            sessions
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Past Slots Rule */}
-                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-orange-500/5 border border-orange-500/10 hover:shadow-sm transition-all">
-                      <div className="absolute left-0 top-0 h-full w-1.5 bg-orange-500 " />
-                      <div className="flex items-start gap-3">
-                        <Clock className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="font-medium">Past Time Slots</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Past time slots for today are automatically disabled
-                            for scheduling
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Schedule Range Rule */}
-                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-blue-500/5 border border-blue-500/10 hover:shadow-sm transition-all">
-                      <div className="absolute left-0 top-0 h-full w-1.5 bg-blue-500 " />
-                      <div className="flex items-start gap-3">
-                        <CalendarDays className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="font-medium">Scheduling Window</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Schedule slots for the next 7 days, including
-                            weekends
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timezone Rule */}
-                    <div className="relative pl-8 pr-4 py-3 rounded-lg bg-green-500/5 border border-green-500/10 hover:shadow-sm transition-all">
-                      <div className="absolute left-0 top-0 h-full w-1.5 bg-green-500 " />
-                      <div className="flex items-start gap-3">
-                        <Globe2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="font-medium">Time Zone</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            All times are shown in your local timezone for
-                            convenience
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Info className="h-4 w-4" />
-                      <span className="text-xs">
-                        These rules ensure consistent and reliable scheduling
-                        for both you and your patients.
-                      </span>
-                    </div>
                   </div>
                 </div>
 

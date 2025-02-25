@@ -516,7 +516,7 @@ const AppointmentManager: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 dark:border-[#333333]">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold tracking-tight">Appointments</h2>
         </div>
@@ -583,8 +583,9 @@ const AppointmentManager: React.FC = () => {
               {filteredAppointments.map(renderAppointmentCard)}
             </div>
           ) : (
-            <div className="text-center py-12 bg-muted/50 rounded-lg">
-              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="text-center py-12 bg-muted/50 rounded-lg dark:border-[#333333] dark:bg-input border">
+              <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+
               <p className="text-muted-foreground">
                 No upcoming appointments found
               </p>
@@ -598,8 +599,9 @@ const AppointmentManager: React.FC = () => {
               {filteredAppointments.map(renderAppointmentCard)}
             </div>
           ) : (
-            <div className="text-center py-12 bg-muted/50 rounded-lg">
-              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="text-center py-12 bg-muted/50 rounded-lg border dark:bg-input dark:border-[#333333]">
+              <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+
               <p className="text-muted-foreground">
                 No past appointments found
               </p>
@@ -613,10 +615,13 @@ const AppointmentManager: React.FC = () => {
               {filteredAppointments.map(renderAppointmentCard)}
             </div>
           ) : (
-            <div className="text-center py-12 bg-muted/50 rounded-lg">
-              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                No canceled appointments found
+            <div className="flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-input rounded-xl  border dark:border-[#333333]">
+              <Ban className="h-12 w-12 text-muted-foreground" />
+              <p className="text-base font-medium text-muted-foreground">
+                No canceled appointments
+              </p>
+              <p className="text-sm text-muted-foreground">
+                You don't have any canceled appointments
               </p>
             </div>
           )}

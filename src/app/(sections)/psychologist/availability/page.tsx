@@ -190,13 +190,13 @@ const generateTimeSlots = () => {
 const timeSlots: TimeSlot[] = generateTimeSlots();
 
 const DAYS_OF_WEEK = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+  'Sunday', // 0
+  'Monday', // 1
+  'Tuesday', // 2
+  'Wednesday', // 3
+  'Thursday', // 4
+  'Friday', // 5
+  'Saturday', // 6
 ] as const;
 
 export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
@@ -349,6 +349,8 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     return true;
   };
 
+ 
+
   const DaySelectionCard = ({
     dayName,
     dayIndex,
@@ -357,6 +359,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     isSelected,
     onClick,
   }) => {
+   
     const currentDate = new Date();
     const isPastDay =
       dayIndex < currentDate.getDay() ||
@@ -388,33 +391,46 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
           </div>
         )}
 
-        <div className="flex flex-col items-center gap-2 select-none">
-          <span
-            className={`text-base font-semibold ${
-              isSelected && !isPastDay ? 'text-primary' : ''
-            }`}
-          >
-            {dayName}
+        <div className="absolute top-2 left-2">
+          <span className="text-xs font-mono text-muted-foreground">
+            Day {dayIndex}
           </span>
-          <span className="text-sm text-muted-foreground">{formattedDate}</span>
-          {isToday && (
-            <Badge variant="default" className="mt-1">
-              Today
-            </Badge>
-          )}
-          {isWeekend && !isToday && (
-            <Badge variant="outline" className="mt-1">
-              Weekend
-            </Badge>
-          )}
-          {isPastDay && (
-            <Badge
-              variant="outline"
-              className="mt-1 bg-muted text-muted-foreground"
+        </div>
+
+        <div className="flex flex-col items-center gap-2 select-none pt-4">
+          <div className="flex flex-col items-center">
+            <span
+              className={`text-base font-semibold ${
+                isSelected && !isPastDay ? 'text-primary' : ''
+              }`}
             >
-              Past
-            </Badge>
-          )}
+              {dayName}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {formattedDate}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-1 justify-center mt-1">
+            {isToday && (
+              <Badge variant="default" className="text-xs">
+                Today
+              </Badge>
+            )}
+            {isWeekend && !isToday && (
+              <Badge variant="outline" className="text-xs">
+                Weekend
+              </Badge>
+            )}
+            {isPastDay && (
+              <Badge
+                variant="outline"
+                className="bg-muted text-muted-foreground text-xs"
+              >
+                Past
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     );

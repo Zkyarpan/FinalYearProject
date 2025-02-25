@@ -265,8 +265,18 @@ const generateWeeklySlots = (
   startTimeStr: string,
   endTimeStr: string,
   duration: number,
-  currentDate: Date
+  currentDate: Date,
+  timezone: string
 ): ITimeSlot[] => {
+  console.log('🎯 Starting slot generation with:', {
+    daysOfWeek,
+    startTimeStr,
+    endTimeStr,
+    duration,
+    currentDate: currentDate.toISOString(),
+    timezone,
+  });
+
   const slots: ITimeSlot[] = [];
   const startOfWeek = new Date(currentDate);
   startOfWeek.setHours(0, 0, 0, 0);
@@ -275,33 +285,66 @@ const generateWeeklySlots = (
   const [startHour, startMinute] = startTimeStr.split(':').map(Number);
   const [endHour, endMinute] = endTimeStr.split(':').map(Number);
 
+  console.log('📅 Week starts at:', startOfWeek.toISOString());
+
   for (const dayOfWeek of daysOfWeek) {
-    const date = new Date(startOfWeek);
-    date.setDate(date.getDate() + dayOfWeek);
+    const currentSlotDate = new Date(startOfWeek);
+    currentSlotDate.setDate(startOfWeek.getDate() + dayOfWeek);
 
-    const slotStart = new Date(date);
-    slotStart.setHours(startHour, startMinute, 0, 0);
+    let currentTime = new Date(currentSlotDate);
+    currentTime.setHours(startHour, startMinute, 0, 0);
 
-    const slotEnd = calculateEndTime(slotStart, duration);
+    const dayEndTime = new Date(currentSlotDate);
+    dayEndTime.setHours(endHour, endMinute, 0, 0);
 
-    // Ensure slot end time doesn't exceed the specified end time
-    const maxEndTime = new Date(date);
-    maxEndTime.setHours(endHour, endMinute, 0, 0);
+    console.log(`🕒 Generating slots for day ${dayOfWeek}:`, {
+      date: currentSlotDate.toISOString(),
+      startTime: currentTime.toISOString(),
+      endTime: dayEndTime.toISOString(),
+    });
 
-    if (slotStart >= currentDate && slotEnd <= maxEndTime) {
-      slots.push({
-        _id: new mongoose.Types.ObjectId(),
-        startTime: slotStart,
-        endTime: slotEnd,
-        duration: duration,
-        isBooked: false,
-        status: SlotStatus.AVAILABLE,
-        lastUpdated: new Date(),
-      });
+    // Generate slots until we reach end time
+    while (currentTime < dayEndTime) {
+      const slotEndTime = new Date(currentTime.getTime() + duration * 60000);
+
+      // Only add slot if it fits within the time window
+      if (slotEndTime <= dayEndTime && currentTime >= currentDate) {
+        const slot: ITimeSlot = {
+          _id: new mongoose.Types.ObjectId(),
+          startTime: new Date(currentTime),
+          endTime: new Date(slotEndTime),
+          duration,
+          isBooked: false,
+          status: SlotStatus.AVAILABLE,
+          lastUpdated: new Date(),
+          timezone,
+          rawStartTime: startTimeStr,
+          rawEndTime: endTimeStr,
+          timePeriods: getTimePeriod(currentTime.getHours()),
+        };
+
+        slots.push(slot);
+        console.log(`✅ Created slot:`, {
+          start: slot.startTime.toISOString(),
+          end: slot.endTime.toISOString(),
+          duration: slot.duration,
+        });
+      }
+
+      currentTime = slotEndTime;
     }
   }
 
+  console.log(`📊 Generated ${slots.length} total slots`);
   return slots;
+};
+
+// Helper function to determine time period
+const getTimePeriod = (hour: number): string[] => {
+  if (hour >= 0 && hour <= 11) return ['MORNING'];
+  if (hour >= 12 && hour <= 16) return ['AFTERNOON'];
+  if (hour >= 17 && hour <= 20) return ['EVENING'];
+  return ['NIGHT'];
 };
 
 // Static method to cleanup past slots
@@ -414,8 +457,11 @@ AvailabilitySchema.statics.cleanupPastSlots =
   };
 
 // Pre-save middleware for slot generation
+
 AvailabilitySchema.pre('save', async function (next) {
   try {
+    console.log('⚡ Pre-save middleware triggered');
+
     if (
       this.isNew ||
       this.isModified('startTime') ||
@@ -423,22 +469,25 @@ AvailabilitySchema.pre('save', async function (next) {
       this.isModified('daysOfWeek') ||
       this.isModified('duration')
     ) {
+      console.log('📝 Generating new slots due to changes in:', {
+        isNew: this.isNew,
+        modifiedPaths: this.modifiedPaths(),
+      });
+
       const currentDate = new Date();
       currentDate.setSeconds(0, 0);
 
-      // Generate slots for the current week with the specified duration
+      // Generate slots for the current week
       const generatedSlots = generateWeeklySlots(
         this.daysOfWeek,
         this.startTime,
         this.endTime,
         this.duration,
-        currentDate
+        currentDate,
+        this.timezone
       );
 
-      // Sort slots chronologically
-      generatedSlots.sort(
-        (a, b) => a.startTime.getTime() - b.startTime.getTime()
-      );
+      console.log(`🎲 Generated ${generatedSlots.length} new slots`);
 
       // Keep existing booked and in-progress slots
       const existingValidSlots = this.slots.filter(
@@ -447,11 +496,23 @@ AvailabilitySchema.pre('save', async function (next) {
           slot.status === SlotStatus.IN_PROGRESS
       );
 
-      // Merge slots
-      this.slots = [...existingValidSlots, ...generatedSlots];
+      console.log(
+        `🔒 Keeping ${existingValidSlots.length} existing booked/in-progress slots`
+      );
+
+      // Merge and sort slots
+      this.slots = [...existingValidSlots, ...generatedSlots].sort(
+        (a, b) => a.startTime.getTime() - b.startTime.getTime()
+      );
+
+      console.log(`✨ Final slot count: ${this.slots.length}`);
+    } else {
+      console.log('💤 No relevant changes, skipping slot generation');
     }
+
     next();
   } catch (error) {
+    console.error('❌ Error in pre-save middleware:', error);
     next(error as Error);
   }
 });
@@ -499,101 +560,6 @@ AvailabilitySchema.pre('find', function (next) {
   });
   next();
 });
-
-// Instance method to get available slots
-AvailabilitySchema.methods.getAvailableSlots = function (): ITimeSlot[] {
-  return this.slots.filter(slot => slot.status === SlotStatus.AVAILABLE);
-};
-
-// Instance method to book a slot
-AvailabilitySchema.methods.bookSlot = async function (
-  slotId: mongoose.Types.ObjectId,
-  userId: mongoose.Types.ObjectId,
-  appointmentId: mongoose.Types.ObjectId
-): Promise<boolean> {
-  const slot = this.slots.find(slot => slot._id?.equals(slotId));
-
-  if (slot && slot.status === SlotStatus.AVAILABLE) {
-    slot.status = SlotStatus.BOOKED;
-    slot.isBooked = true;
-    slot.userId = userId;
-    slot.appointmentId = appointmentId;
-    slot.lastUpdated = new Date();
-    await this.save();
-    return true;
-  }
-  return false;
-};
-
-// Instance method to start a session
-AvailabilitySchema.methods.startSession = async function (
-  slotId: mongoose.Types.ObjectId
-): Promise<boolean> {
-  const slot = this.slots.find(slot => slot._id?.equals(slotId));
-
-  if (slot && slot.status === SlotStatus.BOOKED) {
-    slot.status = SlotStatus.IN_PROGRESS;
-    slot.sessionStartedAt = new Date();
-    slot.lastUpdated = new Date();
-    await this.save();
-    return true;
-  }
-  return false;
-};
-
-// Instance method to complete a session
-AvailabilitySchema.methods.completeSession = async function (
-  slotId: mongoose.Types.ObjectId,
-  notes?: string
-): Promise<boolean> {
-  const slot = this.slots.find(slot => slot._id?.equals(slotId));
-
-  if (slot && slot.status === SlotStatus.IN_PROGRESS) {
-    slot.status = SlotStatus.COMPLETED;
-    slot.sessionEndedAt = new Date();
-    if (notes) {
-      slot.notes = notes;
-    }
-    slot.lastUpdated = new Date();
-    await this.save();
-    return true;
-  }
-  return false;
-};
-
-// Instance method to cancel a slot
-AvailabilitySchema.methods.cancelSlot = async function (
-  slotId: mongoose.Types.ObjectId
-): Promise<boolean> {
-  const slot = this.slots.find(slot => slot._id?.equals(slotId));
-
-  if (
-    slot &&
-    (slot.status === SlotStatus.BOOKED ||
-      slot.status === SlotStatus.IN_PROGRESS)
-  ) {
-    slot.status = SlotStatus.CANCELLED;
-    slot.lastUpdated = new Date();
-    await this.save();
-    return true;
-  }
-  return false;
-};
-
-// Instance method to mark a slot as missed
-AvailabilitySchema.methods.markMissed = async function (
-  slotId: mongoose.Types.ObjectId
-): Promise<boolean> {
-  const slot = this.slots.find(slot => slot._id?.equals(slotId));
-
-  if (slot && slot.status === SlotStatus.BOOKED) {
-    slot.status = SlotStatus.MISSED;
-    slot.lastUpdated = new Date();
-    await this.save();
-    return true;
-  }
-  return false;
-};
 
 // Indexes
 AvailabilitySchema.index({ psychologistId: 1, isActive: 1 });

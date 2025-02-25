@@ -249,12 +249,49 @@ export async function GET(req: NextRequest) {
   }
 }
 
+enum TimePeriod {
+  MORNING = 'MORNING',
+  AFTERNOON = 'AFTERNOON',
+  EVENING = 'EVENING',
+  NIGHT = 'NIGHT',
+}
+const getTimePeriod = (hour: number): string => {
+  console.log('⏰ Calculating time period for:', {
+    hour: hour,
+    timeOfDay: `${hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`,
+    duration: 'Not related to duration',
+  });
+
+  if (hour >= 0 && hour <= 11) {
+    return 'MORNING'; // 12:00 AM (0) to 11:59 AM
+  } else if (hour >= 12 && hour <= 16) {
+    return 'AFTERNOON'; // 12:00 PM to 4:59 PM
+  } else if (hour >= 17 && hour <= 20) {
+    return 'EVENING'; // 5:00 PM to 8:59 PM
+  } else {
+    return 'NIGHT'; // 9:00 PM to 11:59 PM
+  }
+};
+
 export async function POST(req: NextRequest) {
+  console.log('📝 Starting availability creation process');
+
   return withAuth(
     async (req: NextRequest, token: AuthToken) => {
       try {
         await connectDB();
         const data: CreateAvailabilityData = await req.json();
+
+        const validDays = data.daysOfWeek.every(day => day >= 0 && day <= 6);
+        if (!validDays) {
+          return NextResponse.json(
+            createErrorResponse(
+              400,
+              'Days must be between 0 (Sunday) and 6 (Saturday)'
+            ),
+            { status: 400 }
+          );
+        }
 
         const {
           daysOfWeek,
@@ -265,16 +302,11 @@ export async function POST(req: NextRequest) {
             'Asia/Kathmandu',
         } = data;
 
-        const hour = parseInt(startTime.split(':')[0]);
-        let timePeriod;
-        if (hour >= 0 && hour <= 11) {
-          timePeriod = 'MORNING';
-        } else if (hour >= 12 && hour <= 16) {
-          timePeriod = 'AFTERNOON';
-        } else if (hour >= 17 && hour <= 20) {
-          timePeriod = 'EVENING';
-        } else {
-          timePeriod = 'NIGHT';
+        if (!daysOfWeek?.length) {
+          return NextResponse.json(
+            createErrorResponse(400, 'Days of week are required'),
+            { status: 400 }
+          );
         }
 
         const formattedStartTime = formatTimeToHHMM(startTime);
@@ -295,26 +327,11 @@ export async function POST(req: NextRequest) {
         }
 
         const duration = Number(durationInput);
-
-        if (isNaN(duration)) {
-          return NextResponse.json(
-            createErrorResponse(400, 'Duration must be a valid number'),
-            { status: 400 }
-          );
-        }
-
-        if (!daysOfWeek?.length) {
-          return NextResponse.json(
-            createErrorResponse(400, 'Days of week are required'),
-            { status: 400 }
-          );
-        }
-
         const allowedDurations = Object.values(SessionDuration).filter(
           value => typeof value === 'number'
         );
 
-        if (!allowedDurations.includes(duration)) {
+        if (isNaN(duration) || !allowedDurations.includes(duration)) {
           return NextResponse.json(
             createErrorResponse(
               400,
@@ -326,9 +343,14 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const psychologist = await Psychologist.findById(token.id).select(
-          'firstName lastName profileImage sessionFee'
-        );
+        const psychologist = await Psychologist.findById(token.id)
+          .select('firstName lastName profileImage sessionFee')
+          .lean<{
+            firstName: string;
+            lastName: string;
+            profileImage?: string;
+            sessionFee: number;
+          }>();
 
         if (!psychologist) {
           return NextResponse.json(
@@ -347,7 +369,7 @@ export async function POST(req: NextRequest) {
             },
           ],
           isActive: true,
-        });
+        }).lean();
 
         if (overlappingSlots) {
           return NextResponse.json(
@@ -355,6 +377,9 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
+
+        const hour = parseInt(formattedStartTime.split(':')[0]);
+        const timePeriod = getTimePeriod(hour);
 
         const availability = new Availability({
           psychologistId: token.id,
@@ -365,35 +390,42 @@ export async function POST(req: NextRequest) {
           timezone,
           timePeriods: [timePeriod],
           psychologistDetails: {
-            name: `${psychologist.firstName} ${psychologist.lastName}`,
+            name: `${psychologist.firstName} ${psychologist.lastName}`.trim(),
             profilePhotoUrl: psychologist.profileImage,
             sessionFee: psychologist.sessionFee,
           },
           isActive: true,
         });
 
-        availability.slots = availability.slots.map(slot => ({
-          ...slot,
-          timePeriods: [timePeriod],
-        }));
-
         const savedAvailability = await availability.save();
+        console.log(
+          `✅ Created availability with ${savedAvailability.slots.length} slots`
+        );
 
         return NextResponse.json(
           createSuccessResponse(201, {
             message: 'Availability created successfully',
-            availability: savedAvailability,
+            availability: {
+              ...savedAvailability.toJSON(),
+              totalSlots: savedAvailability.slots.length,
+              firstSlot: savedAvailability.slots[0],
+              lastSlot:
+                savedAvailability.slots[savedAvailability.slots.length - 1],
+            },
             slotsCreated: savedAvailability.slots.length,
             sessionDuration: savedAvailability.duration,
+            timePeriod,
           }),
           { status: 201 }
         );
       } catch (error) {
-        console.error('Create availability error:', error);
+        console.error('Error creating availability:', error);
         return NextResponse.json(
           createErrorResponse(
             500,
-            'Error creating availability: ' + (error as Error).message
+            `Error creating availability: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`
           ),
           { status: 500 }
         );

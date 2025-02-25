@@ -10,6 +10,7 @@ const config = Object.freeze({
   jwtSecret: process.env.JWT_SECRET,
   jwtRefreshSecret: process.env.REFRESH_TOKEN,
   secretKey: process.env.CLIENT_SECRET_KEY || '',
+  monogUri: process.env.MONGO_URI || '',
 });
 
 export default config;

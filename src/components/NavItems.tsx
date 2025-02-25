@@ -31,6 +31,11 @@ export const USER_NAV_ITEMS = [
     href: '/stories',
   },
   {
+    icon: <Messages />,
+    text: 'Inbox',
+    href: '/inbox',
+  },
+  {
     icon: <ServicesIcon />,
     text: 'Services',
     href: '/services',
@@ -40,6 +45,7 @@ export const USER_NAV_ITEMS = [
     text: 'Psychologist',
     href: '/psychologist',
   },
+
   {
     icon: <ArticlesIcon />,
     text: 'Articles',

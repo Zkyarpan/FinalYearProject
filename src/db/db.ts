@@ -1,9 +1,15 @@
 import mongoose from 'mongoose';
-import User from '@/models/User';
-import Appointment from '@/models/Appointment';
-import Availability from '@/models/Availability';
+import User from '../models/User';
+import Appointment from '../models/Appointment';
+import Availability from '../models/Availability';
+import config from '../config/config';
+import dotenv from 'dotenv';
 
-const MONGODB_URI = process.env.MONGO_URI!;
+dotenv.config();
+
+const MONGODB_URI =
+  process.env.MONGO_URI ||
+  'mongodb+srv://mrarpann22:9uANsNhZMVpbxEU0@mentality.5aunh.mongodb.net/mentality?retryWrites=true&w=majority&appName=mentality';
 
 if (!MONGODB_URI) {
   throw new Error('MONGO_URI is not defined in the environment variables');

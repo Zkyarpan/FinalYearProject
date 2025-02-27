@@ -9,6 +9,7 @@ import NextTopLoader from 'nextjs-toploader';
 import AuthGuard from '@/providers/AuthGuard';
 import { StripeProvider } from '@/providers/stripe-provider';
 import { SocketProvider } from '@/context/SocketContext';
+import { ChatProvider } from '../context/ChatContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -61,7 +62,9 @@ export default function RootLayout({
           <NavbarWrapper />
           <AuthGuard>
             <StripeProvider>
-              <SocketProvider>{children}</SocketProvider>
+              <SocketProvider>
+                <ChatProvider>{children}</ChatProvider>
+              </SocketProvider>
             </StripeProvider>
           </AuthGuard>
           <FooterWrapper />

@@ -60,8 +60,24 @@ const PsychologistDirectory = () => {
       try {
         const response = await fetch('/api/psychologist/profile');
         const data = await response.json();
+
+        // Check the structure of the response data
+        console.log('API Response:', data);
+
         if (data.IsSuccess) {
-          setPsychologists(data.Result.psychologists);
+          // If the response has the old structure with nested psychologists
+          if (data.Result && data.Result.psychologists) {
+            setPsychologists(data.Result.psychologists);
+          }
+          // If the response has the new structure with direct array
+          else if (Array.isArray(data.Result)) {
+            setPsychologists(data.Result);
+          }
+          // Fallback for other structures
+          else {
+            console.error('Unexpected API response structure:', data);
+            setPsychologists([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching psychologists:', error);

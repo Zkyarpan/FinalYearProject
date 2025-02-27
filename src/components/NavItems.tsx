@@ -86,8 +86,8 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   },
   {
     icon: <Messages />,
-    text: 'Messages',
-    href: '/psychologist/messages',
+    text: 'Inbox',
+    href: '/inbox',
   },
   {
     icon: <ArticlesIcon />,

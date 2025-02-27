@@ -106,7 +106,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log('Found blog:', blog._id);
 
     const profile = await Profile.findOne({
       user: blog.author._id,

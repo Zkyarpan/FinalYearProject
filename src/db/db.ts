@@ -2,8 +2,13 @@ import mongoose from 'mongoose';
 import User from '../models/User';
 import Appointment from '../models/Appointment';
 import Availability from '../models/Availability';
-import config from '../config/config';
 import dotenv from 'dotenv';
+
+// Import the Psychologist model - this is crucial for the conversations API
+// If you don't have this file, you'll need to create it based on your schema requirements
+import Psychologist from '../models/Psychologist';
+import Conversation from '../models/Conversation';
+import Message from '../models/Message';
 
 dotenv.config();
 
@@ -30,25 +35,58 @@ globalThis.mongooseCache = globalThis.mongooseCache || {
   promise: null,
 };
 
+// Track model initialization status
+let modelsInitialized = false;
+
 // Initialize models function
 async function initializeModels() {
   try {
+    if (modelsInitialized) {
+      // Skip if models are already initialized
+      return;
+    }
+
     // Wait for connection to be ready
     await mongoose.connection.asPromise();
 
-    // Initialize models in order of dependency
+    // Initialize all models in order of dependency
     if (!mongoose.models.User) {
+      console.log('Initializing User model');
       User;
     }
+
+    if (!mongoose.models.Psychologist) {
+      console.log('Initializing Psychologist model');
+      Psychologist;
+    }
+
+    if (!mongoose.models.Conversation) {
+      console.log('Initializing Conversation model');
+      Conversation;
+    }
+
+    if (!mongoose.models.Message) {
+      console.log('Initializing Message model');
+      Message;
+    }
+
     if (!mongoose.models.Appointment) {
+      console.log('Initializing Appointment model');
       Appointment;
     }
+
     if (!mongoose.models.Availability) {
+      console.log('Initializing Availability model');
       Availability;
     }
+
+    modelsInitialized = true;
     console.log('✅ Models initialized successfully');
+
+
   } catch (error) {
     console.error('❌ Error initializing models:', error);
+    modelsInitialized = false;
     throw error;
   }
 }
@@ -70,8 +108,10 @@ const connectDB = async (): Promise<typeof mongoose> => {
       return mongoose;
     }
 
+    console.log('🔄 Creating new MongoDB connection...');
+
     const opts = {
-      bufferCommands: true, // Changed to true to allow buffering commands
+      bufferCommands: true, // Keep true to allow buffering commands
       maxPoolSize: 10,
       minPoolSize: 5,
       socketTimeoutMS: 30000,
@@ -95,11 +135,13 @@ const connectDB = async (): Promise<typeof mongoose> => {
 
     mongoose.connection.on('error', err => {
       console.error('❌ MongoDB connection error:', err);
+      modelsInitialized = false;
       globalThis.mongooseCache.promise = null;
     });
 
     mongoose.connection.on('disconnected', () => {
       console.log('❗MongoDB disconnected');
+      modelsInitialized = false;
       globalThis.mongooseCache.promise = null;
     });
 
@@ -119,10 +161,14 @@ const connectDB = async (): Promise<typeof mongoose> => {
     await globalThis.mongooseCache.promise;
     globalThis.mongooseCache.conn = mongoose;
 
+    // Make sure models are initialized
+    await initializeModels();
+
     return mongoose;
   } catch (error) {
     globalThis.mongooseCache.promise = null;
     globalThis.mongooseCache.conn = null;
+    modelsInitialized = false;
     console.error('❌ Failed to connect to MongoDB:', error);
     throw error;
   }

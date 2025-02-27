@@ -119,6 +119,8 @@ const RootLayout = ({ children }) => {
     );
   };
 
+  const psychologistId = pathname.split('/')[2];
+
   const showBackButton =
     isNestedBlogRoute ||
     (pathname.startsWith('/psychologist/') &&
@@ -139,8 +141,7 @@ const RootLayout = ({ children }) => {
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
       pathname === '/' ||
-      isAccountPage ||
-      (isAuthenticated && pathname === '/inbox'));
+      isAccountPage);
 
   const handleNavigation = (path, requiresAuth = false) => {
     if (requiresAuth && !isAuthenticated) {
@@ -193,7 +194,6 @@ const RootLayout = ({ children }) => {
       '/articles': ArticlesSection,
       '/resources': ResourcesSection,
       '/': StoriesSection,
-      '/inbox': InboxSection,
     };
 
     let SectionComponent = sections[pathname];
@@ -381,7 +381,7 @@ const RootLayout = ({ children }) => {
                   {/* Message Button for Psychologist Profile */}
                   {isPsychologistProfileRoute(pathname) && (
                     <Link
-                      href={'/inbox'}
+                      href={`/inbox?psychologistId=${psychologistId}`}
                       type="button"
                       className="justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
                     >

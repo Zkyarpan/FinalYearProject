@@ -313,9 +313,8 @@ PsychologistSchema.index({
   sessionFee: 1,
 });
 
-// Create or retrieve the model
 const Psychologist =
   mongoose.models.Psychologist ||
-  mongoose.model<IPsychologist>('Psychologist', PsychologistSchema);
+  mongoose.model('Psychologist', PsychologistSchema);
 
 export default Psychologist;

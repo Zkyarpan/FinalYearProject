@@ -27,6 +27,10 @@ import LoginModal from '@/components/LoginModel';
 import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
 import { DEFAULT_AVATAR } from '@/constants';
+import FilterSection from '@/components/FilterSection';
+import PsychologistProfileHighlights from '@/components/PsychologistProfileHighlights';
+import Messages from '@/icons/Messages';
+import InboxSection from '@/components/InboxRightSection';
 
 const routeTitles = {
   // User routes
@@ -40,12 +44,13 @@ const routeTitles = {
   '/notifications': 'Notifications',
   '/dashboard': 'Dashboard',
   '/appointments': 'Appointments',
+  '/inbox': 'Inbox',
 
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
   '/psychologist/patients': 'My Patients',
   '/psychologist/appointments': 'Your Appointments',
-  '/psychologist/messages': 'Messages',
+  '/psychologist/messages': 'Inbox',
   '/psychologist/articles': 'My Articles',
   '/psychologist/blog': 'My Blogs',
   '/psychologist/availability': 'My Availability',
@@ -73,7 +78,8 @@ const RootLayout = ({ children }) => {
       : USER_NAV_ITEMS.filter(
           item =>
             !item.href.includes('dashboard') &&
-            !item.href.includes('appointments')
+            !item.href.includes('appointments') &&
+            !item.href.includes('inbox')
         );
 
   const isAccountPage =
@@ -113,6 +119,8 @@ const RootLayout = ({ children }) => {
     );
   };
 
+  const psychologistId = pathname.split('/')[2];
+
   const showBackButton =
     isNestedBlogRoute ||
     (pathname.startsWith('/psychologist/') &&
@@ -126,13 +134,12 @@ const RootLayout = ({ children }) => {
 
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
-      (isAuthenticated &&
-        !isDashboardPage &&
-        role === 'user' &&
-        !pathname.startsWith('/psychologist'))) &&
+      (isAuthenticated && !isDashboardPage && role === 'user')) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
       pathname === '/psychologist' ||
+      (pathname.startsWith('/psychologist/') &&
+        !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
       pathname === '/' ||
       isAccountPage);
 
@@ -180,7 +187,8 @@ const RootLayout = ({ children }) => {
 
     const sections = {
       '/blogs': BlogRightSection,
-      '/psychologist': PsychologistSection,
+      '/psychologist': FilterSection,
+      '/psychologist/:path*': FilterSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
@@ -188,7 +196,14 @@ const RootLayout = ({ children }) => {
       '/': StoriesSection,
     };
 
-    const SectionComponent = sections[pathname];
+    let SectionComponent = sections[pathname];
+
+    if (
+      pathname.startsWith('/psychologist/') &&
+      !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))
+    ) {
+      SectionComponent = PsychologistProfileHighlights;
+    }
 
     if (SectionComponent) {
       return (
@@ -362,20 +377,32 @@ const RootLayout = ({ children }) => {
                     <h1 className="text-base font-semibold">{title}</h1>
                   )}
                 </div>
-                {!showRightSidebar && (
-                  <div className="relative z-[102]">
-                    <UserActions
-                      isAuthenticated={isAuthenticated}
-                      profileImage={profileImage}
-                      role={role}
-                      firstName={firstName}
-                      lastName={lastName}
-                      router={router}
-                      onLoginClick={() => setShowLoginModal(true)}
-                      logout={logout}
-                    />
-                  </div>
-                )}
+                <div className="flex items-center gap-x-3">
+                  {/* Message Button for Psychologist Profile */}
+                  {isPsychologistProfileRoute(pathname) && (
+                    <Link
+                      href={`/inbox?psychologistId=${psychologistId}`}
+                      type="button"
+                      className="justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                      <Messages />
+                    </Link>
+                  )}
+                  {!showRightSidebar && (
+                    <div className="relative z-[102]">
+                      <UserActions
+                        isAuthenticated={isAuthenticated}
+                        profileImage={profileImage}
+                        role={role}
+                        firstName={firstName}
+                        lastName={lastName}
+                        router={router}
+                        onLoginClick={() => setShowLoginModal(true)}
+                        logout={logout}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

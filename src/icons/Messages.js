@@ -10,7 +10,7 @@ const Messages = () => {
         height={24}
         color={'#000000'}
         fill={'none'}
-        className="text-black dark:text-white"
+        className="text-black dark:text-white/80"
       >
         <path
           d="M8.5 14.5H15.5M8.5 9.5H12"

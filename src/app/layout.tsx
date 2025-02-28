@@ -4,10 +4,12 @@ import './globals.css';
 import NavbarWrapper from '@/components/NavbarWrapper';
 import FooterWrapper from '@/components/FooterWrapper';
 import { Toaster } from 'sonner';
-import { ThemeProviders } from './providers/ThemeProviders';
+import { ThemeProviders } from '@/providers/ThemeProviders';
 import NextTopLoader from 'nextjs-toploader';
-import AuthGuard from './providers/AuthGuard';
-import { StripeProvider } from './providers/stripe-provider';
+import AuthGuard from '@/providers/AuthGuard';
+import { StripeProvider } from '@/providers/stripe-provider';
+import { SocketProvider } from '@/context/SocketContext';
+import { ChatProvider } from '../context/ChatContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -59,7 +61,11 @@ export default function RootLayout({
           <Toaster position="bottom-right" richColors />
           <NavbarWrapper />
           <AuthGuard>
-            <StripeProvider>{children}</StripeProvider>
+            <StripeProvider>
+              <SocketProvider>
+                <ChatProvider>{children}</ChatProvider>
+              </SocketProvider>
+            </StripeProvider>
           </AuthGuard>
           <FooterWrapper />
         </ThemeProviders>

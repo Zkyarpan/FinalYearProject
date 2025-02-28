@@ -92,19 +92,36 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const { fields, files } = await parseForm(req);
-    const { profilePhoto, certificateOrLicense } = files;
-    const { email, password } = fields;
 
-    if (!email || !password) {
+    // Validate required fields first
+    const requiredFields = ['email', 'password', 'firstName', 'lastName'];
+    for (const field of requiredFields) {
+      if (!fields[field]) {
+        return NextResponse.json(
+          createErrorResponse(400, `${field} is required.`),
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate required files
+    if (!files.profilePhoto?.buffer || !files.certificateOrLicense?.buffer) {
       return NextResponse.json(
-        createErrorResponse(400, 'All fields are required.'),
+        createErrorResponse(
+          400,
+          'Profile photo and certificate/license are required.'
+        ),
         { status: 400 }
       );
     }
 
+    const { email, password } = fields;
+
+    // Check for existing user
     const existingUser = await Psychologist.findOne({
-      email: email.toLowerCase(),
+      email: email.toString().toLowerCase(),
     });
+
     if (existingUser) {
       return NextResponse.json(
         createErrorResponse(400, 'Email already registered.'),
@@ -112,19 +129,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const profilePhotoUrl = await uploadToCloudinary({
-      fileBuffer: profilePhoto.buffer,
-      folder: 'photos/profile-images',
-      filename: profilePhoto.originalFilename,
-      mimetype: profilePhoto.mimetype,
-    });
+    // Upload files with proper error handling
+    let profilePhotoUrl, certificateOrLicenseUrl;
+    try {
+      profilePhotoUrl = await uploadToCloudinary({
+        fileBuffer: files.profilePhoto.buffer,
+        folder: 'photos/profile-images',
+        filename: files.profilePhoto.originalFilename || 'profile-photo',
+        mimetype: files.profilePhoto.mimetype || 'image/jpeg',
+      });
 
-    const certificateOrLicenseUrl = await uploadToCloudinary({
-      fileBuffer: certificateOrLicense.buffer,
-      folder: 'photos/certificates',
-      filename: certificateOrLicense.originalFilename,
-      mimetype: certificateOrLicense.mimetype,
-    });
+      certificateOrLicenseUrl = await uploadToCloudinary({
+        fileBuffer: files.certificateOrLicense.buffer,
+        folder: 'photos/certificates',
+        filename: files.certificateOrLicense.originalFilename || 'certificate',
+        mimetype: files.certificateOrLicense.mimetype || 'image/jpeg',
+      });
+    } catch (error) {
+      console.error('File upload error:', error);
+      return NextResponse.json(
+        createErrorResponse(500, 'Failed to upload files.'),
+        { status: 500 }
+      );
+    }
+
+    // Safely parse JSON fields with fallbacks
+    const safeJSONParse = (value: any, defaultValue: any) => {
+      try {
+        return value ? JSON.parse(value) : defaultValue;
+      } catch {
+        return defaultValue;
+      }
+    };
 
     const verificationCode = Math.floor(
       100000 + Math.random() * 900000
@@ -134,38 +170,39 @@ export async function POST(req: NextRequest) {
     const psychologistData = {
       firstName: fields.firstName,
       lastName: fields.lastName,
-      email: email.toLowerCase(),
+      email: email.toString().toLowerCase(),
       password: hashedPassword,
-      country: fields.country,
-      streetAddress: fields.streetAddress,
-      city: fields.city,
-      about: fields.about,
+      country: fields.country || '',
+      streetAddress: fields.streetAddress || '',
+      city: fields.city || '',
+      about: fields.about || '',
       profilePhotoUrl,
       certificateOrLicenseUrl,
-      licenseNumber: fields.licenseNumber,
-      licenseType: fields.licenseType,
-      yearsOfExperience: fields.yearsOfExperience,
-      education: JSON.parse(fields.education),
-      specializations: JSON.parse(fields.specializations),
-      languages: JSON.parse(fields.languages),
-      sessionDuration: parseInt(fields.sessionDuration),
-      sessionFee: parseFloat(fields.sessionFee),
-      sessionFormats: JSON.parse(fields.sessionFormats),
+      licenseNumber: fields.licenseNumber || '',
+      licenseType: fields.licenseType || '',
+      yearsOfExperience: fields.yearsOfExperience || 0,
+      education: safeJSONParse(fields.education, []),
+      specializations: safeJSONParse(fields.specializations, []),
+      languages: safeJSONParse(fields.languages, []),
+      sessionDuration: 60, // Fixed at 1 hour
+      sessionFee: parseFloat(fields.sessionFee) || 0,
+      sessionFormats: safeJSONParse(fields.sessionFormats, []),
       acceptsInsurance: Boolean(fields.acceptsInsurance),
-      insuranceProviders: JSON.parse(fields.insuranceProviders),
-      availability: JSON.parse(fields.availability),
+      insuranceProviders: safeJSONParse(fields.insuranceProviders, []),
+      availability: safeJSONParse(fields.availability, {}),
       acceptingNewClients: Boolean(fields.acceptingNewClients),
-      ageGroups: JSON.parse(fields.ageGroups),
+      ageGroups: safeJSONParse(fields.ageGroups, []),
       isVerified: false,
       role: 'psychologist',
     };
 
     const token = await encrypt({ ...psychologistData });
 
+    // Update or create temporary token
     await TemporaryToken.findOneAndUpdate(
-      { email: email.toLowerCase() },
+      { email: email.toString().toLowerCase() },
       {
-        email: email.toLowerCase(),
+        email: email.toString().toLowerCase(),
         token,
         verificationCode,
         verificationCodeExpiry: new Date(Date.now() + 15 * 60 * 1000),
@@ -173,6 +210,7 @@ export async function POST(req: NextRequest) {
       { upsert: true, new: true }
     );
 
+    // Send verification email
     const emailResult = await sendVerificationEmail(email, verificationCode);
     if (!emailResult.success) {
       return NextResponse.json(
@@ -189,6 +227,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
+    // Set cookie
     response.cookies.set('tempToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

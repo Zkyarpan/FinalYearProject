@@ -6,11 +6,11 @@ const Location = () => {
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        width={24}
-        height={24}
+        width={20}
+        height={20}
         color={'#000000'}
         fill={'none'}
-        className="text-black dark:text-white"
+        className="text-black dark:text-white/80"
       >
         <path
           d="M7 18C5.17107 18.4117 4 19.0443 4 19.7537C4 20.9943 7.58172 22 12 22C16.4183 22 20 20.9943 20 19.7537C20 19.0443 18.8289 18.4117 17 18"

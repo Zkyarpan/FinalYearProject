@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useRouter } from 'next/navigation';
 import Loader from '@/components/common/Loader';
 import { useUserStore } from '@/store/userStore';
 import Link from 'next/link';
@@ -17,7 +17,7 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Please enter a password.'),
 });
 
-const LoginForm = () => {
+export default function LoginForm() {
   const { setUser } = useUserStore();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +59,7 @@ const LoginForm = () => {
       if (data.Result?.accessToken) {
         const userData = data.Result.user_data;
 
-        setUser({
+        const userObj = {
           _id: userData.id,
           email: userData.email,
           role: userData.role,
@@ -68,7 +68,9 @@ const LoginForm = () => {
           firstName: userData.firstName || null,
           lastName: userData.lastName || null,
           profileImage: userData.profileImage || null,
-        });
+        };
+
+        setUser(userObj);
 
         toast.success('Login successful!');
         setIsLoading(false);
@@ -112,7 +114,7 @@ const LoginForm = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
               />
             </div>
 
@@ -129,7 +131,7 @@ const LoginForm = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="block w-full rounded-md  px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+                  className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
                 />
                 <Button
                   type="button"
@@ -206,6 +208,4 @@ const LoginForm = () => {
       </div>
     </>
   );
-};
-
-export default LoginForm;
+}

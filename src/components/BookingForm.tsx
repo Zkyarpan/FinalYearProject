@@ -1,8 +1,5 @@
-'use client';
-
 import React from 'react';
-import { format } from 'date-fns';
-import { CalendarIcon, Clock } from 'lucide-react';
+import { Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -15,18 +12,37 @@ export const BookingForm = ({
   onCancel,
   isLoading,
 }) => {
+  const formatDateTime = () => {
+    try {
+      const date = new Date(selectedSlot.start);
+      const formattedDate = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      return formattedDate;
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return 'Invalid Date';
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-secondary/20 dark:bg-input border p-2 rounded-lg space-y-1 text-sm">
         <div className="flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4" />
-          <span>{format(selectedSlot.start, 'EEEE, MMMM d, yyyy')}</span>
+          <Calendar className="h-4 w-4" />
+          <span>{formatDateTime()}</span>
         </div>
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4" />
           <span>
-            {format(selectedSlot.start, 'h:mm a')} -{' '}
-            {format(selectedSlot.end, 'h:mm a')}
+            {selectedSlot.extendedProps?.originalStartTime ||
+              selectedSlot.originalStartTime}{' '}
+            -{' '}
+            {selectedSlot.extendedProps?.originalEndTime ||
+              selectedSlot.originalEndTime}
           </span>
         </div>
       </div>
@@ -43,7 +59,7 @@ export const BookingForm = ({
               onChange={e =>
                 onUpdateBookingDetails({ patientName: e.target.value })
               }
-              className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+              className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-border placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
             />
           </div>
           <div className="space-y-1">
@@ -55,7 +71,7 @@ export const BookingForm = ({
               type="email"
               value={bookingDetails.email}
               onChange={e => onUpdateBookingDetails({ email: e.target.value })}
-              className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+              className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-border placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
             />
           </div>
         </div>
@@ -69,7 +85,7 @@ export const BookingForm = ({
               id="phone"
               value={bookingDetails.phone}
               onChange={e => onUpdateBookingDetails({ phone: e.target.value })}
-              className="block w-full rounded-md px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+              className="block w-full rounded-md px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-border placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
             />
           </div>
           <div className="space-y-1">
@@ -81,14 +97,16 @@ export const BookingForm = ({
               }
               className="flex gap-3"
             >
-              {selectedSlot.sessionFormats.map(format => (
-                <div key={format} className="flex items-center space-x-1">
-                  <RadioGroupItem value={format} id={format} />
-                  <Label htmlFor={format} className="text-sm">
-                    {format}
-                  </Label>
-                </div>
-              ))}
+              {(selectedSlot.extendedProps?.sessionFormats || ['video']).map(
+                format => (
+                  <div key={format} className="flex items-center space-x-1">
+                    <RadioGroupItem value={format} id={format} />
+                    <Label htmlFor={format} className="text-sm capitalize">
+                      {format}
+                    </Label>
+                  </div>
+                )
+              )}
             </RadioGroup>
           </div>
         </div>
@@ -103,7 +121,7 @@ export const BookingForm = ({
             onChange={e =>
               onUpdateBookingDetails({ reasonForVisit: e.target.value })
             }
-            className="block w-full rounded-md h-20 px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+            className="block w-full rounded-md h-20 px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-border placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
           />
         </div>
 
@@ -115,7 +133,7 @@ export const BookingForm = ({
             id="notes"
             value={bookingDetails.notes}
             onChange={e => onUpdateBookingDetails({ notes: e.target.value })}
-            className="block w-full rounded-md h-20 px-3 py-1.5 text-base text-[hsl(var(--foreground))] outline outline-1 -outline-offset-1 outline-[hsl(var(--border))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
+            className="block w-full rounded-md h-20 px-3 py-1.5 text-base text-foreground outline outline-1 -outline-offset-1 outline-border placeholder:text-muted-foreground outline-none focus-visible:ring-transparent sm:text-sm dark:bg-input"
           />
         </div>
       </div>
@@ -127,7 +145,10 @@ export const BookingForm = ({
         <Button onClick={onSubmit} disabled={isLoading} className="h-8">
           {isLoading
             ? 'Processing...'
-            : `Proceed to Payment ($${selectedSlot.sessionFee})`}
+            : `Proceed to Payment ($${
+                selectedSlot.extendedProps?.sessionFee ||
+                selectedSlot.sessionFee
+              })`}
         </Button>
       </div>
     </div>

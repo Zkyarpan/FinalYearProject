@@ -12,8 +12,6 @@ export async function POST(req: NextRequest) {
       await connectDB();
 
       const { paymentIntentId, status } = await req.json();
-      console.log('paymentIntentId:', paymentIntentId);
-      console.log('status:', status);
 
       if (!paymentIntentId || !status) {
         return NextResponse.json(

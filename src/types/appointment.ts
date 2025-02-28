@@ -28,21 +28,33 @@ export interface PsychologistDetails {
 }
 
 export interface SelectedSlot {
-  start: Date;
-  end: Date;
+  start: string;
+  title: string;
+  end: string;
   psychologistId: string;
   psychologistName: string;
-  about: string;
-  languages: string[];
+  psychologistPhoto: string;
   sessionDuration: number;
   sessionFee: number;
+  sessionFormat: string;
+  timezone: string;
+  rawStartTime: string;
+  rawEndTime: string;
+  originalStartTime: string;
+  originalEndTime: string;
+  about: string;
   sessionFormats: string[];
-  specializations: string[];
-  acceptsInsurance: boolean;
-  insuranceProviders: string[];
+  timePeriods: string[];
+  profilePhotoUrl: string;
   licenseType: string;
   yearsOfExperience: number;
-  profilePhotoUrl: string;
+  languages: string[];
+  specializations: string[];
+  id: string;
+  date: string;
+  status: string;
+  isBooked: boolean;
+  acceptsInsurance: boolean;
 }
 
 export interface BookingDetails {
@@ -68,5 +80,3 @@ export interface AppointmentEvent {
   className?: string;
   extendedProps?: Record<string, any>;
 }
-
-

@@ -10,7 +10,7 @@ const Users = () => {
         height={24}
         color={'#000000'}
         fill={'none'}
-        className="text-black dark:text-white"
+        className="text-black dark:text-white/80"
       >
         <path
           d="M7.5 19.5C7.5 18.5344 7.82853 17.5576 8.63092 17.0204C9.59321 16.3761 10.7524 16 12 16C13.2476 16 14.4068 16.3761 15.3691 17.0204C16.1715 17.5576 16.5 18.5344 16.5 19.5"

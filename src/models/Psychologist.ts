@@ -1,25 +1,52 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+// Define interfaces for stronger typing
+export interface ISlot {
+  id: string;
+  startTime: string;
+  originalStartTime: string;
+  endTime: string;
+  originalEndTime: string;
+  date: string;
+  duration: number;
+  timePeriods: string[];
+  isBooked?: boolean;
+}
+
+export interface IAvailabilityDay {
+  available: boolean;
+  startTime?: string;
+  endTime?: string;
+  slots?: ISlot[];
+}
+
 export interface IPsychologist extends Document {
+  // Personal Information
   firstName: string;
   lastName: string;
+  fullName: string;
   email: string;
   country: string;
-  role: 'admin' | 'psychologist' | 'user';
-  streetAddress: string;
   city: string;
+  streetAddress: string;
   about: string;
-  profilePhotoUrl?: string;
-  certificateOrLicenseUrl?: string;
-  password: string;
-  isVerified: boolean;
 
+  // Professional Details
+  role: 'admin' | 'psychologist' | 'user';
   licenseNumber: string;
   licenseType:
     | 'clinical_psychologist'
     | 'counseling_psychologist'
     | 'psychiatrist'
     | 'mental_health_counselor';
+
+  // Media and Verification
+  profilePhotoUrl?: string;
+  certificateOrLicenseUrl?: string;
+  password: string;
+  isVerified: boolean;
+
+  // Professional Background
   education: {
     degree: string;
     university: string;
@@ -29,48 +56,97 @@ export interface IPsychologist extends Document {
   yearsOfExperience: number;
   languages: string[];
 
+  // Session Details
   sessionDuration: 30 | 50 | 80;
   sessionFee: number;
   sessionFormats: ('in-person' | 'video' | 'phone')[];
 
+  // Insurance and Clients
   acceptsInsurance: boolean;
   insuranceProviders?: string[];
-
-  availability: {
-    monday: { available: boolean; startTime?: string; endTime?: string };
-    tuesday: { available: boolean; startTime?: string; endTime?: string };
-    wednesday: { available: boolean; startTime?: string; endTime?: string };
-    thursday: { available: boolean; startTime?: string; endTime?: string };
-    friday: { available: boolean; startTime?: string; endTime?: string };
-    saturday: { available: boolean; startTime?: string; endTime?: string };
-    sunday: { available: boolean; startTime?: string; endTime?: string };
-  };
-
   acceptingNewClients: boolean;
   ageGroups: ('children' | 'teenagers' | 'adults' | 'seniors')[];
 
+  // Availability
+  availability: {
+    monday: IAvailabilityDay;
+    tuesday: IAvailabilityDay;
+    wednesday: IAvailabilityDay;
+    thursday: IAvailabilityDay;
+    friday: IAvailabilityDay;
+    saturday: IAvailabilityDay;
+    sunday: IAvailabilityDay;
+  };
+
+  // Timestamps
   createdAt: Date;
   updatedAt: Date;
 }
 
-const availabilityDaySchema = new Schema(
+// Slot Schema
+const SlotSchema: Schema = new Schema(
   {
-    available: { type: Boolean, default: false },
-    startTime: String,
-    endTime: String,
+    id: {
+      type: String,
+      required: true,
+    },
+    startTime: {
+      type: String,
+      required: true,
+    },
+    originalStartTime: {
+      type: String,
+      required: true,
+    },
+    endTime: {
+      type: String,
+      required: true,
+    },
+    originalEndTime: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: String,
+      required: true,
+    },
+    duration: {
+      type: Number,
+      required: true,
+    },
+    timePeriods: [
+      {
+        type: String,
+        enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
+      },
+    ],
+    isBooked: {
+      type: Boolean,
+      default: false,
+    },
   },
   { _id: false }
 );
 
-const educationSchema = new Schema(
+// Availability Day Schema
+const AvailabilityDaySchema: Schema = new Schema(
   {
-    degree: { type: String, required: true },
-    university: { type: String, required: true },
-    graduationYear: { type: Number, required: true },
+    available: {
+      type: Boolean,
+      default: false,
+    },
+    startTime: {
+      type: String,
+    },
+    endTime: {
+      type: String,
+    },
+    slots: [SlotSchema],
   },
   { _id: false }
 );
 
+// Main Psychologist Schema
 const PsychologistSchema: Schema = new Schema(
   {
     firstName: {
@@ -83,28 +159,27 @@ const PsychologistSchema: Schema = new Schema(
       required: true,
       trim: true,
     },
+    fullName: {
+      type: String,
+      trim: true,
+    },
     email: {
       type: String,
       required: true,
       unique: true,
       trim: true,
+      lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address.'],
     },
     country: {
       type: String,
       required: true,
     },
-    role: {
-      type: String,
-      enum: ['admin', 'psychologist', 'user'],
-      default: 'psychologist',
-      index: true,
-    },
-    streetAddress: {
+    city: {
       type: String,
       required: true,
     },
-    city: {
+    streetAddress: {
       type: String,
       required: true,
     },
@@ -113,15 +188,10 @@ const PsychologistSchema: Schema = new Schema(
       required: true,
       maxlength: 1000,
     },
-    profilePhotoUrl: String,
-    certificateOrLicenseUrl: String,
-    password: {
+    role: {
       type: String,
-      required: true,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
+      enum: ['admin', 'psychologist', 'user'],
+      default: 'psychologist',
     },
     licenseNumber: {
       type: String,
@@ -137,7 +207,32 @@ const PsychologistSchema: Schema = new Schema(
         'mental_health_counselor',
       ],
     },
-    education: [educationSchema],
+    profilePhotoUrl: String,
+    certificateOrLicenseUrl: String,
+    password: {
+      type: String,
+      required: true,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    education: [
+      {
+        degree: {
+          type: String,
+          required: true,
+        },
+        university: {
+          type: String,
+          required: true,
+        },
+        graduationYear: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
     specializations: [
       {
         type: String,
@@ -155,7 +250,6 @@ const PsychologistSchema: Schema = new Schema(
         required: true,
       },
     ],
-
     sessionDuration: {
       type: Number,
       required: true,
@@ -173,27 +267,20 @@ const PsychologistSchema: Schema = new Schema(
         required: true,
       },
     ],
-
     acceptsInsurance: {
       type: Boolean,
       default: false,
     },
-    insuranceProviders: [
-      {
-        type: String,
-      },
-    ],
-
+    insuranceProviders: [String],
     availability: {
-      monday: availabilityDaySchema,
-      tuesday: availabilityDaySchema,
-      wednesday: availabilityDaySchema,
-      thursday: availabilityDaySchema,
-      friday: availabilityDaySchema,
-      saturday: availabilityDaySchema,
-      sunday: availabilityDaySchema,
+      monday: AvailabilityDaySchema,
+      tuesday: AvailabilityDaySchema,
+      wednesday: AvailabilityDaySchema,
+      thursday: AvailabilityDaySchema,
+      friday: AvailabilityDaySchema,
+      saturday: AvailabilityDaySchema,
+      sunday: AvailabilityDaySchema,
     },
-
     acceptingNewClients: {
       type: Boolean,
       default: true,
@@ -207,16 +294,27 @@ const PsychologistSchema: Schema = new Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-PsychologistSchema.index({ specializations: 1 });
-PsychologistSchema.index({ languages: 1 });
-PsychologistSchema.index({ city: 1, stateOrProvince: 1 });
-PsychologistSchema.index({ sessionFee: 1 });
+// Pre-save middleware to create full name
+PsychologistSchema.pre('save', function (next) {
+  this.fullName = `Dr. ${this.firstName} ${this.lastName}`;
+  next();
+});
+
+// Indexes for performance
+PsychologistSchema.index({
+  specializations: 1,
+  languages: 1,
+  city: 1,
+  sessionFee: 1,
+});
 
 const Psychologist =
   mongoose.models.Psychologist ||
-  mongoose.model<IPsychologist>('Psychologist', PsychologistSchema);
+  mongoose.model('Psychologist', PsychologistSchema);
 
 export default Psychologist;

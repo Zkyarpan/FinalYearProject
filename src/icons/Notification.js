@@ -35,7 +35,7 @@ const Notification = () => {
           viewBox="0 0 24 24"
           width={22}
           height={22}
-          className="text-gray-700 dark:text-gray-200"
+          className="text-black dark:text-white/50"
           fill="none"
         >
           <path

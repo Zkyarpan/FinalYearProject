@@ -191,23 +191,25 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       >
         <div className="flex justify-between items-center">
           <span
-            className={`text-sm font-medium main-font ${
-              isDarkMode ? 'text-zinc-200' : 'text-gray-700'
+            className={`text-2xl font-semibold main-font  ${
+              isDarkMode ? 'text-zinc-200' : 'text-black'
             }`}
           >
-            Amount to pay:
+            Amount to pay
           </span>
           <span
-            className={`text-lg font-semibold ${
+            className={`text-2xl font-semibold main-font ${
               isDarkMode ? 'text-white' : 'text-gray-900'
             }`}
           >
             ${amount}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Lock className="w-3 h-3" />
-          <span className="main-font">Secure payment powered by Stripe</span>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Lock className="w-4 h-4 text-green-500" />
+          <span className="main-font text-sky-500 font-medium">
+            Secure payment powered by Stripe
+          </span>
         </div>
       </div>
 
@@ -248,8 +250,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           disabled={isProcessing || !stripe || !elements}
           className={`h-11 px-5 ${
             isDarkMode
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
+              ? 'bg-blue-700 hover:bg-blue-600'
+              : 'bg-blue-700 hover:bg-blue-600'
           }`}
         >
           {isProcessing ? (
@@ -260,7 +262,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           ) : (
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
-              <span className="main-font">Pay ${amount}</span>
+              <span className="">Pay ${amount}</span>
             </div>
           )}
         </Button>

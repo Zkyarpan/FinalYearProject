@@ -24,10 +24,16 @@ export const USER_NAV_ITEMS = [
     text: 'Appointments',
     href: '/appointments',
   },
+
   {
     icon: <StoriesIcon />,
     text: 'Stories',
     href: '/stories',
+  },
+  {
+    icon: <Messages />,
+    text: 'Inbox',
+    href: '/inbox',
   },
   {
     icon: <ServicesIcon />,
@@ -39,6 +45,7 @@ export const USER_NAV_ITEMS = [
     text: 'Psychologist',
     href: '/psychologist',
   },
+
   {
     icon: <ArticlesIcon />,
     text: 'Articles',
@@ -79,8 +86,8 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   },
   {
     icon: <Messages />,
-    text: 'Messages',
-    href: '/psychologist/messages',
+    text: 'Inbox',
+    href: '/inbox',
   },
   {
     icon: <ArticlesIcon />,

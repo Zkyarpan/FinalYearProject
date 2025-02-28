@@ -1,14 +1,20 @@
-'use client';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import SignupPageClient from './client';
+import Loading from './loading';
 
-import dynamic from 'next/dynamic';
-const SignupForm = dynamic(() => import('@/components/SignUpPage'));
+export default async function SignupPage() {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('accessToken')?.value;
 
-const Signup = () => {
+  if (accessToken) {
+    redirect('/dashboard');
+  }
+
   return (
-    <div>
-      <SignupForm />
-    </div>
+    <Suspense fallback={<Loading />}>
+      <SignupPageClient />
+    </Suspense>
   );
-};
-
-export default Signup;
+}

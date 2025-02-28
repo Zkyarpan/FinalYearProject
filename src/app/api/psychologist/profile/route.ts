@@ -1,3 +1,4 @@
+// app/api/psychologist/ui/route.ts
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,7 +9,22 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    const psychologists = await Psychologist.find({}).exec();
+
+    // Get query parameters
+    const { searchParams } = new URL(req.url);
+    const specialization = searchParams.get('specialization');
+    const limit = parseInt(searchParams.get('limit') || '50');
+
+    // Build query
+    let query: any = {};
+    if (specialization) {
+      query.specializations = { $in: [specialization] };
+    }
+
+    const psychologists = await Psychologist.find(query)
+      .limit(limit)
+      .sort({ firstName: 1 })
+      .exec();
 
     if (!psychologists || psychologists.length === 0) {
       return NextResponse.json(
@@ -19,30 +35,37 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const formattedPsychologists = psychologists.map(profile => ({
-      id: profile._id,
-      firstName: profile.firstName || null,
-      lastName: profile.lastName || null,
-      email: profile.email || null,
-      country: profile.country || null,
-      city: profile.city || null,
-      about: profile.about || null,
-      profilePhoto: profile.profilePhotoUrl || null,
-      licenseType: profile.licenseType || null,
-      yearsOfExperience: profile.yearsOfExperience || null,
-      education: profile.education || [],
-      languages: profile.languages || [],
-      specializations: profile.specializations || [],
-      sessionDuration: profile.sessionDuration || null,
-      sessionFee: profile.sessionFee || null,
-      sessionFormats: profile.sessionFormats || [],
-      acceptsInsurance: profile.acceptsInsurance || false,
-      insuranceProviders: profile.insuranceProviders || [],
-      acceptingNewClients: profile.acceptingNewClients || false,
-      ageGroups: profile.ageGroups || [],
-      availability: profile.availability || {},
-    }));
+    // Format exactly as expected by your UI component
+    const formattedPsychologists = psychologists.map(profile => {
+      // Convert Mongoose document to plain object
+      const plainProfile = profile.toObject ? profile.toObject() : profile;
 
+      return {
+        id: plainProfile._id.toString(), // Use id, not _id
+        firstName: plainProfile.firstName || '',
+        lastName: plainProfile.lastName || '',
+        email: plainProfile.email || '',
+        country: plainProfile.country || '',
+        city: plainProfile.city || '',
+        about: plainProfile.about || '',
+        profilePhoto: plainProfile.profilePhotoUrl || '', // Use profilePhoto, not profilePhotoUrl
+        licenseType: plainProfile.licenseType || '',
+        yearsOfExperience: plainProfile.yearsOfExperience || 0,
+        education: plainProfile.education || [],
+        languages: plainProfile.languages || [],
+        specializations: plainProfile.specializations || [],
+        sessionDuration: plainProfile.sessionDuration || '',
+        sessionFee: plainProfile.sessionFee || 0,
+        sessionFormats: plainProfile.sessionFormats || [],
+        acceptsInsurance: plainProfile.acceptsInsurance || false,
+        insuranceProviders: plainProfile.insuranceProviders || [],
+        acceptingNewClients: plainProfile.acceptingNewClients || false,
+        ageGroups: plainProfile.ageGroups || [],
+        availability: plainProfile.availability || {},
+      };
+    });
+
+    // Return in the exact format expected by your component
     return NextResponse.json(
       createSuccessResponse(200, {
         message: 'Psychologists fetched successfully',
@@ -52,7 +75,8 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Server Error:', error);
     return NextResponse.json(
-      createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      createErrorResponse(500, 'Internal Server Error: ' + error.message),
+      { status: 500 }
     );
   }
 }

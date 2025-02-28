@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 const VerificationDialog = ({
   isOpen,
   onClose,
-  email,
+  email: propEmail,
   onVerificationComplete,
   isLoading: externalLoading,
 }) => {
@@ -31,6 +31,27 @@ const VerificationDialog = ({
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [email, setEmail] = useState(propEmail);
+
+  // Check for stored email on mount and refresh
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('email');
+    const storedToken = localStorage.getItem('verificationToken');
+
+    if (storedEmail && storedToken) {
+      setEmail(storedEmail);
+    }
+  }, []);
+
+  // Prevent closing dialog if verification is pending
+  const handleDialogClose = () => {
+    const hasToken = localStorage.getItem('verificationToken');
+    if (hasToken) {
+      toast.error('Please complete the verification process');
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -50,10 +71,16 @@ const VerificationDialog = ({
 
     setIsVerifying(true);
     try {
+      const token = localStorage.getItem('verificationToken');
+      if (!token) {
+        throw new Error('Verification session expired');
+      }
+
       const response = await fetch('/api/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           code: verificationCode.trim(),
@@ -86,13 +113,18 @@ const VerificationDialog = ({
       setIsRedirecting(true);
 
       setTimeout(() => {
-        onVerificationComplete();
+        onVerificationComplete?.();
         router.push('/dashboard/psychologist');
       }, 1500);
     } catch (error) {
-      toast.error(
-        error.message || 'Invalid verification code. Please try again.'
-      );
+      if (error.message === 'Verification session expired') {
+        toast.error('Session expired. Please sign up again.');
+        router.push('/signup');
+      } else {
+        toast.error(
+          error.message || 'Invalid verification code. Please try again.'
+        );
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -127,6 +159,11 @@ const VerificationDialog = ({
       toast.success('Verification code resent successfully');
       setResendCooldown(60);
     } catch (error) {
+      if (error.message.includes('expired')) {
+        localStorage.removeItem('verificationToken');
+        localStorage.removeItem('email');
+        router.push('/signup');
+      }
       toast.error(error.message || 'Failed to resend verification code');
     } finally {
       setIsResending(false);
@@ -145,8 +182,18 @@ const VerificationDialog = ({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50" />
+      <Dialog open={isOpen} onOpenChange={handleDialogClose}>
+        <DialogOverlay
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50"
+          onClick={e => {
+            const hasToken = localStorage.getItem('verificationToken');
+            if (hasToken) {
+              e.preventDefault();
+              e.stopPropagation();
+              toast.error('Please complete the verification process');
+            }
+          }}
+        />
         <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-[380px] border bg-background p-6 shadow-md z-[51]">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-lg font-semibold text-foreground text-center">

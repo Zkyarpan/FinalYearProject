@@ -1,12 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
-    "lib": ["es2019"],
-    "target": "es2019",
+    "target": "ESNext",
     "isolatedModules": false,
     "noEmit": false
   },
-  "include": ["server.ts"]
+  "include": ["server.ts", "db/**/*", "models/**/*"]
 }

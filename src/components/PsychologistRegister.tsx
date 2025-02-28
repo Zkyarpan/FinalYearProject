@@ -71,7 +71,7 @@ const PsychologistRegister = () => {
     }[];
     languages: string[];
     specializations: string[];
-    sessionDuration: string;
+    sessionDuration: number | string;
     sessionFee: string;
     sessionFormats: string[];
     acceptsInsurance: boolean;
@@ -116,7 +116,7 @@ const PsychologistRegister = () => {
     languages: [],
     specializations: [],
 
-    sessionDuration: '50',
+    sessionDuration: '60',
     sessionFee: '',
     sessionFormats: [] as string[],
 
@@ -324,7 +324,9 @@ const PsychologistRegister = () => {
 
     if (!formData.profilePhoto || !formData.certificateOrLicense) {
       toast.error(
-        `${!formData.profilePhoto ? 'Profile photo' : 'Certificate or license'} is required.`
+        `${
+          !formData.profilePhoto ? 'Profile photo' : 'Certificate or license'
+        } is required.`
       );
       setIsLoading(false);
       return;
@@ -362,14 +364,9 @@ const PsychologistRegister = () => {
 
       if (data.StatusCode === 200 && data.Result?.token) {
         localStorage.setItem('verificationToken', data.Result.token);
-
-        setVerificationEmail(formData.email);
-        setShowVerificationDialog(true);
-
-        toast.success(
-          data.Result.message ||
-            'Please verify your email to complete registration.'
-        );
+        localStorage.setItem('email', formData.email);
+        router.push('/verify');
+        toast.success('Please verify your email to complete registration.');
       } else {
         throw new Error('Invalid response from server');
       }
@@ -896,7 +893,7 @@ const PsychologistRegister = () => {
                     <SelectContent className="dark:bg-input">
                       <SelectItem value="30">30 minutes</SelectItem>
                       <SelectItem value="50">50 minutes</SelectItem>
-                      <SelectItem value="80">80 minutes</SelectItem>
+                      <SelectItem value="60">60 minutes</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

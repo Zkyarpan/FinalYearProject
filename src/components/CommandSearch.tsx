@@ -110,7 +110,7 @@ export function CommandMenu({ router }: CommandMenuProps) {
   }, [search]);
 
   return (
-    <div className="relative w-full max-w-lg" ref={menuRef}>
+    <div className="relative w-full max-w-lg z-[100]" ref={menuRef}>
       <div className="relative flex items-center">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 pointer-events-none" />
         <input

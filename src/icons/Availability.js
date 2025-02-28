@@ -10,7 +10,7 @@ const Availability = () => {
         height={24}
         color={'#000000'}
         fill={'none'}
-        className="text-black dark:text-white"
+        className="text-black dark:text-white/80"
       >
         <path
           d="M5 19.25V21.25M19 19.25V21.25"

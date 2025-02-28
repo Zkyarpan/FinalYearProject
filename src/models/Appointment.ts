@@ -1,4 +1,11 @@
-import { Schema, model, models, Document, Types, Model } from 'mongoose';
+import mongoose, {
+  Schema,
+  model,
+  models,
+  Document,
+  Types,
+  Model,
+} from 'mongoose';
 
 export enum SessionFormat {
   VIDEO = 'video',
@@ -10,6 +17,7 @@ export enum AppointmentStatus {
   CANCELED = 'canceled',
   COMPLETED = 'completed',
   ONGOING = 'ongoing',
+  MISSED = 'missed',
 }
 
 export interface IAppointment extends Document {
@@ -27,6 +35,12 @@ export interface IAppointment extends Document {
   notes?: string;
   insuranceProvider?: string;
   status: AppointmentStatus;
+  isCanceled: boolean;
+  canceledAt?: Date;
+  canceledBy?: Types.ObjectId;
+  cancelationReason?: string;
+  joinedAt?: Date;
+  completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +52,9 @@ interface IAppointmentMethods {
   getDurationInMinutes(): number;
   updateStatus(status: AppointmentStatus): Promise<void>;
   updateStatusBasedOnTime(): Promise<void>;
+  cancel(userId: Types.ObjectId, reason: string): Promise<void>;
+  markAsJoined(): Promise<void>;
+  markAsCompleted(): Promise<void>;
 }
 
 interface IAppointmentModel
@@ -47,6 +64,7 @@ interface IAppointmentModel
     psychologistId: Types.ObjectId
   ): Promise<IAppointment[]>;
   findUpcomingAppointments(userId: Types.ObjectId): Promise<IAppointment[]>;
+  findActiveAppointments(): Promise<IAppointment[]>;
 }
 
 const appointmentSchema = new Schema<
@@ -154,6 +172,33 @@ const appointmentSchema = new Schema<
       default: AppointmentStatus.CONFIRMED,
       index: true,
     },
+    isCanceled: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    canceledAt: {
+      type: Date,
+      default: null,
+    },
+    canceledBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    cancelationReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    joinedAt: {
+      type: Date,
+      default: null,
+    },
+    completedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -169,71 +214,89 @@ const appointmentSchema = new Schema<
   }
 );
 
-// Instance methods
-appointmentSchema.methods.isPast = function (): boolean {
-  return this.endTime < new Date();
-};
-
-appointmentSchema.methods.isUpcoming = function (): boolean {
-  return this.dateTime > new Date();
-};
-
-appointmentSchema.methods.canJoin = function (): boolean {
+// Enhanced instance methods
+appointmentSchema.methods.cancel = async function (
+  userId: Types.ObjectId,
+  reason: string
+): Promise<void> {
   const now = new Date();
-  const joinWindow = 5 * 60 * 1000; // 5 minutes in milliseconds
-  return (
-    this.status === AppointmentStatus.CONFIRMED &&
-    Math.abs(this.dateTime.getTime() - now.getTime()) <= joinWindow
+  this.status = AppointmentStatus.CANCELED;
+  this.isCanceled = true;
+  this.canceledAt = now;
+  this.canceledBy = userId;
+  this.cancelationReason = reason;
+  await this.save();
+
+  // Release the availability slot
+  await mongoose.connection.collection('availabilities').updateOne(
+    {
+      psychologistId: this.psychologistId,
+      'slots.appointmentId': this._id,
+    },
+    {
+      $set: {
+        'slots.$.isBooked': false,
+        'slots.$.userId': null,
+        'slots.$.appointmentId': null,
+      },
+    }
   );
 };
 
-appointmentSchema.methods.getDurationInMinutes = function (): number {
-  return (this.endTime.getTime() - this.dateTime.getTime()) / (1000 * 60);
+appointmentSchema.methods.markAsJoined = async function (): Promise<void> {
+  if (this.status === AppointmentStatus.CONFIRMED) {
+    this.status = AppointmentStatus.ONGOING;
+    this.joinedAt = new Date();
+    await this.save();
+  }
 };
 
-appointmentSchema.methods.updateStatus = async function (
-  status: AppointmentStatus
-): Promise<void> {
-  this.status = status;
-  await this.save();
+appointmentSchema.methods.markAsCompleted = async function (): Promise<void> {
+  if (this.status === AppointmentStatus.ONGOING) {
+    this.status = AppointmentStatus.COMPLETED;
+    this.completedAt = new Date();
+    await this.save();
+  }
 };
 
-appointmentSchema.methods.updateStatusBasedOnTime =
-  async function (): Promise<void> {
-    const now = new Date();
-    if (this.endTime <= now && this.status !== AppointmentStatus.COMPLETED) {
-      this.status = AppointmentStatus.COMPLETED;
-      await this.save();
-    } else if (
-      this.dateTime <= now &&
-      this.endTime > now &&
-      this.status === AppointmentStatus.CONFIRMED
-    ) {
-      this.status = AppointmentStatus.ONGOING;
-      await this.save();
-    }
-  };
-
-// Indexes
-appointmentSchema.index({ psychologistId: 1, dateTime: 1 });
-appointmentSchema.index({ userId: 1, dateTime: 1 });
-appointmentSchema.index({ status: 1, dateTime: 1 });
-
-// Pre-save middleware
-appointmentSchema.pre('save', function (next) {
+// Static methods
+appointmentSchema.statics.findActiveAppointments = async function (): Promise<
+  IAppointment[]
+> {
   const now = new Date();
+  return this.find({
+    status: { $in: [AppointmentStatus.CONFIRMED, AppointmentStatus.ONGOING] },
+    dateTime: { $lte: now },
+    endTime: { $gt: now },
+    isCanceled: false,
+  }).populate('userId psychologistId');
+};
+
+// Enhanced middleware
+appointmentSchema.pre('save', async function (next) {
+  const now = new Date();
+
+  // Set duration if needed
   if (this.isNew || this.isModified('dateTime') || this.isModified('endTime')) {
     this.duration = this.getDurationInMinutes();
   }
-  if (this.endTime <= now && this.status !== AppointmentStatus.COMPLETED) {
-    this.status = AppointmentStatus.COMPLETED;
-  } else if (
-    this.dateTime <= now &&
-    this.endTime > now &&
-    this.status === AppointmentStatus.CONFIRMED
-  ) {
-    this.status = AppointmentStatus.ONGOING;
+
+  // Auto-update status based on time
+  if (!this.isCanceled) {
+    if (this.endTime <= now) {
+      if (this.status !== AppointmentStatus.COMPLETED) {
+        this.status = this.joinedAt
+          ? AppointmentStatus.COMPLETED
+          : AppointmentStatus.MISSED;
+        this.completedAt = now;
+      }
+    } else if (this.dateTime <= now && this.endTime > now) {
+      if (this.status === AppointmentStatus.CONFIRMED) {
+        this.status = AppointmentStatus.ONGOING;
+      }
+    }
   }
+
   next();
 });
 

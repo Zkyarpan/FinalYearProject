@@ -170,8 +170,8 @@ export default function AppointmentScheduler() {
     if (!validateBookingDetails() || !selectedSlot) return;
 
     const availabilityCheck = await checkAvailability(
-      selectedSlot.start,
-      selectedSlot.end,
+      new Date(selectedSlot.start),
+      new Date(selectedSlot.end),
       selectedSlot.psychologistId
     );
 
@@ -222,8 +222,8 @@ export default function AppointmentScheduler() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           psychologistId: selectedSlot.psychologistId,
-          start: selectedSlot.start.toISOString(),
-          end: selectedSlot.end.toISOString(),
+          start: new Date(selectedSlot.start).toISOString(),
+          end: new Date(selectedSlot.end).toISOString(),
           paymentIntentId,
           sessionFormat: bookingDetails.sessionFormat,
           patientName: bookingDetails.patientName.trim(),

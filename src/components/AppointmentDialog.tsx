@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,26 @@ import Patient from '@/icons/Patient';
 const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
   if (!appointment) return null;
 
+  const getProfilePhotoUrl = () => {
+    if (!appointment.profile || !appointment.profile.profilePhotoUrl) return '';
+
+    const url = appointment.profile.profilePhotoUrl;
+
+    // Ensure it's a valid string and not an object
+    if (typeof url !== 'string') {
+      console.error('Invalid profile photo URL:', url);
+      return '';
+    }
+
+    // Fix potential encoding issues
+    return decodeURIComponent(url).replace(/\[object Object\]/g, '');
+  };
+
+  const profilePhotoUrl = getProfilePhotoUrl();
+  console.log('Clean profile photo URL:', profilePhotoUrl);
+
+  console.log('Appointment Profile Data:', appointment.profile);
+
   const handleJoinSession = () => {
     if (appointment.videoCallLink) {
       onJoinSession(appointment.videoCallLink);
@@ -70,11 +90,16 @@ const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
     `${appointment.userId.firstName} ${appointment.userId.lastName}`;
 
   const getInitials = name => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('');
+    return (
+      name
+        ?.split(' ')
+        .map(part => part?.[0])
+        .join('')
+        .toUpperCase() || 'UK'
+    );
   };
+
+  console.log(appointment.profile?.profilePhotoUrl);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -99,10 +124,16 @@ const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
             <Card className="bg-muted/30 dark:bg-input overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarImage src={appointment.profile?.profilePhotoUrl} />
-                    <AvatarFallback className="bg-primary/10 text-xl">
-                      {getInitials(patientName)}
+                  <Avatar className="h-10 w-10">
+                    {profilePhotoUrl && (
+                      <AvatarImage
+                        src={profilePhotoUrl}
+                        alt={appointment.patientName || 'Patient'}
+                        className="object-cover"
+                      />
+                    )}
+                    <AvatarFallback className="bg-primary/10">
+                      {getInitials(appointment.patientName)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">

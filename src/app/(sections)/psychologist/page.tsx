@@ -1,47 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Search,
-  MapPin,
-  GraduationCap,
-  Phone,
-  Video,
-  Star,
-  Calendar,
-  Users,
-  Languages,
-  Filter,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, MapPin, Star, Calendar, MessageCircle } from 'lucide-react';
+import Message from '@/icons/Messages';
+import Verified from '@/icons/Verified';
+import Time from '@/icons/Clock';
+import Dollar from '@/icons/Dollar';
+import Award from '@/icons/Award';
+import Video from '@/icons/Video';
+import Phone from '@/icons/Phone';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookingDialog } from '@/components/BookingDialog';
-import { useUserStore } from '@/store/userStore';
-import LoginModal from '@/components/LoginModel';
-
-interface Education {
-  degree: string;
-  university: string;
-  graduationYear: number;
-}
-
-interface Availability {
-  available: boolean;
-  startTime: string;
-  endTime: string;
-}
+import Location from '@/icons/Location';
+import { PsychologistCardSkeleton } from '../../../components/PsychologistCardSkeleton';
 
 interface PsychologistProfile {
   id: string;
@@ -54,7 +27,11 @@ interface PsychologistProfile {
   profilePhoto: string;
   licenseType: string;
   yearsOfExperience: number;
-  education: Education[];
+  education: Array<{
+    degree: string;
+    university: string;
+    graduationYear: number;
+  }>;
   languages: string[];
   specializations: string[];
   sessionDuration: number;
@@ -65,64 +42,45 @@ interface PsychologistProfile {
   acceptingNewClients: boolean;
   ageGroups: string[];
   availability: {
-    monday: Availability;
-    tuesday: Availability;
-    wednesday: Availability;
-    thursday: Availability;
-    friday: Availability;
-    saturday: Availability;
-    sunday: Availability;
+    [key: string]: {
+      available: boolean;
+      startTime: string;
+      endTime: string;
+    };
   };
 }
-
-interface ApiResponse {
-  StatusCode: number;
-  IsSuccess: boolean;
-  ErrorMessage: string[];
-  Result: {
-    message: string;
-    psychologists: PsychologistProfile[];
-  };
-}
-
-const truncateText = (text: string, maxLength: number) => {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
-};
 
 const PsychologistDirectory = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSpecialization, setSelectedSpecialization] = useState('All');
-  const [selectedLocation, setSelectedLocation] = useState('All');
-  const [selectedFormat, setSelectedFormat] = useState('All');
-  const [priceRange, setPriceRange] = useState('All');
   const [psychologists, setPsychologists] = useState<PsychologistProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const { user } = useUserStore();
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchPsychologists = async () => {
       try {
         const response = await fetch('/api/psychologist/profile');
-        const data: ApiResponse = await response.json();
+        const data = await response.json();
 
-        if (data.IsSuccess && data.Result.psychologists) {
-          setPsychologists(data.Result.psychologists);
-        } else {
-          setError(
-            Array.isArray(data.ErrorMessage)
-              ? data.ErrorMessage[0]
-              : 'Failed to fetch psychologist data'
-          );
+        // Check the structure of the response data
+        console.log('API Response:', data);
+
+        if (data.IsSuccess) {
+          // If the response has the old structure with nested psychologists
+          if (data.Result && data.Result.psychologists) {
+            setPsychologists(data.Result.psychologists);
+          }
+          // If the response has the new structure with direct array
+          else if (Array.isArray(data.Result)) {
+            setPsychologists(data.Result);
+          }
+          // Fallback for other structures
+          else {
+            console.error('Unexpected API response structure:', data);
+            setPsychologists([]);
+          }
         }
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Failed to fetch psychologist data'
-        );
+      } catch (error) {
+        console.error('Error fetching psychologists:', error);
       } finally {
         setLoading(false);
       }
@@ -131,341 +89,158 @@ const PsychologistDirectory = () => {
     fetchPsychologists();
   }, []);
 
-  const specializations = [
-    'All',
-    ...new Set(psychologists.flatMap(p => p.specializations)),
-  ];
-  const sessionFormats = ['All', 'Video', 'Phone', 'In-person'];
-  const priceRanges = ['All', '$50-100', '$100-150', '$150-200', '$200+'];
+  if (loading) {
+    return (
+      <div>
+        <PsychologistCardSkeleton />
+      </div>
+    );
+  }
 
-  const filteredPsychologists = psychologists.filter(psych => {
-    const matchesSearch =
+  const filteredPsychologists = psychologists.filter(
+    psych =>
       psych.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       psych.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      psych.licenseType.toLowerCase().includes(searchTerm.toLowerCase());
+      psych.specializations.some(spec =>
+        spec.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+  );
 
-    const matchesSpecialization =
-      selectedSpecialization === 'All' ||
-      psych.specializations.includes(selectedSpecialization);
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName[0]}${lastName[0]}`;
+  };
 
-    const matchesLocation =
-      selectedLocation === 'All' ||
-      `${psych.city}, ${psych.country}` === selectedLocation;
-
-    const matchesFormat =
-      selectedFormat === 'All' || psych.sessionFormats.includes(selectedFormat);
-
-    const matchesPriceRange =
-      priceRange === 'All' ||
-      (priceRange === '$50-100' &&
-        psych.sessionFee >= 50 &&
-        psych.sessionFee <= 100) ||
-      (priceRange === '$100-150' &&
-        psych.sessionFee > 100 &&
-        psych.sessionFee <= 150) ||
-      (priceRange === '$150-200' &&
-        psych.sessionFee > 150 &&
-        psych.sessionFee <= 200) ||
-      (priceRange === '$200+' && psych.sessionFee > 200);
-
-    return (
-      matchesSearch &&
-      matchesSpecialization &&
-      matchesLocation &&
-      matchesFormat &&
-      matchesPriceRange
-    );
-  });
-
-  const handleNavigation = async (path, requireAuth = false) => {
-    if (requireAuth && !user) {
-      localStorage.setItem('redirectAfterLogin', path);
-      setShowLoginModal(true);
-      return false;
-    }
-    return true;
+  const formatLicenseType = (type: string) => {
+    return type
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900/50">
-      <div className="text-white py-20 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e')]  bg-cover bg-center" />
-        <div className="relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-6 leading-tight">
-              Find Your Path to Mental Wellness
-            </h1>
-            <p className="text-xl opacity-90 mb-8 leading-relaxed">
-              Connect with experienced, licensed psychologists who specialize in
-              your needs. Take the first step towards a healthier mind with
-              personalized care and support.
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <Badge variant="secondary" className="px-4 py-2 text-lg">
-                <Users className="w-4 h-4 mr-2" />
-                {psychologists.length}+ Professionals
-              </Badge>
-              <Badge variant="secondary" className="px-4 py-2 text-lg">
-                <Star className="w-4 h-4 mr-2" />
-                Verified Experts
-              </Badge>
-              <Badge variant="secondary" className="px-4 py-2 text-lg">
-                <Calendar className="w-4 h-4 mr-2" />
-                Easy Scheduling
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto px-4 -mt-10 mb-12">
-        <Card className="shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-800/90">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="relative col-span-2">
-                <Input
-                  type="text"
-                  placeholder="Search by name, specialization, or license..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              </div>
-
-              <Select
-                value={selectedSpecialization}
-                onValueChange={setSelectedSpecialization}
-              >
-                <SelectTrigger>
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Specialization" />
-                </SelectTrigger>
-                <SelectContent>
-                  {specializations.map(spec => (
-                    <SelectItem key={spec} value={spec}>
-                      {spec}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedFormat} onValueChange={setSelectedFormat}>
-                <SelectTrigger>
-                  <Video className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Session Format" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sessionFormats.map(format => (
-                    <SelectItem key={format} value={format}>
-                      {format}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={priceRange} onValueChange={setPriceRange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Price Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  {priceRanges.map(range => (
-                    <SelectItem key={range} value={range}>
-                      {range}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-6 my-8">
+    <div className="min-h-screen">
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="space-y-4">
           {filteredPsychologists.map(psych => (
             <Card
               key={psych.id}
-              className="hover:shadow-lg transition-shadow duration-300"
+              className="overflow-hidden hover:shadow-md transition-shadow duration-200"
             >
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="md:w-1/4">
-                    <Link
-                      href={`/psychologist/${psych.firstName}-${psych.lastName}`}
-                    >
-                      <div className="relative group">
-                        <Avatar className="w-full h-64 rounded-lg border-2 border-white shadow-lg">
+              <CardContent className="p-0">
+                <Link
+                  href={`/psychologist/${psych.firstName}-${psych.lastName}`}
+                >
+                  <div className="flex items-start p-6 gap-4">
+                    <div className="flex-shrink-0">
+                      <div className="relative">
+                        <Avatar className="w-16 h-16">
                           <AvatarImage
                             src={psych.profilePhoto}
                             alt={`${psych.firstName} ${psych.lastName}`}
-                            className="object-cover"
                           />
-                          <AvatarFallback className="text-4xl">
-                            {psych.firstName[0]}
-                            {psych.lastName[0]}
+                          <AvatarFallback>
+                            {getInitials(psych.firstName, psych.lastName)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-medium">
-                            View Profile
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Session Fee</span>
-                        <span className="font-semibold">
-                          ${psych.sessionFee}
-                        </span>
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Duration</span>
-                        <span>{psych.sessionDuration} min</span>
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Experience</span>
-                        <span>{psych.yearsOfExperience} years</span>
+                        {psych.acceptingNewClients && (
+                          <div className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4">
+                            <Verified />
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="md:w-3/4">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <Link href={`/psychologist/${psych.id}`}>
-                          <h2 className="text-2xl font-bold hover:text-blue-600 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold hover:underline underline-offset-2">
                             Dr. {psych.firstName} {psych.lastName}
-                          </h2>
-                        </Link>
-                        <p className="text-muted-foreground">
-                          {psych.licenseType.replace(/_/g, ' ')}
-                        </p>
-                        <div className="flex items-center mt-2 text-muted-foreground">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          <span>
-                            {psych.city}, {psych.country}
-                          </span>
+                          </h3>
+                          <p className="text-sm hover:underline underline-offset-2">
+                            {formatLicenseType(psych.licenseType)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              psych.acceptingNewClients
+                                ? 'default'
+                                : 'secondary'
+                            }
+                            className="text-xs"
+                          >
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {psych.acceptingNewClients
+                              ? 'Available'
+                              : 'Not Available'}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {psych.sessionFormats.map(format => (
+
+                      <div className="mt-2 flex items-center gap-4 dark:text-muted-foreground">
+                        <div className="flex items-center text-sm">
+                          <Location />
+                          {psych.city}, {psych.country}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Award />
+                          {psych.yearsOfExperience} years exp.
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2 uppercase dark:text-muted">
+                        {psych.specializations.map((spec, index) => (
                           <Badge
-                            key={format}
-                            variant="outline"
-                            className="capitalize"
+                            key={index}
+                            variant="default"
+                            className="text-xs border "
                           >
-                            {format === 'video' && (
-                              <Video className="w-3 h-3 mr-1" />
-                            )}
-                            {format === 'phone' && (
-                              <Phone className="w-3 h-3 mr-1" />
-                            )}
-                            {format}
+                            {spec}
                           </Badge>
                         ))}
                       </div>
-                    </div>
 
-                    <Tabs defaultValue="about" className="mt-6">
-                      <TabsList className="grid w-full grid-cols-3 mb-4">
-                        <TabsTrigger value="about">About</TabsTrigger>
-                        <TabsTrigger value="expertise">Expertise</TabsTrigger>
-                        <TabsTrigger value="education">Education</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="about">
-                        <p className="text-sm leading-relaxed">
-                          {truncateText(psych.about, 300)}
-                        </p>
-                      </TabsContent>
-
-                      <TabsContent value="expertise">
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="font-medium mb-2">
-                              Specializations
-                            </h3>
-                            <div className="flex flex-wrap gap-2">
-                              {psych.specializations.map(spec => (
-                                <Badge key={spec} variant="secondary">
-                                  {spec}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <h3 className="font-medium mb-2">Age Groups</h3>
-                            <div className="flex flex-wrap gap-2">
-                              {psych.ageGroups.map(age => (
-                                <Badge key={age} variant="outline">
-                                  {age}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+                      <div className="mt-4 flex items-center gap-4 text-sm dark:text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          {psych.sessionFormats.includes('video') && <Video />}
+                          {psych.sessionFormats.includes('phone') && <Phone />}
+                          {psych.sessionFormats.join(' & ')}
                         </div>
-                      </TabsContent>
-
-                      <TabsContent value="education">
-                        <div className="space-y-3">
-                          {psych.education.map((edu, index) => (
-                            <div key={index} className="flex items-center">
-                              <GraduationCap className="w-5 h-5 mr-2 text-blue-600" />
-                              <span>
-                                {edu.degree} from {edu.university} (
-                                {edu.graduationYear})
-                              </span>
-                            </div>
-                          ))}
+                        <div className="flex gap-1">
+                          <Dollar />
+                          {psych.sessionFee} USD
                         </div>
-                      </TabsContent>
-                    </Tabs>
-
-                    <div className="mt-6 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center">
-                          <Languages className="w-4 h-4 mr-2 text-muted-foreground" />
-                          <span className="text-sm">
-                            {psych.languages.join(' • ')}
-                          </span>
-                        </div>
-                        <div
-                          className={`flex items-center ${
-                            psych.acceptingNewClients
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }`}
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full mr-2 ${
-                              psych.acceptingNewClients
-                                ? 'bg-green-600'
-                                : 'bg-red-600'
-                            }`}
-                          />
-                          <span className="text-sm font-medium">
-                            {psych.acceptingNewClients
-                              ? 'Accepting new clients'
-                              : 'Not accepting new clients'}
-                          </span>
+                        <div className="flex gap-1">
+                          <Time />
+                          {psych.sessionDuration} minutes
                         </div>
                       </div>
-                      <BookingDialog handleNavigation={handleNavigation} />
+
+                      <div className="flex flex-wrap items-center mt-2 gap-2">
+                        <div className="flex items-center text-sm dark:text-muted-foreground gap-1">
+                          <Message />
+                          <span>Speaks:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 ">
+                          {psych.languages.map((language, index) => (
+                            <Badge
+                              key={index}
+                              variant="custom"
+                              className="text-xs border"
+                            >
+                              {language}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
-
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-      />
     </div>
   );
 };

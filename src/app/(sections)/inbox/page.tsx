@@ -26,16 +26,26 @@ import {
   CheckCheck,
   Loader2,
   AlertCircle,
+  MessageSquare,
+  User,
+  Ban,
+  Trash2,
+  Search,
+  UserSquare,
+  Paperclip,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useSocket } from '@/context/SocketContext';
 import { useUserStore } from '@/store/userStore';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { formatTime } from '@/helpers/formatTime';
 
 // Interface definitions remain the same
 interface Psychologist {
@@ -842,504 +852,564 @@ const Inbox = () => {
     }
   };
 
-  return (
-    <div className="h-screen max-h-[calc(100vh-6rem)]">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-        {/* Conversations list (left side) */}
-        <div
-          className={`md:col-span-1 h-full ${
-            isMobileListVisible ? 'block' : 'hidden md:block'
-          }`}
-        >
-          {isPsychologist ? (
-            // Psychologist view - just show patient conversations
-            <Card className="h-full flex flex-col rounded-lg shadow-sm">
-              <CardHeader className="pb-3 pt-4 flex flex-row justify-between items-center">
-                <CardTitle>Patients</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={loading}
-                  className="h-8 w-8 rounded-full"
-                >
-                  <RefreshCcw
-                    className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-                  />
-                </Button>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-hidden p-0 px-3">
-                {loading ? (
-                  <div className="flex justify-center p-4">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : fetchError ? (
-                  <div className="text-center p-4 space-y-2">
-                    <AlertCircle className="h-8 w-8 mx-auto text-destructive" />
-                    <p className="text-sm text-destructive">
-                      Failed to load conversations
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchConversations(true)}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-full">
-                    <div className="space-y-1 pr-3">
-                      {conversations.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 p-4 text-center">
-                          <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
-                          <h3 className="font-medium">No patients yet</h3>
-                          <p className="text-sm text-muted-foreground">
-                            You'll see your patients here when they start
-                            conversations with you
-                          </p>
-                        </div>
-                      ) : (
-                        conversations.map(conversation => {
-                          // For psychologists, we're interested in the user, not the psychologist
-                          const patient = conversation.user;
-                          return (
-                            <div
-                              key={conversation._id}
-                              className={`p-3 rounded-md cursor-pointer transition-colors ${
-                                currentConversation?._id === conversation._id
-                                  ? 'bg-primary/10'
-                                  : 'hover:bg-muted'
-                              }`}
-                              onClick={() => {
-                                setCurrentConversation(conversation);
-                                setSelectedPsychologist(patient);
-                                setIsMobileListVisible(false);
-                                loadMessages(conversation._id);
-                              }}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="relative">
-                                  <Avatar className="h-10 w-10 border">
-                                    <AvatarImage
-                                      src={patient?.image || ''}
-                                      alt={patient?.firstName || ''}
-                                    />
-                                    <AvatarFallback className="bg-primary/10 text-primary">
-                                      {getInitials(
-                                        patient?.firstName,
-                                        patient?.lastName
-                                      )}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span
-                                    className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${
-                                      isOnline(patient?._id || '')
-                                        ? 'bg-green-500'
-                                        : 'bg-gray-400'
-                                    }`}
-                                  />
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-sm truncate">
-                                      {patient?.firstName} {patient?.lastName}
-                                    </h4>
-                                    {conversation.lastMessage && (
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatTimestamp(
-                                          conversation.lastMessage.createdAt
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {conversation.lastMessage?.content ||
-                                        'No messages yet'}
-                                    </p>
-                                    {(conversation.unreadCount ?? 0) > 0 && (
-                                      <Badge
-                                        variant="default"
-                                        className="ml-auto h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
-                                      >
-                                        {conversation.unreadCount}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            // Regular user view - original InboxSection
-            <InboxRightSection
-              selectedPsychologist={selectedPsychologist}
-              currentConversation={currentConversation}
-              conversations={conversations}
-              onSelectPsychologist={handleSelectPsychologist}
-              onSelectConversation={conversation => {
-                setMessages([]);
-                setCurrentConversation(conversation);
-                setSelectedPsychologist(
-                  conversation.psychologist._id === user?._id
-                    ? conversation.user
-                    : conversation.psychologist
-                );
-                setIsMobileListVisible(false);
-                loadMessages(conversation._id);
-              }}
-              onRefresh={handleRefresh}
-              loading={loading}
-              fetchError={fetchError}
-            />
-          )}
-        </div>
+  function shouldShowAvatar(
+    message: Message,
+    index: number,
+    messages: Message[]
+  ) {
+    // Always show avatar for the first message
+    if (index === 0) return true;
 
-        {/* Chat interface (right side) */}
-        <div
-          className={`md:col-span-2 h-full ${
-            isMobileListVisible ? 'hidden md:block' : 'block'
-          }`}
-        >
-          {!currentConversation ? (
-            <Card className="h-full flex flex-col items-center justify-center rounded-lg shadow-sm">
-              <CardContent className="flex flex-col items-center justify-center text-center p-6">
-                <div className="rounded-full bg-primary/10 p-6 mb-4">
-                  <Send className="h-10 w-10 text-primary" />
+    // Get the previous message
+    const previousMessage = messages[index - 1];
+
+    // Show avatar if sender changes
+    if (previousMessage.senderId !== message.senderId) return true;
+
+    // Show avatar if more than 5 minutes have passed since previous message
+    const timeDiff =
+      new Date(message.createdAt).getTime() -
+      new Date(previousMessage.createdAt).getTime();
+    if (timeDiff > 5 * 60 * 1000) return true;
+
+    // Don't show avatar for consecutive messages from same sender within 5 minutes
+    return false;
+  }
+
+  return (
+    <div className="flex h-screen bg-background border dark:border-[#333333]  text-white rounded-2xl mt-5">
+      {/* Left sidebar - Conversations */}
+      <div
+        className={`w-[350px] border-r dark:border-[#333333] flex flex-col ${
+          isMobileListVisible ? 'block' : 'hidden md:block'
+        }`}
+      >
+        {isPsychologist ? (
+          // PSYCHOLOGIST VIEW
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b dark:border-[#333333]">
+              <h2 className="text-xl font-semibold dark:text-white text-black">
+                Patients
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="h-8 w-8 rounded-full text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+                />
+              </Button>
+            </div>
+
+            {/* Search */}
+            <div className="p-2 border-b dark:border-[#333333]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                <Input
+                  placeholder="Search patients..."
+                  className="pl-9 h-9 text-sm  border dark:border-[#333333] rounded-md focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-white text-black"
+                />
+              </div>
+            </div>
+
+            {/* Patient List */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
+              {loading ? (
+                <div className="flex justify-center items-center h-full">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">
-                  No conversation selected
-                </h3>
-                <p className="text-muted-foreground max-w-md">
-                  {isPsychologist
-                    ? 'Select a patient from the list to view your conversation'
-                    : 'Choose a psychologist from the list to start or continue a conversation'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="h-full flex flex-col rounded-lg shadow-sm">
-              {/* Chat header */}
-              <CardHeader className="border-b flex flex-row items-center p-4 space-y-0">
+              ) : fetchError ? (
+                <div className="flex flex-col justify-center items-center h-full p-4 space-y-2">
+                  <AlertCircle className="h-6 w-6 text-red-500" />
+                  <p className="text-sm text-red-400">
+                    Failed to load conversations
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchConversations(true)}
+                    className="rounded-md border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                  <UserSquare className="h-10 w-10 text-gray-500 mb-3" />
+                  <h3 className="font-medium text-gray-300 mb-1">
+                    No patients yet
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    You'll see your patients here when they start conversations
+                    with you
+                  </p>
+                </div>
+              ) : (
+                conversations.map(conversation => {
+                  const patient = conversation.user;
+                  const isSelected =
+                    currentConversation?._id === conversation._id;
+                  const hasUnread = (conversation.unreadCount ?? 0) > 0;
+
+                  return (
+                    <div
+                      key={conversation._id}
+                      className={`px-3 py-3 cursor-pointer transition-colors dark:hover:bg-[#1a1a1a] bg-gray-200 ${
+                        isSelected ? 'dark:bg-[#1e1e1e]' : ''
+                      }`}
+                      onClick={() => {
+                        setCurrentConversation(conversation);
+                        setSelectedPsychologist(patient);
+                        setIsMobileListVisible(false);
+                        loadMessages(conversation._id);
+                      }}
+                    >
+                      <div className="flex items-center">
+                        <div className="relative mr-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={patient?.image || ''}
+                              alt={patient?.firstName || ''}
+                            />
+                            <AvatarFallback className="bg-[#1e293b] text-blue-400">
+                              {getInitials(
+                                patient?.firstName,
+                                patient?.lastName
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#121212] ${
+                              isOnline(patient?._id || '')
+                                ? 'bg-green-500'
+                                : 'bg-gray-500'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-sm truncate">
+                              {patient?.firstName} {patient?.lastName}
+                            </span>
+                            {conversation.lastMessage && (
+                              <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
+                                {formatTimestamp(
+                                  conversation.lastMessage.createdAt
+                                )}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex">
+                            <p
+                              className={`text-xs truncate ${
+                                hasUnread
+                                  ? 'text-white font-medium'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              {conversation.lastMessage?.content ||
+                                'Start a conversation'}
+                            </p>
+                            {hasUnread && (
+                              <div className="ml-auto">
+                                <span className="bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                  {conversation.unreadCount}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-1">
+                            {isOnline(patient?._id || '') ? (
+                              <span className="text-xs text-green-500">
+                                Online
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-500">
+                                Offline
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : (
+          // REGULAR USER VIEW
+          <InboxRightSection
+            selectedPsychologist={selectedPsychologist}
+            currentConversation={currentConversation}
+            conversations={conversations}
+            onSelectPsychologist={handleSelectPsychologist}
+            onSelectConversation={conversation => {
+              setMessages([]);
+              setCurrentConversation(conversation);
+              setSelectedPsychologist(
+                conversation.psychologist._id === user?._id
+                  ? conversation.user
+                  : conversation.psychologist
+              );
+              setIsMobileListVisible(false);
+              loadMessages(conversation._id);
+            }}
+            onRefresh={handleRefresh}
+            loading={loading}
+            fetchError={fetchError}
+          />
+        )}
+      </div>
+
+      {/* Main Chat Area */}
+      <div
+        className={`flex-1 flex flex-col ${
+          isMobileListVisible ? 'hidden md:flex' : 'flex'
+        }`}
+      >
+        {!currentConversation ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <MessageSquare className="h-12 w-12 text-gray-600 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">
+              No conversation selected
+            </h3>
+            <p className="text-gray-500 text-center max-w-md">
+              {isPsychologist
+                ? 'Select a patient from the list to view your conversation'
+                : 'Choose a psychologist from the list to start or continue a conversation'}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-6 rounded-md border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
+              onClick={showConversationList}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {isPsychologist ? 'View Patients' : 'Find Psychologists'}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Chat Header */}
+            <div className="flex items-center px-4 py-3 border-b dark:border-[#333333]">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden mr-2 text-gray-400 hover:text-white dark:border-[#333333] rounded-full"
+                onClick={showConversationList}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+
+              <div className="flex items-center flex-1">
+                <div className="relative">
+                  <Avatar className="h-10 w-10 mr-3">
+                    <AvatarImage
+                      src={
+                        isPsychologist
+                          ? selectedPsychologist?.image
+                          : selectedPsychologist?.image ||
+                            selectedPsychologist?.profilePhotoUrl
+                      }
+                      alt={`${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
+                    />
+                    <AvatarFallback className="bg-[#1e293b] text-blue-400">
+                      {getInitials(
+                        selectedPsychologist?.firstName,
+                        selectedPsychologist?.lastName
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span
+                    className={`absolute bottom-0 right-3 h-3 w-3 rounded-full border-2 dark:border-[#333333]  ${
+                      isOnline(selectedPsychologist?._id || '')
+                        ? 'bg-green-500'
+                        : 'bg-gray-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold text-base">
+                    {isPsychologist
+                      ? `${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`
+                      : `Dr. ${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {isOnline(selectedPsychologist?._id || '')
+                      ? 'Online'
+                      : 'Last seen recently'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden mr-2"
-                  onClick={showConversationList}
+                  onClick={() => {
+                    if (currentConversation) {
+                      loadMessages(currentConversation._id);
+                    }
+                  }}
+                  className="rounded-full h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                  disabled={loadingMessages}
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <RefreshCcw
+                    className={`h-4 w-4 ${
+                      loadingMessages ? 'animate-spin' : ''
+                    }`}
+                  />
                 </Button>
 
-                <div className="flex items-center flex-1">
-                  <div className="relative">
-                    <Avatar className="h-10 w-10 mr-3 border">
-                      <AvatarImage
-                        src={
-                          isPsychologist
-                            ? selectedPsychologist?.image
-                            : selectedPsychologist?.image ||
-                              selectedPsychologist?.profilePhotoUrl
-                        }
-                        alt={`${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
-                      />
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {getInitials(
-                          selectedPsychologist?.firstName,
-                          selectedPsychologist?.lastName
-                        )}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span
-                      className={`absolute bottom-0 right-3 h-3 w-3 rounded-full border-2 border-background ${
-                        isOnline(selectedPsychologist?._id || '')
-                          ? 'bg-green-500'
-                          : 'bg-gray-400'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <CardTitle className="text-base font-semibold">
-                      {isPsychologist
-                        ? `${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`
-                        : `Dr. ${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      {isOnline(selectedPsychologist?._id || '')
-                        ? 'Online'
-                        : 'Last seen recently'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (currentConversation) {
-                        loadMessages(currentConversation._id);
-                      }
-                    }}
-                    className="rounded-full h-8 w-8"
-                    disabled={loadingMessages}
-                  >
-                    <RefreshCcw
-                      className={`h-4 w-4 ${
-                        loadingMessages ? 'animate-spin' : ''
-                      }`}
-                    />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full h-8 w-8"
-                    onClick={() =>
-                      toast.info('Video call feature coming soon!')
-                    }
-                  >
-                    <Video className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full h-8 w-8"
-                    onClick={() =>
-                      toast.info('Audio call feature coming soon!')
-                    }
-                  >
-                    <Phone className="h-4 w-4" />
-                  </Button>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem>Clear Chat</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
-                        Block
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-
-              {/* Chat messages */}
-              <CardContent className="flex-1 overflow-hidden p-0">
-                <div
-                  className="h-full overflow-y-auto p-4"
-                  ref={messagesContainerRef}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                  onClick={() => toast.info('Video call feature coming soon!')}
                 >
-                  {/* Loading indicator for older messages */}
-                  {loadingMessages && (
-                    <div className="flex justify-center my-2">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    </div>
-                  )}
+                  <Video className="h-4 w-4" />
+                </Button>
 
-                  <div className="flex flex-col space-y-4">
-                    {messages.length === 0 && !loadingMessages ? (
-                      <div className="flex-1 flex flex-col items-center justify-center h-64 text-center p-4">
-                        <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
-                        <h3 className="font-medium">No messages yet</h3>
-                        <p className="text-sm text-muted-foreground max-w-md">
-                          Send a message to start the conversation
-                        </p>
-                      </div>
-                    ) : (
-                      messages.map((message, index) => {
-                        const isCurrentUser = message.senderId === user?._id;
-                        const uniqueKey = `${message._id}-${index}-${message.createdAt}`;
-                        const prevMessage =
-                          index > 0 ? messages[index - 1] : null;
-                        const nextMessage =
-                          index < messages.length - 1
-                            ? messages[index + 1]
-                            : null;
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                  onClick={() => toast.info('Audio call feature coming soon!')}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
 
-                        // Group messages by sender
-                        const isFirstInGroup =
-                          !prevMessage ||
-                          prevMessage.senderId !== message.senderId;
-                        const isLastInGroup =
-                          !nextMessage ||
-                          nextMessage.senderId !== message.senderId;
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="bg-[#1a1a1a] border-[#2a2a2a] text-gray-300"
+                  >
+                    <DropdownMenuItem className="hover:bg-[#2a2a2a] hover:text-white focus:bg-[#2a2a2a] focus:text-white">
+                      <User className="h-4 w-4 mr-2" />
+                      View Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="hover:bg-[#2a2a2a] hover:text-white focus:bg-[#2a2a2a] focus:text-white">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Chat
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                    <DropdownMenuItem className="text-red-500 hover:bg-[#2a2a2a] hover:text-red-500 focus:bg-[#2a2a2a] focus:text-red-500">
+                      <Ban className="h-4 w-4 mr-2" />
+                      Block
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
 
-                        return (
+            {/* Messages Area */}
+            <div
+              className="flex-1 overflow-y-auto scrollbar-hide p-4"
+              ref={messagesContainerRef}
+              onScroll={e => {
+                const container = e.currentTarget;
+                if (
+                  container.scrollTop < 50 &&
+                  hasMoreMessages &&
+                  !loadingMessages
+                ) {
+                  loadMoreMessages();
+                }
+              }}
+            >
+              {/* Date separator */}
+              <div className="flex justify-center my-4">
+                <div className="px-2 py-1 bg-[#1a1a1a] rounded-md text-xs text-gray-500">
+                  {new Date().toLocaleDateString('en-US', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </div>
+              </div>
+
+              {loadingMessages && (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                </div>
+              )}
+
+              {messages.length === 0 && !loadingMessages ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <MessageSquare className="h-10 w-10 text-gray-600 mb-3" />
+                  <h3 className="font-medium text-gray-300 mb-1">
+                    No messages yet
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Send a message to start the conversation
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {messages.map((message, index) => {
+                    const isCurrentUser = message.senderId === user?._id;
+                    const showAvatar = shouldShowAvatar(
+                      message,
+                      index,
+                      messages
+                    );
+
+                    return (
+                      <div
+                        key={`${message._id}-${index}`}
+                        className={`flex ${
+                          isCurrentUser ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        {!isCurrentUser && showAvatar && (
+                          <Avatar className="h-8 w-8 mr-2 flex-shrink-0 self-end">
+                            <AvatarImage
+                              src={
+                                selectedPsychologist?.image ||
+                                selectedPsychologist?.profilePhotoUrl ||
+                                ''
+                              }
+                              alt={`${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
+                            />
+                            <AvatarFallback className="bg-[#1e293b] text-gray-300 text-xs">
+                              {getInitials(
+                                selectedPsychologist?.firstName,
+                                selectedPsychologist?.lastName
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+
+                        <div
+                          className={`max-w-md flex flex-col ${
+                            !showAvatar && !isCurrentUser ? 'ml-10' : ''
+                          }`}
+                        >
                           <div
-                            key={uniqueKey}
-                            className={`flex ${
+                            className={`px-3 py-1.5 rounded-md ${
+                              isCurrentUser
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-[#2a2a2a] text-gray-300'
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`flex items-center mt-1 ${
                               isCurrentUser ? 'justify-end' : 'justify-start'
                             }`}
                           >
-                            <div
-                              className={`flex max-w-[85%] ${
-                                isCurrentUser ? 'flex-row-reverse' : 'flex-row'
-                              } ${!isLastInGroup ? 'mb-1' : ''}`}
-                            >
-                              {/* Only show avatar for the first message in a group from the same sender */}
-                              {!isCurrentUser && isFirstInGroup && (
-                                <Avatar
-                                  className={`h-8 w-8 ${
-                                    isCurrentUser ? 'ml-2' : 'mr-2'
-                                  } self-end mb-1`}
-                                >
-                                  <AvatarImage
-                                    src={
-                                      selectedPsychologist?.image ||
-                                      selectedPsychologist?.profilePhotoUrl ||
-                                      ''
-                                    }
-                                    alt={`${selectedPsychologist?.firstName} ${selectedPsychologist?.lastName}`}
-                                  />
-                                  <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                                    {getInitials(
-                                      selectedPsychologist?.firstName,
-                                      selectedPsychologist?.lastName
-                                    )}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-
-                              {/* Message content - don't show avatar placeholder for non-first messages */}
-                              <div
-                                className={`flex flex-col ${
-                                  !isCurrentUser && !isFirstInGroup
-                                    ? 'ml-10'
-                                    : ''
-                                }`}
-                              >
-                                <div
-                                  className={`px-4 py-2 ${
-                                    isCurrentUser
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-secondary text-secondary-foreground'
-                                  } ${
-                                    isFirstInGroup && isLastInGroup
-                                      ? 'rounded-lg'
-                                      : isFirstInGroup
-                                      ? isCurrentUser
-                                        ? 'rounded-t-lg rounded-bl-lg rounded-br-sm'
-                                        : 'rounded-t-lg rounded-br-lg rounded-bl-sm'
-                                      : isLastInGroup
-                                      ? isCurrentUser
-                                        ? 'rounded-b-lg rounded-bl-lg rounded-tr-sm'
-                                        : 'rounded-b-lg rounded-br-lg rounded-tl-sm'
-                                      : isCurrentUser
-                                      ? 'rounded-bl-lg rounded-tr-sm rounded-br-sm'
-                                      : 'rounded-br-lg rounded-tl-sm rounded-bl-sm'
-                                  }`}
-                                >
-                                  <p className="text-sm whitespace-pre-wrap">
-                                    {message.content}
-                                  </p>
-                                </div>
-
-                                {isLastInGroup && (
-                                  <span
-                                    className={`text-xs mt-1 text-muted-foreground flex items-center ${
-                                      isCurrentUser
-                                        ? 'justify-end'
-                                        : 'justify-start'
-                                    }`}
-                                  >
-                                    {formatTimestamp(message.createdAt)}
-                                    {isCurrentUser && (
-                                      <span className="ml-1">
-                                        {message.isRead ? (
-                                          <CheckCheck className="h-3 w-3 text-blue-500" />
-                                        ) : message._id.startsWith('temp-') ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Check className="h-3 w-3" />
-                                        )}
-                                      </span>
-                                    )}
-                                  </span>
+                            <span className="text-xs text-gray-500">
+                              {formatTime(message.createdAt)}
+                            </span>
+                            {isCurrentUser && (
+                              <span className="ml-1">
+                                {message.isRead ? (
+                                  <CheckCheck className="h-3 w-3 text-blue-500" />
+                                ) : message._id.startsWith('temp-') ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Check className="h-3 w-3 text-gray-500" />
                                 )}
-                              </div>
-
-                              {/* Current user's avatar - only show for first message in group */}
-                              {isCurrentUser && isFirstInGroup && (
-                                <Avatar
-                                  className={`h-8 w-8 ${
-                                    isCurrentUser ? 'ml-2' : 'mr-2'
-                                  } self-end mb-1`}
-                                >
-                                  <AvatarImage
-                                    src={user.image || ''}
-                                    alt={`${user.firstName} ${user.lastName}`}
-                                  />
-                                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                    {getInitials(user.firstName, user.lastName)}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                            </div>
+                              </span>
+                            )}
                           </div>
-                        );
-                      })
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </div>
-              </CardContent>
+                        </div>
 
-              {/* Message input */}
-              <CardFooter className="p-3 border-t">
-                <div className="flex w-full space-x-2 items-end">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 rounded-full flex-shrink-0"
-                    onClick={() => toast.info('Attachments coming soon!')}
-                  >
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                  <Textarea
-                    placeholder="Type your message..."
-                    value={messageInput}
-                    onChange={handleInputChange}
-                    className="min-h-[40px] max-h-32 flex-1 resize-none px-3 py-2 text-sm rounded-full"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                  />
-                  <Button
-                    className="h-9 w-9 rounded-full flex-shrink-0 p-0"
-                    size="icon"
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim()}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
+                        {isCurrentUser && showAvatar && (
+                          <Avatar className="h-8 w-8 ml-2 flex-shrink-0 self-end">
+                            <AvatarImage
+                              src={user.image || ''}
+                              alt={`${user.firstName} ${user.lastName}`}
+                            />
+                            <AvatarFallback className="bg-blue-600 text-white text-xs">
+                              {getInitials(user.firstName, user.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
                 </div>
-                {isTyping && (
-                  <p className="text-xs text-muted-foreground mt-1 ml-2">
+              )}
+            </div>
+
+            {/* Input Area */}
+            <div className="p-3 border-t dark:border-[#333333]">
+              {isTyping && (
+                <div className="flex items-center mb-1 ml-2">
+                  <span className="flex space-x-1 mr-1">
+                    <span className="h-1.5 w-1.5 bg-blue-500/60 rounded-full animate-bounce"></span>
+                    <span
+                      className="h-1.5 w-1.5 bg-blue-500/60 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.2s' }}
+                    ></span>
+                    <span
+                      className="h-1.5 w-1.5 bg-blue-500/60 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.4s' }}
+                    ></span>
+                  </span>
+                  <p className="text-xs text-gray-500">
                     {selectedPsychologist?.firstName} is typing...
                   </p>
-                )}
-              </CardFooter>
-            </Card>
-          )}
-        </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 rounded-full dark:bg-[#1a1a1a] p-1 border dark:border-[#333333]">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                  onClick={() => toast.info('Attachments coming soon!')}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+
+                <Input
+                  placeholder={`Type message for ${selectedPsychologist?.firstName}...`}
+                  value={messageInput}
+                  onChange={handleInputChange}
+                  className="flex-1 h-8 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black dark:placeholder:text-gray-500 dark:text-muted-foreground"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                />
+
+                <Button
+                  className="h-8 w-8 rounded-full p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-[#2a2a2a] disabled:text-gray-600"
+                  onClick={handleSendMessage}
+                  disabled={!messageInput.trim()}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

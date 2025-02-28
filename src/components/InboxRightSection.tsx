@@ -10,6 +10,10 @@ import {
   Loader2,
   AlertCircle,
   Filter,
+  User,
+  Trash2,
+  Ban,
+  UserRound,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +24,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSocket } from '@/context/SocketContext';
 import { useUserStore } from '@/store/userStore';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 // Psychologist interface
 interface Psychologist {
@@ -231,408 +237,378 @@ export default function InboxRightSection({
       onRefresh();
     }
   };
-
   return (
-    <Card className="h-full flex flex-col rounded-lg shadow-sm">
-      <CardHeader className="space-y-0 pb-2 pt-4 px-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Inbox</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={loading || psychologistsLoading}
-            className="h-8 w-8 rounded-full"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${
-                loading || psychologistsLoading ? 'animate-spin' : ''
-              }`}
-            />
-          </Button>
-        </div>
+    <div className="flex flex-col h-full bg-background border-none rounded-s-2xl">
+      {/* Header - Inbox title and refresh button */}
+      <div className="flex items-center justify-between p-4 border-b dark:border-[#333333]">
+        <h2 className="text-xl font-semibold text-black dark:text-white">
+          Inbox
+        </h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={loading || psychologistsLoading}
+          className="h-8 w-8 rounded-full text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+        >
+          <RefreshCcw
+            className={`h-4 w-4 ${
+              loading || psychologistsLoading ? 'animate-spin' : ''
+            }`}
+          />
+        </Button>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="conversations" className="text-xs">
-              Conversations
-            </TabsTrigger>
-            <TabsTrigger value="psychologists" className="text-xs">
-              Find Psychologists
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      {/* Tabs navigation */}
+      <Tabs
+        value={activeTab}
+        onValueChange={value =>
+          setActiveTab(value as 'conversations' | 'psychologists')
+        }
+        className="mx-2 mt-3 mb-2"
+      >
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="conversations">Conversations</TabsTrigger>
+          <TabsTrigger value="psychologists">Find Psychologists</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/* Search bar */}
+      <div className="px-3 pb-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <Input
             placeholder={
               activeTab === 'conversations'
                 ? 'Search conversations...'
                 : 'Search psychologists...'
             }
-            className="pl-8 h-9 text-sm"
+            className="pl-9 h-9 text-sm  border dark:border-[#333333]  rounded-md focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-200"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
+      </div>
 
-        {activeTab === 'psychologists' && allSpecializations.length > 0 && (
-          <div className="flex items-center mt-2 gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <div className="flex-1 overflow-auto no-scrollbar">
-              <div className="flex gap-1">
+      {/* Specialty filters (show only on psychologists tab) */}
+      {activeTab === 'psychologists' && allSpecializations.length > 0 && (
+        <div className="px-3 pb-3 flex items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-500" />
+          <div className="flex-1 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1.5">
+              <Badge
+                variant={specialtyFilter === 'all' ? 'default' : 'outline'}
+                className={`cursor-pointer text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
+                  specialtyFilter === 'all'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'border-[#2a2a2a] text-gray-400 hover:bg-[#2a2a2a] hover:text-white'
+                }`}
+                onClick={() => setSpecialtyFilter('all')}
+              >
+                All
+              </Badge>
+              {allSpecializations.slice(0, 3).map(spec => (
                 <Badge
-                  variant={specialtyFilter === 'all' ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setSpecialtyFilter('all')}
+                  key={spec}
+                  variant={specialtyFilter === spec ? 'default' : 'outline'}
+                  className={`cursor-pointer text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
+                    specialtyFilter === spec
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'border-[#2a2a2a] text-gray-400 hover:bg-[#2a2a2a] hover:text-white'
+                  }`}
+                  onClick={() => setSpecialtyFilter(spec)}
                 >
-                  All
+                  {spec}
                 </Badge>
-                {allSpecializations.slice(0, 4).map(spec => (
-                  <Badge
-                    key={spec}
-                    variant={specialtyFilter === spec ? 'default' : 'outline'}
-                    className="cursor-pointer whitespace-nowrap text-xs"
-                    onClick={() => setSpecialtyFilter(spec)}
-                  >
-                    {spec}
-                  </Badge>
-                ))}
-                {allSpecializations.length > 4 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Badge
-                        variant="outline"
-                        className="cursor-pointer text-xs"
-                      >
-                        More...
-                      </Badge>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {allSpecializations.slice(4).map(spec => (
-                        <DropdownMenuItem
-                          key={spec}
-                          onClick={() => setSpecialtyFilter(spec)}
-                          className="text-xs"
-                        >
-                          {spec}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
+              ))}
+              {allSpecializations.length > 3 && (
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer text-xs px-2 py-0.5 rounded-full whitespace-nowrap border-[#2a2a2a] text-gray-400 hover:bg-[#2a2a2a] hover:text-white"
+                  onClick={() =>
+                    toast.info('More specializations coming soon!')
+                  }
+                >
+                  More...
+                </Badge>
+              )}
             </div>
           </div>
-        )}
-      </CardHeader>
+        </div>
+      )}
 
-      <CardContent className="flex-1 overflow-hidden p-0 pt-2">
-        <Tabs value={activeTab} className="h-full">
-          <TabsContent value="conversations" className="m-0 h-full">
-            <ScrollArea className="h-full px-3">
-              {loading ? (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : fetchError ? (
-                <div className="text-center p-4 space-y-2">
-                  <AlertCircle className="h-8 w-8 mx-auto text-destructive" />
-                  <p className="text-sm text-destructive">
-                    Failed to load conversations
-                  </p>
-                  <Button variant="outline" size="sm" onClick={handleRefresh}>
-                    Retry
-                  </Button>
-                </div>
-              ) : filteredConversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <MessageSquare className="h-12 w-12 text-muted-foreground mb-2" />
-                  <h3 className="font-medium">No conversations yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Start a new conversation with a psychologist
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setActiveTab('psychologists')}
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Find Psychologists
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-1 pr-3">
-                  {filteredConversations.map(conversation => {
-                    const otherPerson = getOtherPerson(conversation);
-                    const online = isOnline(otherPerson?._id || '');
-                    const isSelected =
-                      currentConversation?._id === conversation._id;
+      {/* Main content area */}
+      <div className="flex-1 overflow-hidden">
+        {/* Conversations Tab */}
+        {activeTab === 'conversations' && (
+          <div className="h-full">
+            {loading ? (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              </div>
+            ) : fetchError ? (
+              <div className="flex flex-col justify-center items-center h-full p-4 space-y-2">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+                <p className="text-sm text-red-400">
+                  Failed to load conversations
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="rounded-md border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                <MessageSquare className="h-10 w-10 text-gray-600 mb-3" />
+                <h3 className="font-medium text-gray-300 mb-1">
+                  No conversations yet
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Start a new conversation with a psychologist
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4 rounded-md border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
+                  onClick={() => setActiveTab('psychologists')}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Find Psychologists
+                </Button>
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto scrollbar-hide">
+                {filteredConversations.map(conversation => {
+                  const otherPerson = getOtherPerson(conversation);
+                  const online = isOnline(otherPerson?._id || '');
+                  const isSelected =
+                    currentConversation?._id === conversation._id;
+                  const hasUnread = (conversation.unreadCount ?? 0) > 0;
 
-                    // Determine last message display
-                    const lastMessage =
-                      conversation.lastMessage?.content ||
-                      'Start a conversation';
-                    const timestamp = conversation.lastMessage
-                      ? formatTimestamp(conversation.lastMessage.createdAt)
-                      : formatTimestamp(conversation.updatedAt);
+                  // Determine last message display
+                  const lastMessage =
+                    conversation.lastMessage?.content || 'Start a conversation';
+                  const timestamp = conversation.lastMessage
+                    ? formatTimestamp(conversation.lastMessage.createdAt)
+                    : formatTimestamp(conversation.updatedAt);
 
-                    return (
-                      <div
-                        key={conversation._id}
-                        className={`p-3 rounded-md cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/10' : 'hover:bg-muted'
-                        }`}
-                        onClick={() => onSelectConversation(conversation)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar className="h-10 w-10 border">
-                              <AvatarImage
-                                src={
-                                  otherPerson?.image ||
-                                  otherPerson?.profilePhotoUrl ||
-                                  ''
-                                }
-                                alt={`${otherPerson?.firstName} ${otherPerson?.lastName}`}
-                              />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {getInitials(
-                                  otherPerson?.firstName,
-                                  otherPerson?.lastName
-                                )}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span
-                              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${
-                                online ? 'bg-green-500' : 'bg-gray-400'
-                              }`}
+                  return (
+                    <div
+                      key={conversation._id}
+                      className={`px-3 py-3 cursor-pointer hover:bg-[#1a1a1a] ${
+                        isSelected ? 'bg-[#1e1e1e]' : ''
+                      }`}
+                      onClick={() => onSelectConversation(conversation)}
+                    >
+                      <div className="flex items-center">
+                        <div className="relative mr-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={
+                                otherPerson?.image ||
+                                otherPerson?.profilePhotoUrl ||
+                                ''
+                              }
+                              alt={`${otherPerson?.firstName} ${otherPerson?.lastName}`}
                             />
+                            <AvatarFallback className="bg-[#1e293b] text-blue-400">
+                              {getInitials(
+                                otherPerson?.firstName,
+                                otherPerson?.lastName
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#121212] ${
+                              online ? 'bg-green-500' : 'bg-gray-500'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-sm truncate">
+                              {otherPerson?.role === 'psychologist'
+                                ? 'Dr. '
+                                : ''}
+                              {otherPerson?.firstName} {otherPerson?.lastName}
+                            </span>
+                            <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
+                              {timestamp}
+                            </span>
                           </div>
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-sm truncate">
-                                {otherPerson?.role === 'psychologist'
-                                  ? 'Dr. '
-                                  : ''}
-                                {otherPerson?.firstName} {otherPerson?.lastName}
-                              </h4>
-                              <div className="flex items-center space-x-1">
-                                {conversation.unreadCount &&
-                                conversation.unreadCount > 0 ? (
-                                  <Badge
-                                    variant="default"
-                                    className="h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
-                                  >
-                                    {conversation.unreadCount}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">
-                                    {timestamp}
-                                  </span>
-                                )}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={e => e.stopPropagation()}
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent
-                                    align="end"
-                                    className="text-xs"
-                                  >
-                                    <DropdownMenuItem>
-                                      View Profile
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      Clear Chat
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive">
-                                      Block
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </div>
-
-                            <p className="text-xs text-muted-foreground truncate mt-1">
+                          <div className="flex items-center">
+                            <p
+                              className={`text-xs truncate max-w-[200px] ${
+                                hasUnread
+                                  ? 'text-white font-medium'
+                                  : 'text-gray-500'
+                              }`}
+                            >
                               {lastMessage}
                             </p>
-
-                            <div className="flex items-center mt-1">
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs h-5 px-2 ${
-                                  online ? 'bg-green-100 text-green-800' : ''
-                                }`}
-                              >
-                                {online ? 'Online' : 'Offline'}
-                              </Badge>
-                              {otherPerson?.role === 'psychologist' &&
-                                otherPerson?.specializations?.length > 0 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs ml-1 h-5 px-2"
-                                  >
-                                    {otherPerson.specializations[0]}
-                                  </Badge>
-                                )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="psychologists" className="m-0 h-full">
-            <ScrollArea className="h-full px-3">
-              {psychologistsLoading ? (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : filteredPsychologists.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <MessageCircle className="h-12 w-12 text-muted-foreground mb-2" />
-                  <h3 className="font-medium">No psychologists found</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {searchQuery
-                      ? 'Try adjusting your search criteria'
-                      : 'No psychologists are available right now'}
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={handleRefresh}
-                  >
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Refresh List
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-1 pr-3">
-                  {filteredPsychologists.map(psychologist => {
-                    const online = isOnline(psychologist._id);
-                    const isSelected =
-                      selectedPsychologist?._id === psychologist._id;
-
-                    return (
-                      <div
-                        key={psychologist._id}
-                        className={`p-3 rounded-md cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/10' : 'hover:bg-muted'
-                        }`}
-                        onClick={() => onSelectPsychologist(psychologist)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar className="h-10 w-10 border">
-                              <AvatarImage
-                                src={
-                                  psychologist.profilePhotoUrl ||
-                                  psychologist.image ||
-                                  ''
-                                }
-                                alt={`${psychologist.firstName} ${psychologist.lastName}`}
-                              />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {getInitials(
-                                  psychologist.firstName,
-                                  psychologist.lastName
-                                )}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span
-                              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${
-                                online ? 'bg-green-500' : 'bg-gray-400'
-                              }`}
-                            />
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center">
-                              <h4 className="font-medium text-sm">
-                                Dr. {psychologist.firstName}{' '}
-                                {psychologist.lastName}
-                              </h4>
-                              <Badge
-                                variant={online ? 'default' : 'secondary'}
-                                className={`text-xs ${
-                                  online ? 'bg-green-600' : ''
-                                }`}
-                              >
-                                {online ? 'Online' : 'Offline'}
-                              </Badge>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {psychologist.specializations
-                                ?.slice(0, 2)
-                                .map(spec => (
-                                  <Badge
-                                    key={spec}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {spec}
-                                  </Badge>
-                                ))}
-                              {psychologist.specializations?.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{psychologist.specializations.length - 2}{' '}
-                                  more
-                                </Badge>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex items-center">
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs mr-2"
-                                >
-                                  {psychologist.yearsOfExperience || 0}+ yrs
-                                </Badge>
-                                {psychologist.city && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {psychologist.city}
-                                  </span>
-                                )}
+                            {hasUnread && (
+                              <div className="ml-auto">
+                                <span className="bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                  {conversation.unreadCount}
+                                </span>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="h-7 text-xs rounded-full"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  onSelectPsychologist(psychologist);
-                                }}
-                              >
-                                <MessageSquare className="h-3 w-3 mr-1" />
-                                Message
-                              </Button>
-                            </div>
+                            )}
+                          </div>
+
+                          <div className="mt-1">
+                            {online ? (
+                              <span className="text-xs text-green-500">
+                                Online
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-500">
+                                Offline
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Psychologists Tab */}
+        {activeTab === 'psychologists' && (
+          <div className="h-full">
+            {psychologistsLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              </div>
+            ) : filteredPsychologists.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                <UserRound className="h-10 w-10 text-gray-600 mb-3" />
+                <h3 className="font-medium text-gray-300 mb-1">
+                  No psychologists found
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {searchQuery
+                    ? 'Try adjusting your search criteria'
+                    : 'No psychologists are available right now'}
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4 rounded-md border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
+                  onClick={handleRefresh}
+                >
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Refresh List
+                </Button>
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto scrollbar-hide">
+                {filteredPsychologists.map(psychologist => {
+                  const online = isOnline(psychologist._id);
+                  const isSelected =
+                    selectedPsychologist?._id === psychologist._id;
+
+                  return (
+                    <div
+                      key={psychologist._id}
+                      className={`px-3 py-3 cursor-pointer hover:bg-[#1a1a1a] ${
+                        isSelected ? 'bg-[#1e1e1e]' : ''
+                      }`}
+                      onClick={() => onSelectPsychologist(psychologist)}
+                    >
+                      <div className="flex items-center">
+                        <div className="relative mr-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={
+                                psychologist.profilePhotoUrl ||
+                                psychologist.image ||
+                                ''
+                              }
+                              alt={`${psychologist.firstName} ${psychologist.lastName}`}
+                            />
+                            <AvatarFallback className="bg-[#1e293b] text-blue-400">
+                              {getInitials(
+                                psychologist.firstName,
+                                psychologist.lastName
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#121212] ${
+                              online ? 'bg-green-500' : 'bg-gray-500'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-sm truncate">
+                              Dr. {psychologist.firstName}{' '}
+                              {psychologist.lastName}
+                            </h4>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                online
+                                  ? 'bg-green-500/20 text-green-500'
+                                  : 'bg-[#2a2a2a] text-gray-400'
+                              }`}
+                            >
+                              {online ? 'Online' : 'Offline'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {psychologist.specializations
+                              ?.slice(0, 2)
+                              .map(spec => (
+                                <span
+                                  key={spec}
+                                  className="text-xs px-1.5 py-0.5 rounded-full bg-[#2a2a2a] text-gray-300"
+                                >
+                                  {spec}
+                                </span>
+                              ))}
+                            {psychologist.specializations?.length > 2 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#2a2a2a] text-gray-300">
+                                +{psychologist.specializations.length - 2}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs bg-[#2a2a2a] px-2 py-0.5 rounded-full text-gray-300">
+                              {psychologist.yearsOfExperience || 0}+ yrs
+                            </span>
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs rounded-full px-2 bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={e => {
+                                e.stopPropagation();
+                                onSelectPsychologist(psychologist);
+                              }}
+                            >
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              Message
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

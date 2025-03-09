@@ -187,18 +187,28 @@ export default function AppointmentScheduler() {
 
       // Use events directly from the Result
       if (data.Result?.events) {
-        const formattedEvents = data.Result.events.map(event => ({
-          id: event.id,
-          title: event.title,
-          start: new Date(event.start),
-          end: new Date(event.end),
-          display: event.display,
-          backgroundColor: event.backgroundColor,
-          borderColor: event.borderColor,
-          textColor: event.textColor,
-          className: event.className,
-          extendedProps: event.extendedProps,
-        }));
+        const now = new Date();
+        const formattedEvents = data.Result.events.map(event => {
+          const eventStart = new Date(event.start);
+          const isPast = eventStart < now;
+
+          return {
+            id: event.id,
+            title: event.title,
+            start: eventStart,
+            end: new Date(event.end),
+            display: event.display,
+            backgroundColor: isPast ? '#e5e7eb' : event.backgroundColor,
+            borderColor: isPast ? '#9ca3af' : event.borderColor,
+            textColor: isPast ? '#6b7280' : event.textColor,
+            className: event.className + (isPast ? ' past-slot' : ''),
+            extendedProps: {
+              ...event.extendedProps,
+              isPast,
+            },
+          };
+        });
+
         console.log('Formatted events:', formattedEvents); // Debug log
         setAvailableSlots(formattedEvents);
       }
@@ -426,7 +436,6 @@ export default function AppointmentScheduler() {
         </p>
       </div>
 
-      {/* Display notification badge for new availability */}
       <AvailabilityNotificationBadge />
 
       <CalendarView

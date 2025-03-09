@@ -213,34 +213,10 @@ const NotificationsPage = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search notifications..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-9 h-9"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1 h-7 w-7 p-0"
-              onClick={() => setSearchQuery('')}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
       {/* Tabs & Content */}
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 mb-4">
-          <TabsTrigger value="all">
+        <TabsList className="grid grid-cols-4 mb-4 max-w-[600px]">
+          <TabsTrigger value="all ">
             All
             {unreadCount > 0 && (
               <Badge variant="secondary" className="ml-2 h-5">

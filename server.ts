@@ -1031,8 +1031,12 @@ app
                 $and: [
                   { startTime: { $lt: new Date() } }, // Past appointments
                   // Limit to last 3 months for relevance
-                  { startTime: { $gt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } }
-                ]
+                  {
+                    startTime: {
+                      $gt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+                    },
+                  },
+                ],
               })
               .toArray();
 
@@ -1224,6 +1228,50 @@ app
           });
         } catch (error) {
           log.error('Error in appointment_booked handler:', error);
+        }
+      });
+
+      socket.on('update_availability', async data => {
+        const selfNotification = new Notification({
+          recipient: data.psychologistId,
+          sender: data.psychologistId, // Self-notification
+          type: 'system',
+          title: 'Availability Updated',
+          content: 'You have successfully updated your availability schedule',
+          isRead: false, 
+          relatedId: null,
+          relatedModel: null,
+          meta: {
+            type: 'availability_self_change',
+            timestamp: new Date().toISOString(),
+            slots: data?.slots,
+            dayRange: data?.dayRange,
+          },
+        });
+
+        await selfNotification.save();
+        log.info(
+          `Created self-notification for psychologist ${data.psychologistId}`
+        );
+
+        // Send socket notification to the psychologist
+        const psychologistSocketId = getSocketIdForUser(data.psychologistId);
+        if (psychologistSocketId) {
+          io.to(psychologistSocketId).emit('appointment_notification', {
+            type: 'availability_self_change',
+            message: 'You have successfully updated your availability schedule',
+            timestamp: new Date().toISOString(),
+            notificationId: selfNotification._id,
+          });
+
+          // Also emit a more general notification event
+          io.to(psychologistSocketId).emit('new_notification', {
+            notification: selfNotification.toObject(),
+            unreadCount: await Notification.countDocuments({
+              recipient: data.psychologistId,
+              isRead: false,
+            }),
+          });
         }
       });
 

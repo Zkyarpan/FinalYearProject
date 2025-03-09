@@ -2,7 +2,7 @@
 
 import { Loader2, User2, Settings2 } from 'lucide-react';
 import ThemeSwitch from './ThemeSwitch';
-import Notification from '@/icons/Notification';
+import NotificationIcon from '@/components/notifications/NotificationIcon';
 import Logout from '@/icons/Logout';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -119,7 +119,14 @@ const UserActions = ({
 
           <div className="flex items-center gap-3 px-1">
             <ThemeSwitch />
-            <Notification />
+
+            <Link
+              href="/notifications"
+              className="inline-flex items-center justify-center"
+              aria-label="View notifications"
+            >
+              <NotificationIcon />
+            </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -168,7 +175,7 @@ const UserActions = ({
                     className="px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 cursor-pointer"
                     onClick={navigateToProfile}
                   >
-                    <User2 />
+                    <User2 className="h-4 w-4" />
                     <span className="group-hover:translate-x-1 group transition-transform duration-200">
                       View Profile
                     </span>
@@ -178,9 +185,18 @@ const UserActions = ({
                     className="px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 cursor-pointer"
                     onClick={() => router.push('/settings')}
                   >
-                    <Settings2 />
+                    <Settings2 className="h-4 w-4" />
                     <span className="group-hover:translate-x-1 transition-transform duration-200">
                       Settings
+                    </span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    className="px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 cursor-pointer"
+                    onClick={() => router.push('/notifications')}
+                  >
+                    <span className="group-hover:translate-x-1 transition-transform duration-200">
+                      Notifications
                     </span>
                   </DropdownMenuItem>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useChat } from '@/context/ChatContext';
+import { useChat } from '@/contexts/ChatContext';
 import { useUserStore } from '@/store/userStore';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';

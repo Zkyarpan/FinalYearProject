@@ -12,6 +12,7 @@ import Settings from '@/icons/Settings';
 import Calendar from '@/icons/Calendar';
 import Messages from '@/icons/Messages';
 import Availability from '@/icons/Availability';
+import Computer from '@/icons/Computer';
 
 export const USER_NAV_ITEMS = [
   {
@@ -34,6 +35,11 @@ export const USER_NAV_ITEMS = [
     icon: <Messages />,
     text: 'Inbox',
     href: '/inbox',
+  },
+  {
+    icon: <Computer />,
+    text: 'Sessions',
+    href: '/sessions',
   },
   {
     icon: <ServicesIcon />,
@@ -88,6 +94,11 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
     icon: <Messages />,
     text: 'Inbox',
     href: '/inbox',
+  },
+  {
+    icon: <Computer />,
+    text: 'Sessions',
+    href: '/sessions',
   },
   {
     icon: <ArticlesIcon />,

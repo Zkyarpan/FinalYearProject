@@ -87,3 +87,25 @@ export interface AvailabilitySlot {
 export interface AvailabilitySettingsProps {
   onRefresh?: () => Promise<void>;
 }
+
+export interface Message {
+  _id: string;
+  content: string;
+  conversation: string;
+  createdAt: string;
+  isRead: boolean;
+  readAt?: string;
+  receiverId: string;
+  senderId: string;
+  sender?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    image?: string;
+    role?: string;
+  };
+  updatedAt: string;
+  messageType?: string; // Add this property
+  metadata?: any;       // Consider adding this for call data
+}

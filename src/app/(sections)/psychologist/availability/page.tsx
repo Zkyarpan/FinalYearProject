@@ -50,6 +50,8 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Add from '@/icons/Add';
 import Delete from '@/icons/Delete';
+import { useSocket } from '@/contexts/SocketContext';
+import { useUserStore } from '@/store/userStore';
 
 const SESSION_DURATIONS = [
   { value: 30, label: '30 minutes', description: 'Quick consultation' },
@@ -202,6 +204,10 @@ const DAYS_OF_WEEK = [
 export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
   onRefresh,
 }) => {
+  // Move the socket hook inside the component body
+  const { socket, isConnected } = useSocket();
+  const { user } = useUserStore();
+
   const [isLoading, setIsLoading] = useState(false);
   const [availabilitySlots, setAvailabilitySlots] = useState<
     AvailabilitySlot[]
@@ -349,8 +355,6 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     return true;
   };
 
- 
-
   const DaySelectionCard = ({
     dayName,
     dayIndex,
@@ -359,7 +363,6 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     isSelected,
     onClick,
   }) => {
-   
     const currentDate = new Date();
     const isPastDay =
       dayIndex < currentDate.getDay() ||
@@ -515,6 +518,20 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       // Handle success
       if (data.IsSuccess) {
         toast.success('Availability set successfully');
+
+        // Emit socket event for real-time notifications
+        if (socket && isConnected && user?._id) {
+          socket.emit('update_availability', {
+            psychologistId: user._id,
+            availabilityData: {
+              daysOfWeek: newAvailability.daysOfWeek,
+              startTime: newAvailability.startTime,
+              endTime,
+              duration: newAvailability.duration,
+              timePeriods: [timePeriod],
+            },
+          });
+        }
 
         // Refresh data and reset form
         void fetchAvailability();

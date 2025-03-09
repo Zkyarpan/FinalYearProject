@@ -44,7 +44,7 @@ export async function DELETE(req: NextRequest, { params }) {
         );
       }
 
-      if (new Date(appointment.dateTime) < new Date()) {
+      if (new Date(appointment.startTime) < new Date()) {
         await session.abortTransaction();
         return NextResponse.json(
           createErrorResponse(400, 'Cannot cancel past appointments')
@@ -73,13 +73,6 @@ export async function DELETE(req: NextRequest, { params }) {
           createErrorResponse(500, 'Failed to cancel appointment')
         );
       }
-
-      // If you have payment refund logic, add it here
-      // if (appointment.stripePaymentIntentId) {
-      //   await stripe.refunds.create({
-      //     payment_intent: appointment.stripePaymentIntentId,
-      //   });
-      // }
 
       await session.commitTransaction();
 

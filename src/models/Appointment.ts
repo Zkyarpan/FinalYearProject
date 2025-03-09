@@ -23,7 +23,7 @@ export enum AppointmentStatus {
 export interface IAppointment extends Document {
   userId: Types.ObjectId;
   psychologistId: Types.ObjectId;
-  dateTime: Date;
+  startTime: Date;
   endTime: Date;
   duration: number;
   stripePaymentIntentId: string;
@@ -85,14 +85,15 @@ const appointmentSchema = new Schema<
       required: [true, 'Psychologist ID is required'],
       index: true,
     },
-    dateTime: {
+    startTime: {
+      // Changed from dateTime to startTime
       type: Date,
-      required: [true, 'Appointment date and time is required'],
+      required: [true, 'Appointment start time is required'],
       validate: {
         validator: function (value: Date) {
           return value > new Date();
         },
-        message: 'Appointment date must be in the future',
+        message: 'Appointment start time must be in the future',
       },
       index: true,
     },
@@ -101,7 +102,7 @@ const appointmentSchema = new Schema<
       required: [true, 'End time is required'],
       validate: {
         validator: function (this: IAppointment, value: Date) {
-          return value > this.dateTime;
+          return value > this.startTime; // Changed from dateTime to startTime
         },
         message: 'End time must be after start time',
       },
@@ -114,7 +115,7 @@ const appointmentSchema = new Schema<
       validate: {
         validator: function (this: IAppointment, value: number) {
           const duration =
-            (this.endTime.getTime() - this.dateTime.getTime()) / (1000 * 60);
+            (this.endTime.getTime() - this.startTime.getTime()) / (1000 * 60); // Changed from dateTime to startTime
           return duration === value;
         },
         message:
@@ -259,6 +260,11 @@ appointmentSchema.methods.markAsCompleted = async function (): Promise<void> {
   }
 };
 
+// Method implementation for getDurationInMinutes
+appointmentSchema.methods.getDurationInMinutes = function (): number {
+  return (this.endTime.getTime() - this.startTime.getTime()) / (1000 * 60); // Changed from dateTime to startTime
+};
+
 // Static methods
 appointmentSchema.statics.findActiveAppointments = async function (): Promise<
   IAppointment[]
@@ -266,7 +272,7 @@ appointmentSchema.statics.findActiveAppointments = async function (): Promise<
   const now = new Date();
   return this.find({
     status: { $in: [AppointmentStatus.CONFIRMED, AppointmentStatus.ONGOING] },
-    dateTime: { $lte: now },
+    startTime: { $lte: now }, // Changed from dateTime to startTime
     endTime: { $gt: now },
     isCanceled: false,
   }).populate('userId psychologistId');
@@ -277,7 +283,12 @@ appointmentSchema.pre('save', async function (next) {
   const now = new Date();
 
   // Set duration if needed
-  if (this.isNew || this.isModified('dateTime') || this.isModified('endTime')) {
+  if (
+    this.isNew ||
+    this.isModified('startTime') ||
+    this.isModified('endTime')
+  ) {
+    // Changed from dateTime to startTime
     this.duration = this.getDurationInMinutes();
   }
 
@@ -290,7 +301,8 @@ appointmentSchema.pre('save', async function (next) {
           : AppointmentStatus.MISSED;
         this.completedAt = now;
       }
-    } else if (this.dateTime <= now && this.endTime > now) {
+    } else if (this.startTime <= now && this.endTime > now) {
+      // Changed from dateTime to startTime
       if (this.status === AppointmentStatus.CONFIRMED) {
         this.status = AppointmentStatus.ONGOING;
       }

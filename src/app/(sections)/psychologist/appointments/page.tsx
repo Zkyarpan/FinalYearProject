@@ -92,18 +92,45 @@ const PsychologistAppointments = () => {
 
         if (Array.isArray(availabilityRes.Result.events)) {
           availabilityRes.Result.events.forEach(event => {
-            const matchingAppointment = appointmentsData.find(
-              apt =>
-                new Date(apt.dateTime).toISOString() ===
-                new Date(event.start).toISOString()
-            );
+            // Validate event start date
+            const eventStart = event.start ? new Date(event.start) : null;
+            if (!eventStart || isNaN(eventStart.getTime())) {
+              console.warn('Invalid event start date:', event.start);
+              return; // Skip this event if date is invalid
+            }
+
+            // Find matching appointment with proper validation
+            const matchingAppointment = appointmentsData.find(apt => {
+              // Validate appointment date
+              if (!apt.dateTime) return false;
+
+              try {
+                const aptDate = new Date(apt.dateTime);
+                return (
+                  aptDate &&
+                  !isNaN(aptDate.getTime()) &&
+                  aptDate.toISOString() === eventStart.toISOString()
+                );
+              } catch (error) {
+                console.warn('Error comparing dates:', error);
+                return false;
+              }
+            });
 
             if (matchingAppointment) {
+              // Ensure endTime is valid
+              const endTime = matchingAppointment.endTime
+                ? new Date(matchingAppointment.endTime)
+                : new Date(
+                    new Date(matchingAppointment.dateTime).getTime() +
+                      60 * 60 * 1000
+                  );
+
               processedEvents.push({
                 id: matchingAppointment._id,
                 title: matchingAppointment.patientName,
                 start: matchingAppointment.dateTime,
-                end: matchingAppointment.endTime,
+                end: endTime.toISOString(),
                 extendedProps: {
                   type: 'appointment',
                   status: matchingAppointment.status,
@@ -112,8 +139,15 @@ const PsychologistAppointments = () => {
                 },
               });
             } else {
+              // Ensure event.end is valid
+              const endTime = event.end
+                ? new Date(event.end)
+                : new Date(eventStart.getTime() + 60 * 60 * 1000);
+
               processedEvents.push({
                 ...event,
+                start: eventStart.toISOString(),
+                end: endTime.toISOString(),
                 backgroundColor: 'rgba(16, 185, 129, 0.15)',
                 borderColor: 'rgb(16, 185, 129)',
                 textColor: 'rgb(6, 95, 70)',

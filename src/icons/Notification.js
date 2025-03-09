@@ -1,16 +1,121 @@
 'use client';
 
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { useUserStore } from '@/store/userStore';
 import { useRouter } from 'next/navigation';
 
-const Notification = () => {
+/**
+ * Standalone notification icon component that can be used anywhere in the app
+ * Shows a notification badge with unread count
+ */
+const NotificationIcon = () => {
   const router = useRouter();
+  const { user } = useUserStore();
+  const [unreadCount, setLocalUnreadCount] = useState(0);
 
-  const handleNotificationClick = () => {
+  // Try to use context, but provide fallback if it fails
+  const contextData = React.useMemo(() => {
+    try {
+      return useNotifications();
+    } catch (error) {
+      console.error('Error accessing notification context:', error);
+      return null;
+    }
+  }, []);
+
+  const {
+    unreadCount: contextUnreadCount = 0,
+    setIsOpen,
+    fetchNotifications,
+  } = contextData || {};
+
+  // Sync local unread count with context
+  useEffect(() => {
+    if (contextUnreadCount !== undefined) {
+      setLocalUnreadCount(contextUnreadCount);
+    }
+  }, [contextUnreadCount]);
+
+  // Fallback to localStorage if context fails
+  useEffect(() => {
+    if (!contextData && user?._id) {
+      try {
+        const storedNotifications = localStorage.getItem(
+          `notifications_${user._id}`
+        );
+        if (storedNotifications) {
+          const parsed = JSON.parse(storedNotifications);
+          const unreadNotifications = parsed.filter(n => !n.isRead);
+          setLocalUnreadCount(unreadNotifications.length);
+        }
+      } catch (error) {
+        console.error('Error parsing stored notifications:', error);
+      }
+    }
+  }, [contextData, user?._id]);
+
+  // Listen for notification updates
+  useEffect(() => {
+    const handleNotificationUpdate = () => {
+      // Try to update from context first
+      if (contextData) {
+        setLocalUnreadCount(contextData.unreadCount || 0);
+      }
+      // Fallback to localStorage
+      else if (user?._id) {
+        try {
+          const storedNotifications = localStorage.getItem(
+            `notifications_${user._id}`
+          );
+          if (storedNotifications) {
+            const parsed = JSON.parse(storedNotifications);
+            const unreadNotifications = parsed.filter(n => !n.isRead);
+            setLocalUnreadCount(unreadNotifications.length);
+          }
+        } catch (error) {
+          console.error('Error parsing stored notifications:', error);
+        }
+      }
+    };
+
+    // Listen for custom event
+    window.addEventListener('notifications-updated', handleNotificationUpdate);
+
+    return () => {
+      window.removeEventListener(
+        'notifications-updated',
+        handleNotificationUpdate
+      );
+    };
+  }, [contextData, user?._id]);
+
+  const handleNotificationClick = e => {
+    e.preventDefault();
+
+    // Try to refresh notifications on click
+    if (fetchNotifications) {
+      fetchNotifications();
+    }
+
+    // If on mobile or we have a context setter, open the dropdown
+    if (window.innerWidth < 768 || setIsOpen) {
+      // Only use dropdown if we're not already on the notifications page
+      if (window.location.pathname !== '/notifications') {
+        if (setIsOpen) {
+          setIsOpen(true);
+          return;
+        }
+      }
+    }
+
+    // Default: navigate to notifications page
     router.push('/notifications');
   };
 
   return (
-    <div role="button" tabIndex={0}>
+    <div className="relative">
       <button
         onClick={handleNotificationClick}
         type="button"
@@ -54,8 +159,22 @@ const Notification = () => {
           />
         </svg>
       </button>
+
+      {unreadCount > 0 && (
+        <span
+          className="absolute -top-1 -right-1 flex items-center justify-center 
+          h-5 w-5 min-w-5 
+          bg-red-500 
+          text-white text-[10px] font-bold 
+          rounded-full 
+          shadow-sm
+          animate-in fade-in duration-300"
+        >
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
     </div>
   );
 };
 
-export default Notification;
+export default NotificationIcon;

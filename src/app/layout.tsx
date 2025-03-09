@@ -8,8 +8,11 @@ import { ThemeProviders } from '@/providers/ThemeProviders';
 import NextTopLoader from 'nextjs-toploader';
 import AuthGuard from '@/providers/AuthGuard';
 import { StripeProvider } from '@/providers/stripe-provider';
-import { SocketProvider } from '@/context/SocketContext';
-import { ChatProvider } from '../context/ChatContext';
+import { SocketProvider } from '@/contexts/SocketContext';
+import { ChatProvider } from '../contexts/ChatContext';
+import { VideoCallProvider } from '@/contexts/VideoCallContext';
+import VideoCallUI from '@/components/VideoCallUI';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -63,7 +66,12 @@ export default function RootLayout({
           <AuthGuard>
             <StripeProvider>
               <SocketProvider>
-                <ChatProvider>{children}</ChatProvider>
+                <VideoCallProvider>
+                  <ChatProvider>
+                    <NotificationProvider>{children}</NotificationProvider>
+                    <VideoCallUI />
+                  </ChatProvider>
+                </VideoCallProvider>
               </SocketProvider>
             </StripeProvider>
           </AuthGuard>

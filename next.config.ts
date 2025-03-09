@@ -1,13 +1,11 @@
+// next.config.js - Safe version with minimal changes
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Your existing settings
+  // Original settings from your working config
   poweredByHeader: false,
   reactStrictMode: false,
 
-  // Enable production optimizations
-  output: 'standalone',
-  productionBrowserSourceMaps: false,
-
-  // Existing image configuration
+  // Keep your existing image configuration
   images: {
     remotePatterns: [
       {
@@ -31,13 +29,12 @@ const nextConfig = {
         hostname: 'i.postimg.cc',
       },
     ],
-    // Add image optimization settings
-    minimumCacheTTL: 60,
+    minimumCacheTTL: 60, // Keep your original value or set to 60 if unsure
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // Your existing headers configuration
+  // Your original headers configuration
   async headers() {
     return [
       {
@@ -52,62 +49,20 @@ const nextConfig = {
     ];
   },
 
-  // Enhanced webpack configuration
+  // Your original webpack configuration - with minimal optimizations
   webpack: (config, { dev, isServer }) => {
     // Only apply these optimizations in production
     if (!dev) {
       // Enable production mode optimizations
       config.mode = 'production';
-
-      // Optimize chunk splitting
-      config.optimization = {
-        ...config.optimization,
-        minimize: true,
-        runtimeChunk: 'single',
-        splitChunks: {
-          chunks: 'all',
-          maxInitialRequests: 25,
-          minSize: 20000,
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            commons: {
-              name: 'commons',
-              chunks: 'all',
-              minChunks: 2,
-              priority: 20,
-            },
-            shared: {
-              name: (module, chunks) => {
-                const crypto = require('crypto');
-                return crypto
-                  .createHash('sha1')
-                  .update(chunks.map(c => c.name).join('_'))
-                  .digest('hex')
-                  .substring(0, 8);
-              },
-              priority: 10,
-              minChunks: 2,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-      };
     }
-
     return config;
   },
 
-  // Add compression
+  // Basic performance optimizations that shouldn't break anything
   compress: true,
-
-  // Enable proper caching
   generateEtags: true,
-
-  // Optimize page loading
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
-
-  // Add proper trailing slashes handling
   trailingSlash: false,
 };
 

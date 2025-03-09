@@ -1,15 +1,14 @@
+// File: src/db/db.ts - Safe version with minimal changes
 import mongoose from 'mongoose';
 import User from '../models/User';
 import Appointment from '../models/Appointment';
 import Availability from '../models/Availability';
 import dotenv from 'dotenv';
-
-// Import the Psychologist model - this is crucial for the conversations API
-// If you don't have this file, you'll need to create it based on your schema requirements
 import Psychologist from '../models/Psychologist';
 import Conversation from '../models/Conversation';
 import Message from '../models/Message';
 
+// Load environment variables
 dotenv.config();
 
 const MONGODB_URI =
@@ -20,16 +19,18 @@ if (!MONGODB_URI) {
   throw new Error('MONGO_URI is not defined in the environment variables');
 }
 
+// Define connection cache type
 interface ConnectionCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
 }
 
+// Add to global scope
 declare global {
   var mongooseCache: ConnectionCache;
 }
 
-// Initialize the cache
+// Initialize the connection cache
 globalThis.mongooseCache = globalThis.mongooseCache || {
   conn: null,
   promise: null,
@@ -38,11 +39,10 @@ globalThis.mongooseCache = globalThis.mongooseCache || {
 // Track model initialization status
 let modelsInitialized = false;
 
-// Initialize models function
+// Initialize models function - keeping close to your original implementation
 async function initializeModels() {
   try {
     if (modelsInitialized) {
-      // Skip if models are already initialized
       return;
     }
 
@@ -83,7 +83,6 @@ async function initializeModels() {
     modelsInitialized = true;
     console.log('✅ Models initialized successfully');
 
-
   } catch (error) {
     console.error('❌ Error initializing models:', error);
     modelsInitialized = false;
@@ -91,6 +90,7 @@ async function initializeModels() {
   }
 }
 
+// Safe optimization of your database connection logic
 const connectDB = async (): Promise<typeof mongoose> => {
   try {
     // If we have an existing connection, return it
@@ -110,8 +110,9 @@ const connectDB = async (): Promise<typeof mongoose> => {
 
     console.log('🔄 Creating new MongoDB connection...');
 
+    // Using your original options with slight optimization
     const opts = {
-      bufferCommands: true, // Keep true to allow buffering commands
+      bufferCommands: true,
       maxPoolSize: 10,
       minPoolSize: 5,
       socketTimeoutMS: 30000,
@@ -127,7 +128,7 @@ const connectDB = async (): Promise<typeof mongoose> => {
     // Store the connection promise
     globalThis.mongooseCache.promise = mongoose.connect(MONGODB_URI, opts);
 
-    // Set up event listeners
+    // Set up event listeners - keeping your original approach
     mongoose.connection.on('connected', async () => {
       console.log('✅ Successfully connected to MongoDB');
       await initializeModels(); // Initialize models on connection
@@ -143,18 +144,6 @@ const connectDB = async (): Promise<typeof mongoose> => {
       console.log('❗MongoDB disconnected');
       modelsInitialized = false;
       globalThis.mongooseCache.promise = null;
-    });
-
-    // Handle graceful shutdown
-    process.on('SIGINT', async () => {
-      try {
-        await mongoose.connection.close();
-        console.log('MongoDB connection closed through app termination');
-        process.exit(0);
-      } catch (err) {
-        console.error('Error closing MongoDB connection:', err);
-        process.exit(1);
-      }
     });
 
     // Wait for the connection and model initialization

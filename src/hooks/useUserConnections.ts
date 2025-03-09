@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSocket } from '@/context/SocketContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { useUserStore } from '@/store/userStore';
 
 export function useUserConnections() {

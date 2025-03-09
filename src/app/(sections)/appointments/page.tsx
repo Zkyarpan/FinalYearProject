@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { toast } from 'sonner';
 import { useUserStore } from '@/store/userStore';
+import { useNotifications } from '@/contexts/NotificationContext';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +17,8 @@ import { CalendarView } from '@/components/CalendarView';
 import { BookingForm } from '@/components/BookingForm';
 import { PsychologistDetails } from '@/components/PsychologistDetails';
 import { PaymentForm } from '@/components/payment-form';
-import AppointmentManager from '@/components/AppointmentManager';
 import { CalendarStyles } from '@/components/CalenderStyles';
+import { AvailabilityNotificationBadge } from '@/components/AvailabilityNotificationBadge';
 import {
   AppointmentEvent,
   SelectedSlot,
@@ -39,6 +40,17 @@ export default function AppointmentScheduler() {
   const [paymentStep, setPaymentStep] = useState('details');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const { firstName, lastName, email } = useUserStore();
+  const { notifications } = useNotifications();
+
+  const [newAvailabilityData, setNewAvailabilityData] = useState<{
+    psychologistId: string;
+    timestamp: string;
+    psychologistName?: string;
+  } | null>(null);
+
+  const [highlightedSlots, setHighlightedSlots] = useState<Set<string>>(
+    new Set()
+  );
 
   const [bookingDetails, setBookingDetails] = useState<BookingDetails>({
     title: '',
@@ -50,6 +62,70 @@ export default function AppointmentScheduler() {
     insuranceProvider: '',
     reasonForVisit: '',
   });
+
+  // Function to process latest availability notification
+  const processAvailabilityNotifications = useCallback(() => {
+    // Look for the most recent availability change notification
+    const availabilityNotification = notifications
+      .filter(notification => notification.meta?.type === 'availability_change')
+      .sort((a, b) => {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      })[0];
+
+    if (availabilityNotification) {
+      setNewAvailabilityData({
+        psychologistId: availabilityNotification.meta?.psychologistId,
+        timestamp: availabilityNotification.createdAt,
+        psychologistName:
+          availabilityNotification.meta?.psychologistName ||
+          availabilityNotification.title?.split(' ')[0] ||
+          'A provider',
+      });
+    }
+  }, [notifications]);
+
+  // Process notifications when component mounts or notifications change
+  useEffect(() => {
+    processAvailabilityNotifications();
+  }, [processAvailabilityNotifications]);
+
+  // Clear notification highlights after 10 minutes to avoid persistent UI clutter
+  useEffect(() => {
+    if (newAvailabilityData) {
+      const clearHighlightTimer = setTimeout(() => {
+        setNewAvailabilityData(null);
+        setHighlightedSlots(new Set());
+      }, 10 * 60 * 1000); // 10 minutes
+
+      return () => clearTimeout(clearHighlightTimer);
+    }
+  }, [newAvailabilityData]);
+
+  // Update highlighted slots when availability data changes
+  useEffect(() => {
+    if (newAvailabilityData && availableSlots.length > 0) {
+      // Find slots that belong to the psychologist who updated availability
+      const newHighlightedSlots = new Set<string>();
+
+      availableSlots.forEach(slot => {
+        if (
+          !slot.extendedProps?.isBooked &&
+          slot.extendedProps?.psychologistId ===
+            newAvailabilityData.psychologistId
+        ) {
+          // Create a unique ID for each slot
+          const slotId = `${
+            slot.id || `${slot.start}-${slot.extendedProps?.psychologistId}`
+          }`;
+          newHighlightedSlots.add(slotId);
+        }
+      });
+
+      setHighlightedSlots(newHighlightedSlots);
+    }
+  }, [newAvailabilityData, availableSlots]);
 
   useEffect(() => {
     fetchAppointments();
@@ -299,6 +375,11 @@ export default function AppointmentScheduler() {
     setClientSecret(null);
   };
 
+  const dismissNewAvailabilityAlert = () => {
+    setNewAvailabilityData(null);
+    setHighlightedSlots(new Set());
+  };
+
   const renderBookingContent = () => {
     if (paymentStep === 'payment' && clientSecret) {
       return (
@@ -334,7 +415,7 @@ export default function AppointmentScheduler() {
   return (
     <div className="mx-auto p-4 space-y-4 max-w-7xl">
       {CalendarStyles()}
-      <AppointmentManager />
+
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">
           Schedule Appointment
@@ -345,11 +426,18 @@ export default function AppointmentScheduler() {
         </p>
       </div>
 
+      {/* Display notification badge for new availability */}
+      <AvailabilityNotificationBadge />
+
       <CalendarView
-        appointments={appointments as unknown as Event[]}
-        availableSlots={availableSlots as unknown as Event[]}
+        appointments={appointments}
+        availableSlots={availableSlots}
         onEventClick={handleEventClick}
+        newAvailabilityData={newAvailabilityData}
+        highlightedSlots={highlightedSlots}
+        onDismissHighlight={dismissNewAvailabilityAlert}
       />
+
       <Dialog open={showBookingDialog} onOpenChange={handleCloseDialog}>
         <DialogContent className="sm:max-w-2xl p-0">
           <DialogHeader className="p-6 border-b">

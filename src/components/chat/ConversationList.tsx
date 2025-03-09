@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useChat } from '@/context/ChatContext';
+import { useChat } from '@/contexts/ChatContext';
 import { useUserStore } from '@/store/userStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

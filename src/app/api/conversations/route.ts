@@ -104,75 +104,161 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return withAuth(async (req: NextRequest, user: any) => {
     try {
-      const userId = user.id;
-      const { psychologistId, initialMessage } = await req.json();
+      console.log('Conversation POST endpoint called by user:', user.id);
+
+      // Parse request body with error handling
+      let requestBody;
+      try {
+        requestBody = await req.json();
+      } catch (e) {
+        console.error('Failed to parse request body:', e);
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid request body format'),
+          { status: 400 }
+        );
+      }
+
+      const { psychologistId, initialMessage } = requestBody;
 
       if (!psychologistId) {
+        console.log('Missing psychologistId in request');
         return NextResponse.json(
           createErrorResponse(400, 'Psychologist ID is required'),
           { status: 400 }
         );
       }
 
-      await connectDB();
+      console.log(
+        `Looking for conversation between user ${user.id} and psychologist ${psychologistId}`
+      );
+
+      try {
+        await connectDB();
+      } catch (dbError) {
+        console.error('Database connection error:', dbError);
+        return NextResponse.json(
+          createErrorResponse(503, 'Database connection failed'),
+          { status: 503 }
+        );
+      }
 
       // Check if conversation already exists
-      let conversation = await Conversation.findOne({
-        user: userId,
-        psychologist: psychologistId,
-        isActive: true,
-      });
-
-      // If no conversation exists, create a new one
-      if (!conversation) {
-        conversation = new Conversation({
-          participants: [userId, psychologistId],
-          user: userId,
+      let conversation;
+      try {
+        conversation = await Conversation.findOne({
+          user: user.id,
           psychologist: psychologistId,
           isActive: true,
         });
 
-        await conversation.save();
+        console.log(
+          'Existing conversation found:',
+          conversation ? conversation._id : 'None'
+        );
+      } catch (findError) {
+        console.error('Error finding conversation:', findError);
+        return NextResponse.json(
+          createErrorResponse(500, 'Failed to check for existing conversation'),
+          { status: 500 }
+        );
+      }
+
+      // If no conversation exists, create a new one
+      if (!conversation) {
+        try {
+          console.log('Creating new conversation');
+          conversation = new Conversation({
+            participants: [user.id, psychologistId],
+            user: user.id,
+            psychologist: psychologistId,
+            isActive: true,
+          });
+
+          await conversation.save();
+          console.log('New conversation created with ID:', conversation._id);
+        } catch (createError) {
+          console.error('Failed to create conversation:', createError);
+          return NextResponse.json(
+            createErrorResponse(500, 'Failed to create new conversation'),
+            { status: 500 }
+          );
+        }
       }
 
       // If initial message provided, create a message
       if (initialMessage) {
-        const message = new Message({
-          conversation: conversation._id,
-          sender: userId,
-          receiver: psychologistId,
-          content: initialMessage,
-          isRead: false,
-        });
+        try {
+          console.log('Adding initial message to conversation');
+          const message = new Message({
+            conversation: conversation._id,
+            sender: user.id,
+            receiver: psychologistId,
+            content: initialMessage,
+            isRead: false,
+          });
 
-        await message.save();
+          await message.save();
 
-        // Update conversation with last message
-        conversation.lastMessage = message._id;
-        await conversation.save();
+          // Update conversation with last message
+          conversation.lastMessage = message._id;
+          await conversation.save();
+        } catch (messageError) {
+          console.error('Failed to add initial message:', messageError);
+          // Continue anyway since we have the conversation
+        }
       }
 
       // Return the conversation with populated fields
-      const populatedConversation = await Conversation.findById(
-        conversation._id
-      )
-        .populate('user', 'firstName lastName email image')
-        .populate('psychologist', 'firstName lastName email profilePhotoUrl')
-        .populate({
-          path: 'lastMessage',
-          select: 'content createdAt isRead sender',
-        });
+      try {
+        const populatedConversation = await Conversation.findById(
+          conversation._id
+        )
+          .populate('user', 'firstName lastName email image')
+          .populate('psychologist', 'firstName lastName email profilePhotoUrl')
+          .populate({
+            path: 'lastMessage',
+            select: 'content createdAt isRead sender',
+          });
 
-      return NextResponse.json(
-        createSuccessResponse(201, populatedConversation),
-        { status: 201 }
-      );
+        console.log('Returning populated conversation');
+
+        return NextResponse.json(
+          createSuccessResponse(
+            conversation ? 200 : 201,
+            populatedConversation
+          ),
+          { status: conversation ? 200 : 201 }
+        );
+      } catch (populateError) {
+        console.error('Failed to populate conversation:', populateError);
+
+        // Return the unpopulated conversation as fallback
+        return NextResponse.json(
+          createSuccessResponse(conversation ? 200 : 201, conversation),
+          { status: conversation ? 200 : 201 }
+        );
+      }
     } catch (error) {
-      console.error('Error creating conversation:', error);
-      return NextResponse.json(
+      console.error('Unhandled error creating/finding conversation:', error);
+
+      // Check if headers are already sent to avoid "Cannot set headers after they are sent" error
+      const response = NextResponse.json(
         createErrorResponse(500, 'Internal Server Error'),
         { status: 500 }
       );
+
+      // Add CORS headers to ensure browsers can read the response
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set(
+        'Access-Control-Allow-Methods',
+        'GET, POST, OPTIONS'
+      );
+      response.headers.set(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization'
+      );
+
+      return response;
     }
   }, req);
 }

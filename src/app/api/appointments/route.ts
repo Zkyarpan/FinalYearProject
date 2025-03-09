@@ -35,7 +35,7 @@ async function createAppointment(
   const appointmentDoc = {
     userId: new Types.ObjectId(userId),
     psychologistId: new Types.ObjectId(data.psychologistId),
-    dateTime: startDate,
+    startTime: startDate, // Changed from startDate to startTime to match the model
     endTime: endDate,
     duration: Math.round(
       (endDate.getTime() - startDate.getTime()) / (1000 * 60)
@@ -149,7 +149,7 @@ async function getPopulatedAppointment(appointmentId: Types.ObjectId) {
       {
         $project: {
           _id: 1,
-          dateTime: 1,
+          startTime: 1, // Changed from dateTime to startTime
           endTime: 1,
           status: 1,
           sessionFormat: 1,
@@ -330,30 +330,26 @@ function buildMatchStage(
   if (filters.timeRange) {
     switch (filters.timeRange) {
       case 'upcoming':
-        matchStage.dateTime = { $gt: now };
+        matchStage.startTime = { $gt: now }; // Changed from dateTime to startTime
         break;
       case 'past':
-        matchStage.dateTime = { $lt: now };
+        matchStage.startTime = { $lt: now }; // Changed from dateTime to startTime
         break;
     }
   }
 
   if (filters.startDate) {
-    matchStage.dateTime = { ...matchStage.dateTime, $gte: filters.startDate };
+    matchStage.startTime = { ...matchStage.startTime, $gte: filters.startDate }; // Changed from dateTime to startTime
   }
 
   if (filters.endDate) {
-    matchStage.dateTime = { ...matchStage.dateTime, $lte: filters.endDate };
+    matchStage.startTime = { ...matchStage.startTime, $lte: filters.endDate }; // Changed from dateTime to startTime
   }
 
   return matchStage;
 }
 
-function buildAggregationPipeline(
-  matchStage: any,
-  skip: number,
-  limit: number
-) {
+function buildAggregationPipeline(matchStage, skip, limit) {
   return [
     { $match: matchStage },
     // Lookup user info
@@ -374,6 +370,35 @@ function buildAggregationPipeline(
           },
         ],
         as: 'userInfo',
+      },
+    },
+    // Add lookup for user profile data
+    {
+      $lookup: {
+        from: 'profiles',
+        let: { userId: { $toObjectId: '$userId' } },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$user', '$$userId'] } } },
+          {
+            $project: {
+              _id: 1,
+              firstName: 1,
+              lastName: 1,
+              image: 1,
+              age: 1,
+              gender: 1,
+              address: 1,
+              phone: 1,
+              emergencyContact: 1,
+              emergencyPhone: 1,
+              therapyHistory: 1,
+              preferredCommunication: 1,
+              struggles: 1,
+              briefBio: 1,
+            },
+          },
+        ],
+        as: 'profileInfo',
       },
     },
     // Lookup psychologist info from psychologists collection
@@ -454,6 +479,12 @@ function buildAggregationPipeline(
     },
     {
       $unwind: {
+        path: '$profileInfo',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $unwind: {
         path: '$psychologistInfo',
         preserveNullAndEmptyArrays: true,
       },
@@ -467,10 +498,10 @@ function buildAggregationPipeline(
     // Add computed fields
     {
       $addFields: {
-        isPast: { $lt: ['$dateTime', '$$NOW'] },
+        isPast: { $lt: ['$startTime', '$$NOW'] },
         isToday: {
           $eq: [
-            { $dateToString: { format: '%Y-%m-%d', date: '$dateTime' } },
+            { $dateToString: { format: '%Y-%m-%d', date: '$startTime' } },
             { $dateToString: { format: '%Y-%m-%d', date: '$$NOW' } },
           ],
         },
@@ -479,7 +510,7 @@ function buildAggregationPipeline(
             { $eq: ['$status', 'confirmed'] },
             {
               $lte: [
-                { $abs: { $subtract: ['$dateTime', '$$NOW'] } },
+                { $abs: { $subtract: ['$startTime', '$$NOW'] } },
                 300000, // 5 minutes in milliseconds
               ],
             },
@@ -491,7 +522,7 @@ function buildAggregationPipeline(
     {
       $project: {
         _id: 1,
-        dateTime: 1,
+        startTime: 1,
         endTime: 1,
         duration: 1,
         sessionFormat: 1,
@@ -519,6 +550,23 @@ function buildAggregationPipeline(
           firstName: '$userInfo.firstName',
           lastName: '$userInfo.lastName',
           phoneNumber: '$userInfo.phoneNumber',
+        },
+        // Add profile data to the response
+        profile: {
+          _id: '$profileInfo._id',
+          firstName: '$profileInfo.firstName',
+          lastName: '$profileInfo.lastName',
+          profilePhotoUrl: '$profileInfo.image',
+          age: '$profileInfo.age',
+          gender: '$profileInfo.gender',
+          address: '$profileInfo.address',
+          phone: '$profileInfo.phone',
+          emergencyContact: '$profileInfo.emergencyContact',
+          emergencyPhone: '$profileInfo.emergencyPhone',
+          therapyHistory: '$profileInfo.therapyHistory',
+          preferredCommunication: '$profileInfo.preferredCommunication',
+          struggles: '$profileInfo.struggles',
+          briefBio: '$profileInfo.briefBio',
         },
         psychologist: {
           _id: '$psychologistInfo._id',
@@ -563,7 +611,7 @@ function buildAggregationPipeline(
         },
       },
     },
-    { $sort: { dateTime: 1 } },
+    { $sort: { startTime: 1 } },
     { $skip: skip },
     { $limit: limit },
   ];
@@ -581,10 +629,10 @@ async function getAppointmentSummary(matchStage: any) {
           _id: null,
           total: { $sum: 1 },
           upcoming: {
-            $sum: { $cond: [{ $gt: ['$dateTime', now] }, 1, 0] },
+            $sum: { $cond: [{ $gt: ['$startTime', now] }, 1, 0] }, // Changed from dateTime to startTime
           },
           past: {
-            $sum: { $cond: [{ $lt: ['$dateTime', now] }, 1, 0] },
+            $sum: { $cond: [{ $lt: ['$startTime', now] }, 1, 0] }, // Changed from dateTime to startTime
           },
           confirmed: {
             $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] },
@@ -607,7 +655,7 @@ async function getAppointmentSummary(matchStage: any) {
                 {
                   $eq: [
                     {
-                      $dateToString: { format: '%Y-%m-%d', date: '$dateTime' },
+                      $dateToString: { format: '%Y-%m-%d', date: '$startTime' }, // Changed from dateTime to startTime
                     },
                     { $dateToString: { format: '%Y-%m-%d', date: now } },
                   ],

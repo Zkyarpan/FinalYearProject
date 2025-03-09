@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useSocket } from '@/context/SocketContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { useUserStore } from '@/store/userStore';
 
 // Define types

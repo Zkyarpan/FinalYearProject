@@ -30,7 +30,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useSocket } from '@/context/SocketContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { useUserStore } from '@/store/userStore';
 import { format } from 'date-fns';
 import { toast } from 'sonner';

@@ -324,6 +324,6 @@ export default async function AccountPage() {
 
     return <ProfileClient profile={profile} />;
   } catch (error) {
-    throw error; 
+    throw error;
   }
 }

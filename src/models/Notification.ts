@@ -1,4 +1,4 @@
-// models/Notification.js
+// models/Notification.ts
 import mongoose, { Schema } from 'mongoose';
 
 const NotificationSchema = new Schema(

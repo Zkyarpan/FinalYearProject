@@ -29,8 +29,6 @@ import AccountSection from '@/components/AccountSection';
 import { DEFAULT_AVATAR } from '@/constants';
 import FilterSection from '@/components/FilterSection';
 import PsychologistProfileHighlights from '@/components/PsychologistProfileHighlights';
-import Messages from '@/icons/Messages';
-import InboxSection from '@/components/InboxRightSection';
 
 const routeTitles = {
   // User routes
@@ -45,6 +43,7 @@ const routeTitles = {
   '/dashboard': 'Dashboard',
   '/appointments': 'Appointments',
   '/inbox': 'Inbox',
+  '/sessions': 'Your Sessions',
 
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
@@ -54,6 +53,7 @@ const routeTitles = {
   '/psychologist/articles': 'My Articles',
   '/psychologist/blog': 'My Blogs',
   '/psychologist/availability': 'My Availability',
+
   // Admin routes
   '/dashboard/admin': 'Dashboard',
   '/admin/users': 'Users Management',
@@ -110,7 +110,7 @@ const RootLayout = ({ children }) => {
 
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
-  const isPsychologistProfileRoute = (pathname: string) => {
+  const isPsychologistProfileRoute = pathname => {
     const pathParts = pathname.split('/');
     return (
       pathParts.length === 3 &&
@@ -303,7 +303,7 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[50]">
+        <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[10]">
           <div className="flex flex-col h-full">
             <div className="px-4 py-2">
               <Link
@@ -378,16 +378,6 @@ const RootLayout = ({ children }) => {
                   )}
                 </div>
                 <div className="flex items-center gap-x-3">
-                  {/* Message Button for Psychologist Profile */}
-                  {isPsychologistProfileRoute(pathname) && (
-                    <Link
-                      href={`/inbox?psychologistId=${psychologistId}`}
-                      type="button"
-                      className="justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
-                    >
-                      <Messages />
-                    </Link>
-                  )}
                   {!showRightSidebar && (
                     <div className="relative z-[102]">
                       <UserActions

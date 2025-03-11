@@ -1113,7 +1113,22 @@ app
         }
       });
 
-      async function createNotification(data) {
+      interface NotificationDocument extends mongoose.Document {
+        _id: mongoose.Types.ObjectId;
+        recipient: string;
+        sender: string | null;
+        type: string;
+        title: string;
+        content: string;
+        isRead: boolean;
+        relatedId: string | null;
+        relatedModel: string | null;
+        meta: Record<string, any>;
+      }
+
+      async function createNotification(
+        data
+      ): Promise<NotificationDocument | null> {
         try {
           const {
             recipientId,
@@ -1160,74 +1175,209 @@ app
           }
 
           log.info(`New appointment booked: ${appointmentId}`);
+          console.log('⚡ appointment_booked event received:', data);
 
-          // Create notification for psychologist in database
-          const psychNotification = await createNotification({
-            recipientId: psychologistId,
-            senderId: userId,
-            type: 'appointment',
-            title: 'New Appointment Booked',
-            content: 'You have a new appointment booked',
-            relatedId: appointmentId,
-            relatedModel: 'Appointment',
-            meta: {
-              appointmentDetails,
-              type: 'new_booking',
-            },
-          });
-
-          // Create notification for patient in database
-          const userNotification = await createNotification({
-            recipientId: userId,
-            senderId: psychologistId,
-            type: 'appointment',
-            title: 'Appointment Confirmed',
-            content: 'Your appointment has been confirmed',
-            relatedId: appointmentId,
-            relatedModel: 'Appointment',
-            meta: {
-              appointmentDetails,
-              type: 'booking_confirmed',
-            },
-          });
-
-          // Notify the psychologist via socket
-          const psychologistSocketId = getSocketIdForUser(psychologistId);
-          if (psychologistSocketId) {
-            io.to(psychologistSocketId).emit('appointment_notification', {
-              type: 'new_booking',
-              appointmentId,
-              userId,
-              details: appointmentDetails,
-              message: 'New appointment booked',
-              timestamp: new Date().toISOString(),
-              notificationId: psychNotification?._id,
-            });
+          // Fetch additional psychologist details to include in the notification
+          let psychologist: any = null;
+          try {
+            psychologist = await User.findById(psychologistId).select(
+              '_id firstName lastName email profilePhotoUrl specializations sessionFee'
+            );
+            console.log('⚡ Found psychologist:', psychologist ? 'yes' : 'no');
+          } catch (err) {
+            console.error('⚡ Error fetching psychologist details:', err);
           }
 
-          // Notify the user via socket
+          // Create a rich notification object with all needed details
+          // Use fallback values if psychologist is not found
+          const notificationData = {
+            appointmentId,
+            appointmentDetails,
+            psychologistInfo: {
+              id: psychologist ? psychologist._id : psychologistId,
+              name: psychologist
+                ? `${psychologist.firstName} ${psychologist.lastName}`
+                : appointmentDetails.psychologistName || 'Your Provider',
+              profilePhoto:
+                psychologist && psychologist.profilePhotoUrl
+                  ? psychologist.profilePhotoUrl
+                  : '',
+              specializations: psychologist
+                ? psychologist.specializations || []
+                : [],
+              sessionFee: psychologist
+                ? psychologist.sessionFee
+                : appointmentDetails.sessionFee,
+            },
+            dateTime: appointmentDetails.dateTime,
+            endTime: appointmentDetails.endTime,
+            sessionFormat: appointmentDetails.sessionFormat,
+            timestamp: new Date().toISOString(),
+          };
+
+          console.log('⚡ Creating notification for psychologist and user');
+
+          // FIXED: Create notification for psychologist in database
+          let psychNotification: NotificationDocument | null = null;
+          try {
+            psychNotification = await createNotification({
+              recipientId: psychologistId,
+              senderId: userId,
+              type: 'appointment',
+              title: 'New Appointment Booked',
+              content: 'You have a new appointment booked',
+              relatedId: appointmentId,
+              relatedModel: 'Appointment',
+              meta: {
+                ...notificationData,
+                type: 'new_booking', // This is important for client-side role filtering
+              },
+            });
+
+            console.log(
+              '⚡ Created psychologist notification:',
+              psychNotification
+                ? (psychNotification as any)._id
+                : 'No ID available'
+            );
+          } catch (err) {
+            console.error('⚡ Error creating psychologist notification:', err);
+          }
+
+          // FIXED: Create notification for patient in database
+          let userNotification: NotificationDocument | null = null;
+          try {
+            userNotification = await createNotification({
+              recipientId: userId,
+              senderId: psychologistId,
+              type: 'appointment',
+              title: 'Appointment Confirmed',
+              content: 'Your appointment has been confirmed',
+              relatedId: appointmentId,
+              relatedModel: 'Appointment',
+              meta: {
+                ...notificationData,
+                type: 'booking_confirmed', // This is important for client-side role filtering
+              },
+            });
+
+            console.log(
+              '⚡ Created user notification:',
+              userNotification ? userNotification._id : 'No ID available'
+            );
+          } catch (err) {
+            console.error('⚡ Error creating user notification:', err);
+          }
+
+          // Notify the psychologist via socket with rich data
+          const psychologistSocketId = getSocketIdForUser(psychologistId);
+          if (psychologistSocketId) {
+            console.log(
+              '⚡ Emitting notification to psychologist socket:',
+              psychologistSocketId
+            );
+
+            try {
+              io.to(psychologistSocketId).emit('appointment_notification', {
+                type: 'new_booking', // Match the meta.type in the database notification
+                appointmentId,
+                userId,
+                details: notificationData,
+                message: 'New appointment booked',
+                timestamp: new Date().toISOString(),
+                notificationId: psychNotification
+                  ? psychNotification._id
+                  : null,
+              });
+
+              // Also emit the general notification event
+              if (psychNotification) {
+                let unreadCount = 0;
+                try {
+                  unreadCount = await Notification.countDocuments({
+                    recipient: psychologistId,
+                    isRead: false,
+                  });
+                } catch (err) {
+                  console.error('⚡ Error counting notifications:', err);
+                }
+
+                io.to(psychologistSocketId).emit('new_notification', {
+                  notification: psychNotification,
+                  unreadCount: unreadCount,
+                });
+              }
+            } catch (err) {
+              console.error(
+                '⚡ Error emitting notification to psychologist:',
+                err
+              );
+            }
+          } else {
+            console.log('⚡ No socket found for psychologist:', psychologistId);
+          }
+
+          // Notify the user via socket with rich data
           const userSocketId = getSocketIdForUser(userId);
           if (userSocketId) {
-            io.to(userSocketId).emit('appointment_notification', {
-              type: 'booking_confirmed',
-              appointmentId,
-              psychologistId,
-              details: appointmentDetails,
-              message: 'Your appointment has been confirmed',
-              timestamp: new Date().toISOString(),
-              notificationId: userNotification?._id,
-            });
+            console.log(
+              '⚡ Emitting notification to user socket:',
+              userSocketId
+            );
+
+            try {
+              io.to(userSocketId).emit('appointment_notification', {
+                type: 'booking_confirmed', // Match the meta.type in the database notification
+                appointmentId,
+                psychologistId,
+                details: notificationData,
+                message: 'Your appointment has been confirmed',
+                timestamp: new Date().toISOString(),
+                notificationId: userNotification ? userNotification._id : null,
+              });
+
+              // Also emit the general notification event
+              if (userNotification) {
+                let unreadCount = 0;
+                try {
+                  unreadCount = await Notification.countDocuments({
+                    recipient: userId,
+                    isRead: false,
+                  });
+                } catch (err) {
+                  console.error('⚡ Error counting notifications:', err);
+                }
+
+                io.to(userSocketId).emit('new_notification', {
+                  notification: userNotification,
+                  unreadCount: unreadCount,
+                });
+              }
+            } catch (err) {
+              console.error('⚡ Error emitting notification to user:', err);
+            }
+          } else {
+            console.log('⚡ No socket found for user:', userId);
           }
 
           // Broadcast calendar update to all relevant parties
-          io.emit('calendar_update', {
-            type: 'new_appointment',
-            appointmentId,
-            psychologistId,
-            timestamp: new Date().toISOString(),
-          });
+          try {
+            io.emit('calendar_update', {
+              type: 'new_appointment',
+              appointmentId,
+              psychologistId,
+              timestamp: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error('⚡ Error broadcasting calendar update:', err);
+          }
+
+          console.log(
+            '⚡ appointment_booked event processing completed successfully'
+          );
         } catch (error) {
           log.error('Error in appointment_booked handler:', error);
+          console.error('⚡ Error in appointment_booked handler:', error);
         }
       });
 
@@ -1238,7 +1388,7 @@ app
           type: 'system',
           title: 'Availability Updated',
           content: 'You have successfully updated your availability schedule',
-          isRead: false, 
+          isRead: false,
           relatedId: null,
           relatedModel: null,
           meta: {

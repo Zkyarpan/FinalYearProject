@@ -26,6 +26,7 @@ import {
 } from '@/types/appointment';
 import { checkAvailability } from '@/helpers/checkAvailability';
 import { CalendarEvent } from '@/types/calendar';
+import { useSocket } from '@/contexts/SocketContext';
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
@@ -41,6 +42,8 @@ export default function AppointmentScheduler() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const { firstName, lastName, email } = useUserStore();
   const { notifications } = useNotifications();
+  const { socket, isConnected } = useSocket();
+  const userStore = useUserStore();
 
   const [newAvailabilityData, setNewAvailabilityData] = useState<{
     psychologistId: string;
@@ -345,6 +348,46 @@ export default function AppointmentScheduler() {
         });
 
         const paymentData = await paymentResponse.json();
+
+        // Emit socket event for real-time notifications
+        // Use the socket that was initialized at the component level
+        if (socket && isConnected) {
+          console.log('Emitting appointment_booked event');
+
+          // Get user ID from userStore that's already initialized
+          const userId = firstName ? useUserStore.getState().user?._id : null;
+
+          if (userId) {
+            // Emit the appointment booking event
+            socket.emit('appointment_booked', {
+              appointmentId: appointmentId.toString(),
+              psychologistId: selectedSlot.psychologistId,
+              userId: userId,
+              appointmentDetails: {
+                dateTime: new Date(selectedSlot.start).toISOString(),
+                endTime: new Date(selectedSlot.end).toISOString(),
+                sessionFormat: bookingDetails.sessionFormat,
+                patientName: bookingDetails.patientName.trim(),
+                email: bookingDetails.email.trim(),
+                phone: bookingDetails.phone.replace(/\D/g, ''),
+                reasonForVisit: bookingDetails.reasonForVisit.trim(),
+                notes: bookingDetails.notes?.trim() || '',
+                insuranceProvider:
+                  bookingDetails.insuranceProvider?.trim() || '',
+                sessionFee: selectedSlot.sessionFee,
+                psychologistName: selectedSlot.psychologistName || '',
+              },
+            });
+
+            console.log('Appointment booking event emitted successfully');
+          } else {
+            console.warn('User ID not available, cannot send notification');
+          }
+        } else {
+          console.warn(
+            'Socket not connected, cannot send real-time notification'
+          );
+        }
 
         if (paymentData.IsSuccess) {
           toast.success('Appointment booked successfully');

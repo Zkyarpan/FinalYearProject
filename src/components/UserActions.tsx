@@ -191,14 +191,7 @@ const UserActions = ({
                     </span>
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem
-                    className="px-3 py-2 text-sm rounded-lg group transition-colors flex items-center gap-2 cursor-pointer"
-                    onClick={() => router.push('/notifications')}
-                  >
-                    <span className="group-hover:translate-x-1 transition-transform duration-200">
-                      Notifications
-                    </span>
-                  </DropdownMenuItem>
+                 
 
                   <DropdownMenuSeparator />
 

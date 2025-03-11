@@ -34,132 +34,29 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AppointmentSkeleton } from './skeleton/AppointmentSkeleton';
+import { useRouter } from 'next/navigation';
+import { useVideoCall } from '@/contexts/VideoCallContext';
+import VideoCallModal from './VideoCallModal';
+import { verifyAppointmentStatus } from '@/helpers/verifyAppointmentStatus';
+import { Appointment, formatDate, Psychologist } from '@/types/manager';
 
-interface AppointmentParticipant {
-  _id?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  profilePhotoUrl?: string;
-  phoneNumber?: string;
-}
-
-interface Psychologist extends AppointmentParticipant {
-  sessionFee?: number;
-  specialty?: string;
-  languages?: string[];
-  licenseType?: string;
-  education?: Array<{
-    degree: string;
-    university: string;
-    graduationYear: number;
-  }>;
-  about?: string;
-}
-
-interface User extends AppointmentParticipant {
-  // Additional user-specific fields can be added here
-}
-
-interface ProfileInfo {
-  profilePhotoUrl?: string;
-  age?: number;
-  gender?: string;
-  address?: string;
-  emergencyContact?: string;
-  emergencyPhone?: string;
-  therapyHistory?: string;
-  preferredCommunication?: string;
-  struggles?: string[];
-  briefBio?: string;
-}
-
-interface Appointment {
-  _id: string;
-  startTime?: string;
-  dateTime?: string; // Some API responses use dateTime instead of startTime
-  endTime: string;
-  duration: number;
-  sessionFormat: 'video' | 'in-person';
-  status: 'confirmed' | 'canceled' | 'completed' | 'ongoing' | 'missed';
-  reasonForVisit?: string;
-  notes?: string;
-  cancelationReason?: string;
-  canceledAt?: string;
-  patientName?: string;
-  email?: string;
-  phone?: string;
-  psychologist?: Psychologist;
-  user?: User;
-  userId?: {
-    // For past appointments, the API might return userId instead of user
-    _id?: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    profilePhotoUrl?: string;
-  };
-  profile?: ProfileInfo;
-  payment: {
-    amount: number;
-    currency: string;
-    status: string;
-  };
-  isPast: boolean;
-  isToday: boolean;
-  canJoin: boolean;
-}
-
-const formatDate = (
-  dateString: string | undefined,
-  formatType: 'date' | 'time' | 'full'
-) => {
-  if (!dateString) return 'N/A';
-
-  try {
-    const date = new Date(dateString);
-
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return 'Invalid date';
-    }
-
-    switch (formatType) {
-      case 'date':
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        });
-      case 'time':
-        return date.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        });
-      case 'full':
-        return `${formatDate(dateString, 'date')} ${formatDate(
-          dateString,
-          'time'
-        )}`;
-      default:
-        return 'Invalid format';
-    }
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Date error';
-  }
-};
-
+// UPDATED: Improved getStatusBadgeVariant to consider isToday
 const getStatusBadgeVariant = (
   status: string,
-  isPast: boolean
+  isPast: boolean,
+  isToday: boolean
 ): 'default' | 'destructive' | 'outline' | 'secondary' | 'custom' => {
+  // Status-based variants take precedence
   if (status === 'canceled') return 'destructive';
   if (status === 'completed') return 'secondary';
   if (status === 'ongoing') return 'custom';
   if (status === 'missed') return 'destructive';
+
+  // Timing-based variants
   if (isPast) return 'outline';
+  if (isToday) return 'default'; // Highlight today's appointments
+
+  // Default for future appointments
   return 'default';
 };
 
@@ -181,10 +78,21 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [cancellationNote, setCancellationNote] = useState('');
   const [isCanceling, setIsCanceling] = useState(false);
-  const userRole = role || 'user'; // Use the role from props, default to 'user'
+  const userRole = role || 'user';
+  const [isVideoCallModalOpen, setIsVideoCallModalOpen] = useState(false);
+  const { startCall, joinCall, callStatus } = useVideoCall();
 
   useEffect(() => {
     fetchAppointments();
+
+    // ADDED: Refresh appointment statuses periodically
+    const refreshInterval = setInterval(() => {
+      setAppointments(prevAppointments =>
+        prevAppointments.map(verifyAppointmentStatus)
+      );
+    }, 60000); // Check every minute
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const fetchAppointments = async () => {
@@ -195,12 +103,18 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
       if (data.IsSuccess) {
         const sortedAppointments = data.Result?.appointments || [];
+        // Sort by date (ascending)
         sortedAppointments.sort(
           (a: Appointment, b: Appointment) =>
             new Date(a.startTime || a.dateTime || 0).getTime() -
             new Date(b.startTime || b.dateTime || 0).getTime()
         );
-        setAppointments(sortedAppointments);
+
+        // ADDED: Verify appointment statuses for freshness
+        const verifiedAppointments = sortedAppointments.map(
+          verifyAppointmentStatus
+        );
+        setAppointments(verifiedAppointments);
       } else {
         toast.error('Failed to fetch appointments');
       }
@@ -265,21 +179,92 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
   };
 
   const handleJoinSession = (appointment: Appointment) => {
-    if (!appointment.canJoin) {
-      toast.info(
-        'Session is not available to join yet. Please wait until 5 minutes before the appointment.'
+    // Re-verify canJoin status in case page has been open a while
+    const verifiedAppointment = verifyAppointmentStatus(appointment);
+
+    if (!verifiedAppointment.canJoin) {
+      const now = new Date();
+      const appointmentDate = new Date(
+        appointment.startTime || appointment.dateTime || ''
+      );
+      const minutesToStart = Math.round(
+        (appointmentDate.getTime() - now.getTime()) / 60000
+      );
+
+      if (minutesToStart > 5) {
+        toast.info(
+          `Session is not available to join yet. You can join 5 minutes before the appointment (in about ${minutesToStart} minutes).`
+        );
+      } else if (minutesToStart < -15) {
+        toast.error(
+          'This session has ended. Please contact support if you need assistance.'
+        );
+      } else {
+        toast.info(
+          'Session is not available. Please refresh the page or contact support if the issue persists.'
+        );
+      }
+      return;
+    }
+
+    // Set selected appointment for the video call
+    setSelectedAppointment(verifiedAppointment);
+
+    // Get the participant ID based on user role
+    const participantId =
+      userRole === 'psychologist'
+        ? verifiedAppointment.user?._id ||
+          verifiedAppointment.userId?._id ||
+          (typeof verifiedAppointment.userId === 'string'
+            ? verifiedAppointment.userId
+            : '')
+        : verifiedAppointment.psychologist?._id || '';
+
+    // Check if we have a valid participant ID
+    if (!participantId) {
+      console.error('Appointment data:', verifiedAppointment);
+      toast.error(
+        'Could not determine session participant. Please contact support.'
       );
       return;
     }
 
-    // Logic to join the session based on user role
-    if (userRole === 'psychologist') {
-      window.location.href = `/sessions/host/${appointment._id}`;
-    } else {
-      window.location.href = `/sessions/join/${appointment._id}`;
-    }
+    console.log(
+      `Starting call between ${userRole} and participant ID ${participantId}`
+    );
 
-    toast.info('Joining video session...');
+    // Open the video call modal
+    setIsVideoCallModalOpen(true);
+
+    // Add a small delay to ensure the modal is open before starting the call
+    setTimeout(() => {
+      // Start or join the call based on role
+      if (userRole === 'psychologist') {
+        // Psychologist initiates the call
+        startCall(verifiedAppointment._id, participantId)
+          .then(() => {
+            console.log('Call started successfully');
+          })
+          .catch(error => {
+            console.error('Failed to start call:', error);
+            toast.error('Failed to start video session. Please try again.');
+            setIsVideoCallModalOpen(false);
+          });
+      } else {
+        // User joins the call
+        joinCall(verifiedAppointment._id, participantId)
+          .then(() => {
+            console.log('Joined call successfully');
+          })
+          .catch(error => {
+            console.error('Failed to join call:', error);
+            toast.error('Failed to join video session. Please try again.');
+            setIsVideoCallModalOpen(false);
+          });
+      }
+    }, 500);
+
+    toast.info('Joining session...');
   };
 
   // Add a helper function to get role-appropriate search text
@@ -289,7 +274,11 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       : 'Search psychologists or visit reasons...';
   };
 
+  // UPDATED: Improved filteredAppointments logic
   const filteredAppointments = appointments.filter(apt => {
+    // Re-verify appointment status in real-time
+    const verifiedApt = verifyAppointmentStatus(apt);
+
     // Get the participant info based on user role
     const participantName =
       userRole === 'psychologist'
@@ -305,17 +294,27 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
         searchQuery.toLowerCase()
       );
 
+    // Filter based on active tab
     if (activeTab === 'upcoming') {
-      return matchesSearch && !apt.isPast && apt.status !== 'canceled';
+      return (
+        matchesSearch &&
+        !verifiedApt.isPast &&
+        verifiedApt.status !== 'canceled'
+      );
     } else if (activeTab === 'canceled') {
-      return matchesSearch && apt.status === 'canceled';
+      return matchesSearch && verifiedApt.status === 'canceled';
     } else {
-      // past
-      return matchesSearch && apt.isPast && apt.status !== 'canceled';
+      // past tab
+      return (
+        matchesSearch && verifiedApt.isPast && verifiedApt.status !== 'canceled'
+      );
     }
   });
 
   const renderAppointmentCard = (appointment: Appointment) => {
+    // Re-verify appointment status for freshness
+    const verifiedAppointment = verifyAppointmentStatus(appointment);
+
     // Determine which participant to show based on user role
     // For the psychologist role, we need to handle the API response format differently
     let participant;
@@ -325,12 +324,12 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
     if (userRole === 'psychologist') {
       // Handle the data from the API which may have a different structure
-      participant = appointment.user || {};
+      participant = verifiedAppointment.user || {};
 
       // Check if we have user object data or if we need to use appointment data directly
-      if (appointment.patientName) {
+      if (verifiedAppointment.patientName) {
         // For past appointments, the API might provide only patientName, not structured user data
-        displayName = appointment.patientName;
+        displayName = verifiedAppointment.patientName;
 
         // Create initials from patientName if available
         if (displayName) {
@@ -348,16 +347,16 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
         }`;
       } else {
         // Fallback case
-        displayName = appointment.email || 'Patient';
+        displayName = verifiedAppointment.email || 'Patient';
         fallbackInitials = 'PT';
       }
 
       // Determine profile image - check all possible sources
-      if (appointment.profile && appointment.profile.profilePhotoUrl) {
-        profileImage = appointment.profile.profilePhotoUrl;
-      } else if (appointment.profile && appointment.profile.profilePhotoUrl) {
-        // Use profilePhotoUrl from profile
-        profileImage = appointment.profile.profilePhotoUrl;
+      if (
+        verifiedAppointment.profile &&
+        verifiedAppointment.profile.profilePhotoUrl
+      ) {
+        profileImage = verifiedAppointment.profile.profilePhotoUrl;
       } else if (participant.profilePhotoUrl) {
         profileImage = participant.profilePhotoUrl;
       } else if (participant.image) {
@@ -367,7 +366,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       }
     } else {
       // Regular user viewing psychologist
-      participant = appointment.psychologist || {};
+      participant = verifiedAppointment.psychologist || {};
       displayName =
         participant.firstName && participant.lastName
           ? `${participant.firstName} ${participant.lastName}`
@@ -381,9 +380,9 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       profileImage = participant.profilePhotoUrl || participant.image || '';
     }
 
-    const isCanceled = appointment.status === 'canceled';
-    const isCompleted = appointment.status === 'completed';
-    const isOngoing = appointment.status === 'ongoing';
+    const isCanceled = verifiedAppointment.status === 'canceled';
+    const isCompleted = verifiedAppointment.status === 'completed';
+    const isOngoing = verifiedAppointment.status === 'ongoing';
 
     // Check if the image URL is valid - prevent broken images
     const imageUrlIsValid =
@@ -394,7 +393,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
     return (
       <Card
-        key={appointment._id}
+        key={verifiedAppointment._id}
         className={`w-full p-4 ${
           isCanceled
             ? 'bg-muted/30 dark:bg-muted/10'
@@ -437,24 +436,27 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                   </p>
                 )}
                 {/* Display additional info for psychologists */}
-                {userRole === 'psychologist' && appointment.email && (
+                {userRole === 'psychologist' && verifiedAppointment.email && (
                   <p className="text-sm flex items-center gap-2">
                     <span className="text-muted-foreground">
-                      {appointment.email}
+                      {verifiedAppointment.email}
                     </span>
                   </p>
                 )}
               </div>
             </div>
+
+            {/* UPDATED: Include isToday in badge variant calculation */}
             <Badge
               variant={getStatusBadgeVariant(
-                appointment.status,
-                appointment.isPast
+                verifiedAppointment.status,
+                verifiedAppointment.isPast,
+                verifiedAppointment.isToday
               )}
               className="font-medium"
             >
-              {appointment.status.charAt(0).toUpperCase() +
-                appointment.status.slice(1)}
+              {verifiedAppointment.status.charAt(0).toUpperCase() +
+                verifiedAppointment.status.slice(1)}
             </Badge>
           </div>
 
@@ -474,7 +476,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                 }`}
               >
                 {formatDate(
-                  appointment.startTime || appointment.dateTime,
+                  verifiedAppointment.startTime || verifiedAppointment.dateTime,
                   'date'
                 )}
               </span>
@@ -493,14 +495,14 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                 }`}
               >
                 {formatDate(
-                  appointment.startTime || appointment.dateTime,
+                  verifiedAppointment.startTime || verifiedAppointment.dateTime,
                   'time'
                 )}{' '}
-                - {formatDate(appointment.endTime, 'time')}
+                - {formatDate(verifiedAppointment.endTime, 'time')}
               </span>
             </div>
             <div className="flex items-center space-x-3">
-              {appointment.sessionFormat === 'video' ? (
+              {verifiedAppointment.sessionFormat === 'video' ? (
                 <Video
                   className={`h-5 w-5 ${
                     isCanceled
@@ -522,7 +524,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                   isCanceled ? 'text-muted-foreground/70' : ''
                 }`}
               >
-                {appointment.sessionFormat === 'video'
+                {verifiedAppointment.sessionFormat === 'video'
                   ? 'Video Session'
                   : 'In-Person Session'}
               </span>
@@ -531,7 +533,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
             {/* Contact information for psychologists */}
             {userRole === 'psychologist' && (
               <>
-                {appointment.email && (
+                {verifiedAppointment.email && (
                   <div className="flex items-center space-x-3">
                     <Mail
                       className={`h-5 w-5 ${
@@ -545,12 +547,12 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                         isCanceled ? 'text-muted-foreground/70' : ''
                       }`}
                     >
-                      {appointment.email}
+                      {verifiedAppointment.email}
                     </span>
                   </div>
                 )}
 
-                {appointment.phone && (
+                {verifiedAppointment.phone && (
                   <div className="flex items-center space-x-3">
                     <Phone
                       className={`h-5 w-5 ${
@@ -564,36 +566,37 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                         isCanceled ? 'text-muted-foreground/70' : ''
                       }`}
                     >
-                      {appointment.phone}
+                      {verifiedAppointment.phone}
                     </span>
                   </div>
                 )}
 
                 {/* Show additional profile info if available */}
-                {appointment.profile && appointment.profile.age && (
-                  <div className="flex items-center space-x-3">
-                    <User
-                      className={`h-5 w-5 ${
-                        isCanceled
-                          ? 'text-muted-foreground/70'
-                          : 'text-muted-foreground'
-                      }`}
-                    />
-                    <span
-                      className={`font-medium text-sm ${
-                        isCanceled ? 'text-muted-foreground/70' : ''
-                      }`}
-                    >
-                      Age: {appointment.profile.age}, Gender:{' '}
-                      {appointment.profile.gender || 'Not specified'}
-                    </span>
-                  </div>
-                )}
+                {verifiedAppointment.profile &&
+                  verifiedAppointment.profile.age && (
+                    <div className="flex items-center space-x-3">
+                      <User
+                        className={`h-5 w-5 ${
+                          isCanceled
+                            ? 'text-muted-foreground/70'
+                            : 'text-muted-foreground'
+                        }`}
+                      />
+                      <span
+                        className={`font-medium text-sm ${
+                          isCanceled ? 'text-muted-foreground/70' : ''
+                        }`}
+                      >
+                        Age: {verifiedAppointment.profile.age}, Gender:{' '}
+                        {verifiedAppointment.profile.gender || 'Not specified'}
+                      </span>
+                    </div>
+                  )}
               </>
             )}
 
             {/* Visit reason - for both roles */}
-            {appointment.reasonForVisit && (
+            {verifiedAppointment.reasonForVisit && (
               <div className="flex items-start space-x-3 mt-2 pt-2 border-t border-border/50">
                 <AlertCircle
                   className={`h-5 w-5 mt-0.5 ${
@@ -611,7 +614,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                     Reason for Visit:
                   </span>
                   <p className="text-sm text-muted-foreground line-clamp-2">
-                    {appointment.reasonForVisit}
+                    {verifiedAppointment.reasonForVisit}
                   </p>
                 </div>
               </div>
@@ -627,8 +630,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                   isCanceled ? 'opacity-75' : ''
                 }`}
               >
-                ${appointment.payment.amount}{' '}
-                {appointment.payment.currency.toUpperCase()}
+                ${verifiedAppointment.payment.amount}{' '}
+                {verifiedAppointment.payment.currency.toUpperCase()}
               </Badge>
 
               {isCanceled ? (
@@ -647,13 +650,14 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                   Session In Progress
                 </Badge>
               ) : (
-                !appointment.isPast && (
+                // UPDATED: Only show action buttons for non-past appointments and show Join button when available
+                !verifiedAppointment.isPast && (
                   <div className="flex space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSelectedAppointment(appointment);
+                        setSelectedAppointment(verifiedAppointment);
                         setDetailsDialogOpen(true);
                       }}
                     >
@@ -663,20 +667,22 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSelectedAppointment(appointment);
+                        setSelectedAppointment(verifiedAppointment);
                         setCancelDialogOpen(true);
                       }}
                     >
                       Cancel
                     </Button>
-                    {appointment.sessionFormat === 'video' && (
+                    {verifiedAppointment.sessionFormat === 'video' && (
                       <Button
                         size="sm"
-                        onClick={() => handleJoinSession(appointment)}
-                        disabled={!appointment.canJoin}
+                        onClick={() => handleJoinSession(verifiedAppointment)}
+                        disabled={!verifiedAppointment.canJoin}
                         className="bg-primary text-primary-foreground hover:bg-primary/90"
                       >
-                        {appointment.canJoin ? 'Join Session' : 'Join Soon'}
+                        {verifiedAppointment.canJoin
+                          ? 'Join Session'
+                          : 'Join Soon'}
                       </Button>
                     )}
                   </div>
@@ -692,12 +698,12 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                     <History className="h-4 w-4 mr-2" />
                     <span>
                       Canceled on{' '}
-                      {formatDate(appointment.canceledAt || '', 'full')}
+                      {formatDate(verifiedAppointment.canceledAt || '', 'full')}
                     </span>
                   </div>
-                  {appointment.cancelationReason && (
+                  {verifiedAppointment.cancelationReason && (
                     <p className="ml-6 truncate">
-                      Reason: {appointment.cancelationReason}
+                      Reason: {verifiedAppointment.cancelationReason}
                     </p>
                   )}
                 </div>
@@ -742,7 +748,13 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                       } ${
                         selectedAppointment.psychologist?.lastName || ''
                       }`}{' '}
-                  on {formatDate(selectedAppointment.startTime, 'full')}?
+                  on{' '}
+                  {formatDate(
+                    selectedAppointment.startTime ||
+                      selectedAppointment.dateTime,
+                    'full'
+                  )}
+                  ?
                 </>
               )}
             </DialogDescription>
@@ -801,9 +813,12 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       </Dialog>
     );
   };
-
   const renderDetailsDialog = () => {
     if (!selectedAppointment) return null;
+
+    // Re-verify the selected appointment status for freshness
+    const verifiedSelectedAppointment =
+      verifyAppointmentStatus(selectedAppointment);
 
     // Get all the display information needed for the dialog
     let displayName = '';
@@ -827,15 +842,17 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
     if (userRole === 'psychologist') {
       // Handling patient info
       participantInfo =
-        selectedAppointment.user || selectedAppointment.userId || {};
+        verifiedSelectedAppointment.user ||
+        verifiedSelectedAppointment.userId ||
+        {};
 
       // Determine display name
-      if (selectedAppointment.patientName) {
-        displayName = selectedAppointment.patientName;
+      if (verifiedSelectedAppointment.patientName) {
+        displayName = verifiedSelectedAppointment.patientName;
       } else if (participantInfo.firstName && participantInfo.lastName) {
         displayName = `${participantInfo.firstName} ${participantInfo.lastName}`;
       } else {
-        displayName = selectedAppointment.email || 'Patient';
+        displayName = verifiedSelectedAppointment.email || 'Patient';
       }
 
       // Get initials for avatar fallback
@@ -855,21 +872,21 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
       // Get profile image - prioritize the profile.profilePhotoUrl
       profileImage =
-        (selectedAppointment.profile &&
-          selectedAppointment.profile.profilePhotoUrl) ||
+        (verifiedSelectedAppointment.profile &&
+          verifiedSelectedAppointment.profile.profilePhotoUrl) ||
         participantInfo.profilePhotoUrl ||
         '';
 
       // Get contact information
       email =
-        selectedAppointment.email ||
+        verifiedSelectedAppointment.email ||
         (participantInfo && participantInfo.email) ||
         '';
-      phone = selectedAppointment.phone || '';
+      phone = verifiedSelectedAppointment.phone || '';
       contactInfo = true;
     } else {
       // Handling psychologist info
-      participantInfo = selectedAppointment.psychologist || {};
+      participantInfo = verifiedSelectedAppointment.psychologist || {};
 
       // Determine display name
       if (participantInfo.firstName && participantInfo.lastName) {
@@ -898,173 +915,215 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
     // Get appointment date info
     const appointmentDate =
-      selectedAppointment.startTime || selectedAppointment.dateTime || '';
+      verifiedSelectedAppointment.startTime ||
+      verifiedSelectedAppointment.dateTime ||
+      '';
 
     return (
       <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-[#222] border-[#333] text-white p-0 w-[450px] max-w-full max-h-[100vh] overflow-hidden">
+          <div className="p-4 text-center relative">
+            <DialogTitle className="text-lg font-semibold">
+              Appointment Details
+            </DialogTitle>
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-white"
+              onClick={() => setDetailsDialogOpen(false)}
+            ></button>
+          </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-16 w-16 border-2">
-                {profileImage ? (
-                  <AvatarImage
-                    src={profileImage}
-                    alt={displayName}
-                    className="object-cover"
-                  />
-                ) : (
-                  <AvatarFallback className="text-xl font-medium bg-primary/10 text-primary">
-                    {fallbackInitials}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div>
-                <h4 className="font-semibold text-lg">{displayName}</h4>
-                {userRole === 'user' && licenseType && (
-                  <p className="text-sm">
-                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-input dark:text-blue-400 text-xs font-medium border capitalize">
-                      {licenseType}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center space-x-3">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium text-sm">
-                  {formatDate(appointmentDate, 'date')}
-                </span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium text-sm">
-                  {formatDate(appointmentDate, 'time')} -{' '}
-                  {formatDate(selectedAppointment.endTime, 'time')}
-                </span>
-              </div>
-              <div className="flex items-center space-x-3">
-                {selectedAppointment.sessionFormat === 'video' ? (
-                  <Video className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                )}
-                <span className="font-medium text-sm">
-                  {selectedAppointment.sessionFormat === 'video'
-                    ? 'Video Session'
-                    : 'In-Person Session'}
-                </span>
-              </div>
-            </div>
-
-            {selectedAppointment.reasonForVisit && (
-              <div className="pt-4 border-t">
-                <h5 className="font-medium mb-2">Reason for Visit</h5>
-                <p className="text-sm text-muted-foreground">
-                  {selectedAppointment.reasonForVisit}
-                </p>
-              </div>
-            )}
-
-            {selectedAppointment.notes && (
-              <div>
-                <h5 className="font-medium mb-2">Notes</h5>
-                <p className="text-sm text-muted-foreground">
-                  {selectedAppointment.notes}
-                </p>
-              </div>
-            )}
-
-            {contactInfo && (
-              <div className="space-y-2 pt-4 border-t">
-                <h5 className="font-medium mb-2">Contact Information</h5>
-                {email && (
-                  <div className="flex items-center space-x-3">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm">{email}</span>
-                  </div>
-                )}
-                {phone && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm">{phone}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Additional profile information for psychologists viewing patient data */}
-            {userRole === 'psychologist' && selectedAppointment.profile && (
-              <div className="space-y-3 pt-4 border-t">
-                <h5 className="font-medium mb-2">Patient Information</h5>
-
-                {selectedAppointment.profile.age && (
-                  <div className="flex items-start space-x-3">
-                    <User className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div>
-                      <span className="text-sm">
-                        Age: {selectedAppointment.profile.age}
-                        {selectedAppointment.profile.gender &&
-                          `, Gender: ${selectedAppointment.profile.gender}`}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {selectedAppointment.profile.emergencyContact && (
-                  <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div>
-                      <span className="text-sm font-medium">
-                        Emergency Contact:
-                      </span>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedAppointment.profile.emergencyContact}
-                        {selectedAppointment.profile.emergencyPhone &&
-                          ` - ${selectedAppointment.profile.emergencyPhone}`}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {selectedAppointment.profile.therapyHistory && (
-                  <div className="flex items-start space-x-3">
-                    <History className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div>
-                      <span className="text-sm font-medium">
-                        Therapy History:
-                      </span>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedAppointment.profile.therapyHistory}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+          <div className="flex flex-col items-center justify-center py-2">
+            <Avatar className="h-16 w-16 mb-2">
+              {profileImage ? (
+                <AvatarImage
+                  src={profileImage}
+                  alt={displayName}
+                  className="object-cover"
+                />
+              ) : (
+                <AvatarFallback className="text-xl font-medium bg-primary/10 text-primary">
+                  {fallbackInitials}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <h3 className="text-lg font-medium">{displayName}</h3>
+            {userRole === 'user' && licenseType && (
+              <span className="mt-1 text-xs text-gray-300">{licenseType}</span>
             )}
           </div>
 
-          <DialogFooter>
-            <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
-            {selectedAppointment.sessionFormat === 'video' &&
-              !selectedAppointment.isPast &&
-              selectedAppointment.canJoin && (
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="grid grid-cols-3 mx-6 mb-2 border">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="reason">Reason</TabsTrigger>
+              <TabsTrigger value="info">
+                {userRole === 'psychologist' ? 'Patient' : 'Contact'}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Details Tab */}
+            <TabsContent
+              value="details"
+              className="px-6 py-3 h-[200px] overflow-y-auto"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <span>Mar {formatDate(appointmentDate, 'date')}</span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <span>
+                    {formatDate(appointmentDate, 'time')} -{' '}
+                    {formatDate(verifiedSelectedAppointment.endTime, 'time')}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Video className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <span>Video Session</span>
+                </div>
+
+                {/* Notes Section */}
+                {verifiedSelectedAppointment.notes && (
+                  <div className="pt-3 border-t border-gray-700/50">
+                    <h5 className="font-medium mb-2">Notes</h5>
+                    <p className="text-sm text-gray-300">
+                      {verifiedSelectedAppointment.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Reason Tab */}
+            <TabsContent
+              value="reason"
+              className="px-6 py-3 h-[200px] overflow-y-auto"
+            >
+              <h5 className="font-medium mb-2">Reason for Visit</h5>
+              <p className="text-sm text-gray-300">
+                {verifiedSelectedAppointment.reasonForVisit || 'Not specified'}
+              </p>
+            </TabsContent>
+
+            {/* Patient/Contact Info Tab */}
+            <TabsContent
+              value="info"
+              className="px-6 py-3 h-[200px] overflow-y-auto"
+            >
+              {contactInfo && (
+                <div className="mb-4">
+                  <h5 className="font-medium mb-2">Contact Information</h5>
+
+                  <div className="space-y-2">
+                    {email && (
+                      <div className="flex items-center space-x-2">
+                        <Mail className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm">{email}</span>
+                      </div>
+                    )}
+
+                    {phone && (
+                      <div className="flex items-center space-x-2">
+                        <Phone className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm">{phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Patient Information */}
+              {userRole === 'psychologist' &&
+                verifiedSelectedAppointment.profile && (
+                  <div
+                    className={
+                      contactInfo ? 'pt-3 border-t border-gray-700/50' : ''
+                    }
+                  >
+                    <h5 className="font-medium mb-2">Patient Information</h5>
+
+                    <div className="space-y-3">
+                      {verifiedSelectedAppointment.profile.age && (
+                        <div className="flex items-center space-x-2">
+                          <User className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm">
+                            Age: {verifiedSelectedAppointment.profile.age},
+                            Gender:{' '}
+                            {verifiedSelectedAppointment.profile.gender ||
+                              'Not specified'}
+                          </span>
+                        </div>
+                      )}
+
+                      {verifiedSelectedAppointment.profile.emergencyContact && (
+                        <div className="flex items-start space-x-2">
+                          <AlertCircle className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="text-sm font-medium block">
+                              Emergency Contact:
+                            </span>
+                            <span className="text-sm text-gray-300">
+                              {
+                                verifiedSelectedAppointment.profile
+                                  .emergencyContact
+                              }
+                              {verifiedSelectedAppointment.profile
+                                .emergencyPhone &&
+                                ` - ${verifiedSelectedAppointment.profile.emergencyPhone}`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {verifiedSelectedAppointment.profile.therapyHistory && (
+                        <div className="flex items-start space-x-2">
+                          <History className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="text-sm font-medium block">
+                              Therapy History:
+                            </span>
+                            <span className="text-sm text-gray-300">
+                              {
+                                verifiedSelectedAppointment.profile
+                                  .therapyHistory
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Footer with Close button */}
+          <div className="border-t border-gray-700/50 p-4 flex justify-end">
+            <Button
+              onClick={() => setDetailsDialogOpen(false)}
+              variant="outline"
+              className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+            >
+              Close
+            </Button>
+
+            {verifiedSelectedAppointment.sessionFormat === 'video' &&
+              !verifiedSelectedAppointment.isPast &&
+              verifiedSelectedAppointment.canJoin && (
                 <Button
                   onClick={() => {
-                    handleJoinSession(selectedAppointment);
+                    handleJoinSession(verifiedSelectedAppointment);
                     setDetailsDialogOpen(false);
                   }}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="bg-blue-600 hover:bg-blue-700 text-white ml-2"
                 >
                   Join Session
                 </Button>
               )}
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -1087,6 +1146,17 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       </div>
     );
   }
+
+  const verifiedAppointments = appointments.map(verifyAppointmentStatus);
+  const upcomingCount = verifiedAppointments.filter(
+    apt => !apt.isPast && apt.status !== 'canceled'
+  ).length;
+  const canceledCount = verifiedAppointments.filter(
+    apt => apt.status === 'canceled'
+  ).length;
+  const pastCount = verifiedAppointments.filter(
+    apt => apt.isPast && apt.status !== 'canceled'
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -1121,11 +1191,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
             <span>Upcoming</span>
 
             <Badge variant="default" className="ml-2">
-              {
-                appointments.filter(
-                  apt => !apt.isPast && apt.status !== 'canceled'
-                ).length
-              }
+              {upcomingCount}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="canceled" className="flex items-center gap-2">
@@ -1133,18 +1199,14 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
             <span>Canceled</span>
 
             <Badge variant="default" className="ml-2">
-              {appointments.filter(apt => apt.status === 'canceled').length}
+              {canceledCount}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="past" className="flex items-center gap-2">
             <History className="h-4 w-4" />
             <span>Past</span>
             <Badge variant="default" className="ml-2">
-              {
-                appointments.filter(
-                  apt => apt.isPast && apt.status !== 'canceled'
-                ).length
-              }
+              {pastCount}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -1202,6 +1264,13 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
       {renderCancelDialog()}
       {renderDetailsDialog()}
+      <VideoCallModal
+        open={isVideoCallModalOpen}
+        onClose={() => {
+          setIsVideoCallModalOpen(false);
+          setSelectedAppointment(null);
+        }}
+      />
     </div>
   );
 };

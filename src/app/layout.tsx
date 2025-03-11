@@ -11,7 +11,6 @@ import { StripeProvider } from '@/providers/stripe-provider';
 import { SocketProvider } from '@/contexts/SocketContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { VideoCallProvider } from '@/contexts/VideoCallContext';
-import VideoCallUI from '@/components/VideoCallUI';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 
 const inter = Inter({
@@ -66,12 +65,11 @@ export default function RootLayout({
           <AuthGuard>
             <StripeProvider>
               <SocketProvider>
-                <VideoCallProvider>
-                  <ChatProvider>
-                    <NotificationProvider>{children}</NotificationProvider>
-                    <VideoCallUI />
-                  </ChatProvider>
-                </VideoCallProvider>
+                <NotificationProvider>
+                  <VideoCallProvider>
+                    <ChatProvider>{children}</ChatProvider>
+                  </VideoCallProvider>
+                </NotificationProvider>
               </SocketProvider>
             </StripeProvider>
           </AuthGuard>

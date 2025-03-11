@@ -222,16 +222,36 @@ export async function GET(req: NextRequest) {
         isToday: boolean;
         canJoin: boolean;
       })[] = appointments.map(appointment => {
+        // FIXED: Proper date handling - use dateTime field consistently
         const appointmentDate = new Date(appointment.dateTime);
+
+        // FIXED: Improved isToday check using date components only
+        const isToday =
+          appointmentDate.getDate() === currentDate.getDate() &&
+          appointmentDate.getMonth() === currentDate.getMonth() &&
+          appointmentDate.getFullYear() === currentDate.getFullYear();
+
+        // FIXED: isPast only if the appointment time is earlier than current time
+        const isPast = appointmentDate < currentDate;
+
+        // FIXED: Calculate the join window (5 minutes before to 15 minutes after)
+        const joinWindowStart = new Date(appointmentDate);
+        joinWindowStart.setMinutes(joinWindowStart.getMinutes() - 5);
+
+        const joinWindowEnd = new Date(appointmentDate);
+        joinWindowEnd.setMinutes(joinWindowEnd.getMinutes() + 15);
+
+        // FIXED: Correct canJoin logic - only if within join window and status is confirmed
+        const canJoin =
+          appointment.status === 'confirmed' &&
+          currentDate >= joinWindowStart &&
+          currentDate <= joinWindowEnd;
+
         const processed = {
           ...appointment,
-          isPast: appointmentDate < currentDate,
-          isToday:
-            appointmentDate.toDateString() === currentDate.toDateString(),
-          canJoin:
-            appointment.status === 'confirmed' &&
-            Math.abs(appointmentDate.getTime() - currentDate.getTime()) <=
-              5 * 60 * 1000,
+          isPast,
+          isToday,
+          canJoin,
         };
         return processed;
       });
@@ -239,6 +259,22 @@ export async function GET(req: NextRequest) {
       const totalCount = await mongoose.connection
         .collection('appointments')
         .countDocuments(matchStage);
+
+      // FIXED: Calculate summary counts using the corrected isPast logic
+      const summary = {
+        total: totalCount,
+        upcoming: processedAppointments.filter(appt => !appt.isPast).length,
+        past: processedAppointments.filter(appt => appt.isPast).length,
+        confirmed: processedAppointments.filter(
+          appt => appt.status === 'confirmed'
+        ).length,
+        completed: processedAppointments.filter(
+          appt => appt.status === 'completed'
+        ).length,
+        cancelled: processedAppointments.filter(
+          appt => appt.status === 'cancelled'
+        ).length,
+      };
 
       return NextResponse.json(
         createSuccessResponse(200, {
@@ -253,24 +289,7 @@ export async function GET(req: NextRequest) {
             hasMore: page < Math.ceil(totalCount / limit),
             limit,
           },
-          summary: {
-            total: totalCount,
-            upcoming: processedAppointments.filter(
-              appt => new Date(appt.dateTime) >= currentDate
-            ).length,
-            past: processedAppointments.filter(
-              appt => new Date(appt.dateTime) < currentDate
-            ).length,
-            confirmed: processedAppointments.filter(
-              appt => appt.status === 'confirmed'
-            ).length,
-            completed: processedAppointments.filter(
-              appt => appt.status === 'completed'
-            ).length,
-            cancelled: processedAppointments.filter(
-              appt => appt.status === 'cancelled'
-            ).length,
-          },
+          summary,
         })
       );
     } catch (error: any) {

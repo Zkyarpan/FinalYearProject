@@ -65,21 +65,84 @@ const filterNotificationsByRole = (
   notifications: Notification[],
   userRole: string | null
 ) => {
-  if (!userRole || !notifications) return [];
+  if (!userRole || !notifications || !Array.isArray(notifications)) return [];
 
-  return notifications.filter(notification => {
-    // If no roles specified, show to everyone
+  console.log('🔍 Filtering notifications for role:', userRole);
+  console.log('🔍 Total notifications before filtering:', notifications.length);
+
+  // First, make sure all booking notifications have the correct roles
+  const notificationsWithFixedRoles = notifications.map(notification => {
+    // Only create a copy if we need to modify it
+    if (!notification.roles) {
+      const updatedNotification = { ...notification };
+
+      // Check meta.type to determine roles
+      const type = notification.meta?.type || notification.type;
+
+      if (type === 'new_booking') {
+        // Make sure 'new_booking' notifications are visible to psychologists AND users
+        updatedNotification.roles = ['admin', 'psychologist', 'user'];
+        console.log(
+          '🔧 Fixed roles for new_booking notification:',
+          notification._id
+        );
+      } else if (type === 'booking_confirmed') {
+        // Make sure 'booking_confirmed' notifications are visible to users AND psychologists
+        updatedNotification.roles = ['admin', 'user', 'psychologist'];
+        console.log(
+          '🔧 Fixed roles for booking_confirmed notification:',
+          notification._id
+        );
+      } else {
+        // Default - show to everyone
+        updatedNotification.roles = ['admin', 'user', 'psychologist'];
+      }
+
+      return updatedNotification;
+    }
+
+    // Emergency fix: ensure booking notifications have proper roles
+    if (
+      notification.meta?.type === 'new_booking' ||
+      notification.meta?.type === 'booking_confirmed'
+    ) {
+      const updatedNotification = { ...notification };
+      updatedNotification.roles = ['admin', 'user', 'psychologist'];
+      return updatedNotification;
+    }
+
+    return notification;
+  });
+
+  // Then filter based on user role
+  const filtered = notificationsWithFixedRoles.filter(notification => {
+    // If no roles specified or empty roles array, show to everyone
     if (!notification.roles || notification.roles.length === 0) {
       return true;
     }
+
     // Otherwise, check if user's role is included
-    return notification.roles.includes(userRole);
+    const shouldShow = notification.roles.includes(userRole);
+    if (!shouldShow) {
+      console.log(
+        '🔍 Filtering out notification:',
+        notification._id,
+        notification.title,
+        'Type:',
+        notification.meta?.type || notification.type,
+        'Roles:',
+        notification.roles
+      );
+    }
+    return shouldShow;
   });
+
+  console.log('🔍 Notifications after filtering:', filtered.length);
+  return filtered;
 };
 
-// Assign roles to notifications based on their type or meta.type
 const assignRolesToNotifications = (notifications: Notification[]) => {
-  if (!notifications) return [];
+  if (!notifications || !Array.isArray(notifications)) return [];
 
   return notifications.map(notification => {
     // Clone the notification to avoid modifying the original
@@ -87,12 +150,17 @@ const assignRolesToNotifications = (notifications: Notification[]) => {
 
     // Assign roles based on notification type or meta
     const type = notification.meta?.type || notification.type;
+    console.log('⚙️ Assigning roles for notification type:', type);
 
     switch (type) {
       case 'new_booking':
+        // CRITICAL FIX: Booking notifications should be visible to BOTH psychologists AND users
+        notificationWithRoles.roles = ['admin', 'psychologist', 'user'];
+        break;
+
       case 'booking_confirmed':
-        // Booking notifications primarily for psychologists and admins
-        notificationWithRoles.roles = ['admin', 'psychologist'];
+        // Booking confirmed notifications for users and psychologists
+        notificationWithRoles.roles = ['admin', 'user', 'psychologist'];
         break;
 
       case 'appointment_reminder':
@@ -103,6 +171,11 @@ const assignRolesToNotifications = (notifications: Notification[]) => {
       case 'availability_change':
         // Availability changes are visible to users
         notificationWithRoles.roles = ['admin', 'user'];
+        break;
+
+      case 'availability_self_change':
+        // Self availability changes visible to psychologists
+        notificationWithRoles.roles = ['admin', 'psychologist'];
         break;
 
       case 'status_change':
@@ -126,6 +199,7 @@ const assignRolesToNotifications = (notifications: Notification[]) => {
         notificationWithRoles.roles = ['admin', 'user', 'psychologist'];
     }
 
+    console.log(`⚙️ Assigned roles for ${type}:`, notificationWithRoles.roles);
     return notificationWithRoles;
   });
 };
@@ -146,6 +220,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   });
   const { socket, isConnected } = useSocket();
   const { user } = useUserStore();
+
+  // Add this to your NotificationContext useEffect to debug socket connections
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log(
+        'Socket not connected. Cannot set up notification listeners.'
+      );
+      return;
+    }
+
+    console.log(
+      'Setting up socket notification listeners for user:',
+      user?._id
+    );
+
+    // Debug socket connection
+    socket.on('connect', () => {
+      console.log('Socket connected with ID:', socket.id);
+      console.log(
+        'User authenticated as:',
+        user?._id,
+        'with role:',
+        user?.role
+      );
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+
+    socket.on('connect_error', error => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Rest of your socket listeners...
+  }, [socket, isConnected, user]);
 
   // Get role-filtered notifications
   const getRoleFilteredNotifications = useCallback(() => {
@@ -801,19 +912,167 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     const handleAppointmentNotification = data => {
-      console.log('Appointment notification received:', data);
+      console.log('🔔 Appointment notification received:', data);
+      console.log('🔔 Notification type:', data.type);
+      console.log('🔔 User role:', user?.role);
 
-      // Check if this notification type is relevant for this user role
-      const isRelevantForRole =
-        user.role === 'psychologist' ||
-        user.role === 'user' ||
-        user.role === 'admin';
+      // Create a properly formatted notification object from the socket data
+      if (data && data.notificationId) {
+        // Extract notification data
+        const notificationType = data.type; // 'new_booking' or 'booking_confirmed'
+        const appointmentId = data.appointmentId;
+        const details = data.details || {};
 
-      if (isRelevantForRole) {
-        // Refresh notifications list
+        console.log('🔔 Creating notification with type:', notificationType);
+        console.log('🔔 Appointment ID:', appointmentId);
+
+        if (!user?._id) {
+          console.log('🔔 No user ID available, cannot process notification');
+          return;
+        }
+
+        // Create a new notification object
+        const newNotification: Notification = {
+          _id: data.notificationId,
+          recipient: user._id,
+          sender: {
+            _id:
+              notificationType === 'new_booking'
+                ? data.userId
+                : data.psychologistId,
+            firstName: details.psychologistInfo?.name?.split(' ')[0] || 'User',
+            lastName: details.psychologistInfo?.name?.split(' ')[1] || '',
+            profilePhotoUrl: details.psychologistInfo?.profilePhoto,
+          },
+          type: 'appointment',
+          title:
+            notificationType === 'new_booking'
+              ? 'New Appointment Booked'
+              : 'Appointment Confirmed',
+          content:
+            data.message ||
+            (notificationType === 'new_booking'
+              ? 'You have a new appointment booked'
+              : 'Your appointment has been confirmed'),
+          isRead: false,
+          relatedId: appointmentId,
+          relatedModel: 'Appointment',
+          meta: {
+            type: notificationType,
+            ...details,
+          },
+          createdAt: data.timestamp || new Date().toISOString(),
+          updatedAt: data.timestamp || new Date().toISOString(),
+        };
+
+        console.log('🔔 Created notification object:', newNotification);
+
+        // CRITICAL FIX: Ensure all booking notifications are visible to both users and psychologists
+        // Manually assign roles before adding to state
+        if (notificationType === 'new_booking') {
+          newNotification.roles = ['admin', 'psychologist', 'user']; // Show to psychologists AND users
+        } else if (notificationType === 'booking_confirmed') {
+          newNotification.roles = ['admin', 'user', 'psychologist']; // Show to users AND psychologists
+        }
+
+        console.log('🔔 Assigned roles:', newNotification.roles);
+
+        // Add the notification directly to state
+        setNotifications(prev => {
+          // Check if notification already exists
+          const exists = prev.some(n => n._id === newNotification._id);
+          if (exists) {
+            console.log('🔔 Notification already exists, not adding');
+            return prev;
+          }
+          console.log('🔔 Adding notification to state');
+          return [newNotification, ...prev]; // Add at the beginning
+        });
+
+        // Check if this notification is relevant for this user's role
+        const isForUserRole =
+          newNotification.roles?.includes(user.role || '') || false;
+
+        console.log(
+          '🔔 Is notification for user role:',
+          isForUserRole,
+          'User role:',
+          user.role
+        );
+
+        if (isForUserRole && !newNotification.isRead) {
+          // Update unread count
+          setUnreadCount(prev => prev + 1);
+          console.log('🔔 Updated unread count');
+
+          // Save to localStorage
+          try {
+            const storedNotifications = localStorage.getItem(
+              `notifications_${user._id}`
+            );
+            let parsed: Notification[] = [];
+            if (storedNotifications) {
+              parsed = JSON.parse(storedNotifications) as Notification[];
+            }
+
+            const exists = parsed.some(n => n._id === newNotification._id);
+            if (!exists) {
+              const updated = [newNotification, ...parsed];
+              localStorage.setItem(
+                `notifications_${user._id}`,
+                JSON.stringify(updated)
+              );
+              console.log('🔔 Saved to localStorage');
+            }
+          } catch (e) {
+            console.error('Error updating localStorage:', e);
+          }
+
+          // Show toast notification if not viewing notifications
+          if (!isOpen) {
+            console.log('🔔 Showing toast notification');
+            // Show rich toast notification
+            toast(newNotification.title, {
+              description: (
+                <div className="mt-1">
+                  <p>{newNotification.content}</p>
+                  {details.dateTime && (
+                    <p className="text-xs mt-1 text-gray-500">
+                      {new Date(details.dateTime).toLocaleDateString()} at{' '}
+                      {new Date(details.dateTime).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                </div>
+              ),
+              action: {
+                label: 'View',
+                onClick: () => setIsOpen(true),
+              },
+              duration: 8000,
+            });
+          }
+        } else {
+          console.log(
+            '🔔 Notification not relevant for this user role or already read'
+          );
+        }
+
+        // Still refresh notifications as a backup, but with a delay to avoid race conditions
+        setTimeout(() => {
+          console.log('🔔 Refreshing notifications as backup');
+          fetchNotifications();
+        }, 2000);
+      } else {
+        console.log(
+          '🔔 No notification ID in data, just refreshing notifications'
+        );
+        // If no notification ID, just refresh notifications
         fetchNotifications();
 
-        // Show toast notification
+        // Show basic toast notification
         toast(data.message || 'Appointment update', {
           description: `Appointment notification: ${data.type || ''}`,
           action: {

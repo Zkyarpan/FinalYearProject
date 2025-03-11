@@ -6,17 +6,17 @@ import connectDB from '@/db/db';
 import { withAuth } from '@/middleware/authMiddleware';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 
-// GET appointment details by ID
+// Get session details by appointment ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { appointmentId: string } }
 ) {
   return withAuth(async (req: NextRequest, token: any) => {
     try {
       await connectDB();
-      const { id } = params;
+      const { appointmentId } = params;
 
-      if (!id || !Types.ObjectId.isValid(id)) {
+      if (!appointmentId || !Types.ObjectId.isValid(appointmentId)) {
         return NextResponse.json(
           createErrorResponse(400, 'Invalid appointment ID')
         );
@@ -26,7 +26,7 @@ export async function GET(
       const appointment = await mongoose.connection
         .collection('appointments')
         .aggregate([
-          { $match: { _id: new Types.ObjectId(id) } },
+          { $match: { _id: new Types.ObjectId(appointmentId) } },
           // Lookup user details
           {
             $lookup: {
@@ -63,7 +63,6 @@ export async function GET(
               _id: 1,
               startTime: 1,
               endTime: 1,
-              dateTime: 1,
               duration: 1,
               sessionFormat: 1,
               status: 1,
@@ -94,88 +93,64 @@ export async function GET(
         );
       }
 
+      // Verify user has access to this appointment
       const appointmentData = appointment[0];
+      const userId = token.id;
+      const userRole = token.role;
+
+      const isUserAuthorized =
+        userRole === 'psychologist'
+          ? appointmentData.psychologistId.toString() === userId
+          : appointmentData.userId.toString() === userId;
+
+      if (!isUserAuthorized) {
+        return NextResponse.json(
+          createErrorResponse(403, 'Not authorized to access this session')
+        );
+      }
 
       // Calculate if the appointment can be joined
       const now = new Date();
-      const appointmentTime = new Date(
-        appointmentData.startTime || appointmentData.dateTime
-      );
-
+      const appointmentTime = new Date(appointmentData.startTime);
+      
       // Create time window: 5 minutes before to 15 minutes after
       const joinWindowStart = new Date(appointmentTime);
       joinWindowStart.setMinutes(joinWindowStart.getMinutes() - 5);
-
+      
       const joinWindowEnd = new Date(appointmentTime);
-      joinWindowEnd.setMinutes(
-        joinWindowEnd.getMinutes() + appointmentData.duration + 15
-      ); // Add duration + 15min buffer
-
-      const canJoin =
-        (appointmentData.status === 'confirmed' ||
-          appointmentData.status === 'ongoing') &&
-        now >= joinWindowStart &&
-        now <= joinWindowEnd;
-
-      return NextResponse.json(
-        createSuccessResponse(200, {
-          appointment: appointmentData,
-          canJoin,
-        })
+      joinWindowEnd.setMinutes(joinWindowEnd.getMinutes() + 15);
+      
+      const canJoin = (
+        appointmentData.status === 'confirmed' && 
+        now >= joinWindowStart && 
+        now <= joinWindowEnd
       );
-    } catch (error: any) {
-      console.error('Error fetching appointment details:', error);
-      return NextResponse.json(
-        createErrorResponse(500, 'Internal Server Error: ' + error.message)
-      );
-    }
-  }, req);
-}
 
-// Update appointment complete status
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  return withAuth(async (req: NextRequest, token: any) => {
-    try {
-      await connectDB();
-      const { id } = params;
-      const { notes } = await req.json();
-
-      if (!id || !Types.ObjectId.isValid(id)) {
-        return NextResponse.json(
-          createErrorResponse(400, 'Invalid appointment ID')
-        );
-      }
-
-      // Find and update the appointment
-      const result = await mongoose.connection
-        .collection('appointments')
-        .updateOne(
-          { _id: new Types.ObjectId(id) },
-          {
-            $set: {
-              status: 'completed',
-              notes: notes || '',
-              completedAt: new Date(),
-            },
+      // Update appointment to 'ongoing' status if joining and status is 'confirmed'
+      if (canJoin && appointmentData.status === 'confirmed') {
+        await mongoose.connection.collection('appointments').updateOne(
+          { _id: new Types.ObjectId(appointmentId) },
+          { 
+            $set: { 
+              status: 'ongoing',
+              joinedAt: new Date()
+            } 
           }
         );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json(
-          createErrorResponse(404, 'Appointment not found')
-        );
+        
+        appointmentData.status = 'ongoing';
       }
 
       return NextResponse.json(
         createSuccessResponse(200, {
-          message: 'Appointment completed successfully',
+          appointment: {
+            ...appointmentData,
+            canJoin,
+          },
         })
       );
     } catch (error: any) {
-      console.error('Error completing appointment:', error);
+      console.error('Error fetching session details:', error);
       return NextResponse.json(
         createErrorResponse(500, 'Internal Server Error: ' + error.message)
       );
@@ -183,44 +158,84 @@ export async function POST(
   }, req);
 }
 
-// Update appointment notes
-export async function PUT(
+// Update session status
+export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { appointmentId: string } }
 ) {
   return withAuth(async (req: NextRequest, token: any) => {
     try {
       await connectDB();
-      const { id } = params;
-      const { notes } = await req.json();
+      const { appointmentId } = params;
+      const { status } = await req.json();
 
-      if (!id || !Types.ObjectId.isValid(id)) {
+      if (!appointmentId || !Types.ObjectId.isValid(appointmentId)) {
         return NextResponse.json(
           createErrorResponse(400, 'Invalid appointment ID')
         );
       }
 
-      // Find and update the appointment
-      const result = await mongoose.connection
-        .collection('appointments')
-        .updateOne(
-          { _id: new Types.ObjectId(id) },
-          { $set: { notes: notes || '' } }
+      if (!['ongoing', 'completed'].includes(status)) {
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid status update')
         );
+      }
 
-      if (result.matchedCount === 0) {
+      // Verify user has access to this appointment
+      const appointment = await mongoose.connection
+        .collection('appointments')
+        .findOne({ _id: new Types.ObjectId(appointmentId) });
+
+      if (!appointment) {
         return NextResponse.json(
           createErrorResponse(404, 'Appointment not found')
         );
       }
 
+      const userId = token.id;
+      const userRole = token.role;
+
+      const isUserAuthorized =
+        userRole === 'psychologist'
+          ? appointment.psychologistId.toString() === userId
+          : appointment.userId.toString() === userId;
+
+      if (!isUserAuthorized) {
+        return NextResponse.json(
+          createErrorResponse(403, 'Not authorized to update this session')
+        );
+      }
+
+      // Update fields based on status
+      const updateFields: any = { status };
+      
+      if (status === 'completed') {
+        updateFields.completedAt = new Date();
+      }
+
+      // Update the appointment
+      const result = await mongoose.connection
+        .collection('appointments')
+        .updateOne(
+          { _id: new Types.ObjectId(appointmentId) },
+          { $set: updateFields }
+        );
+
+      if (result.modifiedCount === 0) {
+        return NextResponse.json(
+          createErrorResponse(400, 'Failed to update session status')
+        );
+      }
+
       return NextResponse.json(
         createSuccessResponse(200, {
-          message: 'Notes updated successfully',
+          message: `Session status updated to ${status}`,
+          appointmentId,
+          status,
         })
       );
     } catch (error: any) {
-      console.error('Error updating notes:', error);
+      console.error('Error updating session status:', error);
       return NextResponse.json(
         createErrorResponse(500, 'Internal Server Error: ' + error.message)
       );

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { DEFAULT_AVATAR } from '@/constants';
+import Image from 'next/image';
 
 interface AccountSectionProps {
   firstName: string;
@@ -14,6 +15,9 @@ export default function AccountSection({
   profileImage,
   role = 'user',
 }: AccountSectionProps) {
+  // Format role for display (capitalize first letter)
+  const displayRole = role.charAt(0).toUpperCase() + role.slice(1);
+
   const getAccountPath = () => {
     switch (role) {
       case 'psychologist':
@@ -26,14 +30,7 @@ export default function AccountSection({
   };
 
   const getManageLabel = () => {
-    switch (role) {
-      case 'psychologist':
-        return 'Manage account';
-      case 'admin':
-        return 'Manage account';
-      default:
-        return 'Manage account';
-    }
+    return 'Manage account';
   };
 
   return (
@@ -43,7 +40,7 @@ export default function AccountSection({
     >
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full overflow-hidden border shadow-sm">
-          <img
+          <Image
             src={profileImage || DEFAULT_AVATAR}
             alt={`${firstName}'s profile picture`}
             width={32}
@@ -53,7 +50,7 @@ export default function AccountSection({
         </div>
         <div className="flex flex-col items-start justify-center">
           <span className="text-sm font-medium hover:translate-x-1 transition-transform duration-200">
-            {firstName}
+            {displayRole}
           </span>
           <span className="text-xs dark:text-gray-300">{getManageLabel()}</span>
         </div>

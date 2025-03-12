@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+
 const companies = [
   'Google',
   'Microsoft',
@@ -12,8 +14,36 @@ const companies = [
 ];
 
 export function Companies() {
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes marquee {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(calc(-100% - var(--gap)));
+        }
+      }
+      
+      .animate-marquee {
+        animation: marquee var(--duration) linear infinite;
+      }
+      
+      .group:hover .animate-marquee {
+        animation-play-state: paused;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Cleanup function to remove the style when component unmounts
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
   return (
-    <section id="companies dark:bg-transparent ">
+    <section id="companies" className="dark:bg-transparent">
       <div className="py-14">
         <div className="container mx-auto px-4 md:px-8">
           <h3 className="text-center text-sm font-semibold">
@@ -45,26 +75,5 @@ export function Companies() {
     </section>
   );
 }
-
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes marquee {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(calc(-100% - var(--gap)));
-    }
-  }
-  
-  .animate-marquee {
-    animation: marquee var(--duration) linear infinite;
-  }
-  
-  .group:hover .animate-marquee {
-    animation-play-state: paused;
-  }
-`;
-document.head.appendChild(style);
 
 export default Companies;

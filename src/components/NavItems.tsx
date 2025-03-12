@@ -121,27 +121,27 @@ export const ADMIN_NAV_ITEMS = [
   {
     icon: <Users />,
     text: 'Users',
-    href: '/admin/users',
+    href: '/dashboard/admin/users',
   },
   {
     icon: <PsychologistIcon />,
     text: 'Psychologists',
-    href: '/admin/psychologists',
+    href: '/dashboard/psychologist',
   },
   {
     icon: <ArticlesIcon />,
     text: 'Articles',
-    href: '/admin/articles',
+    href: '/dashboard/admin/articles',
   },
   {
     icon: <BlogIcon />,
     text: 'Blogs',
-    href: '/admin/blogs',
+    href: '/dashboard/admin/blogs',
   },
   {
     icon: <Settings />,
     text: 'Settings',
-    href: '/admin/settings',
+    href: '/dashboard/admin/settings',
   },
 ];
 

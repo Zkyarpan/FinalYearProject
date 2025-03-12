@@ -38,13 +38,23 @@ export interface IPsychologist extends Document {
     | 'clinical_psychologist'
     | 'counseling_psychologist'
     | 'psychiatrist'
-    | 'mental_health_counselor';
+    | 'mental_health_counselor'
+    | 'school_psychologist'
+    | 'neuropsychologist'
+    | 'health_psychologist'
+    | 'forensic_psychologist';
 
   // Media and Verification
   profilePhotoUrl?: string;
   certificateOrLicenseUrl?: string;
   password: string;
   isVerified: boolean;
+
+  // Admin Approval
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  adminFeedback?: string;
+  approvedAt?: Date;
+  rejectedAt?: Date;
 
   // Professional Background
   education: {
@@ -205,6 +215,10 @@ const PsychologistSchema: Schema = new Schema(
         'counseling_psychologist',
         'psychiatrist',
         'mental_health_counselor',
+        'school_psychologist',
+        'neuropsychologist',
+        'health_psychologist',
+        'forensic_psychologist',
       ],
     },
     profilePhotoUrl: String,
@@ -216,6 +230,21 @@ const PsychologistSchema: Schema = new Schema(
     isVerified: {
       type: Boolean,
       default: false,
+    },
+    // Admin approval fields
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    adminFeedback: {
+      type: String,
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedAt: {
+      type: Date,
     },
     education: [
       {
@@ -311,6 +340,7 @@ PsychologistSchema.index({
   languages: 1,
   city: 1,
   sessionFee: 1,
+  approvalStatus: 1, // Add index for approval status for faster filtering
 });
 
 const Psychologist =

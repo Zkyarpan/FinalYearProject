@@ -6,7 +6,6 @@ import connectDB from './src/db/db';
 import Message from './src/models/Message';
 import Conversation from './src/models/Conversation';
 import CallHistory from './src/models/CallHistory';
-import { getStatusChangeMessage } from './src/helpers/getStatusChangeMessage';
 import mongoose from 'mongoose';
 import Notification from './src/models/Notification';
 import User from './src/models/User';
@@ -329,6 +328,8 @@ app
               conversationId,
               connectionState: 'new',
               mediaTracksAdded: false,
+              participantStatus: {},
+              lastActivity: Date.now(),
             });
 
             // Forward the offer immediately
@@ -560,6 +561,118 @@ app
 
             // Forward to other party
             io.to(recipientSocketId).emit('webrtc_signal', data);
+          } else if (type === 'participant-left') {
+            log.info(`Participant ${from} temporarily left call ${callId}`);
+
+            // Do NOT delete the call from activeCalls map - keep it active
+            // But update its status to indicate the participant left
+            const callData = activeCalls.get(callId);
+            if (callData) {
+              callData.participantStatus = {
+                ...(callData.participantStatus || {}),
+                [from]: 'left_temporarily',
+              };
+
+              // Keep the call active but mark it as waiting
+              callData.status = 'waiting';
+              callData.lastActivity = Date.now();
+              activeCalls.set(callId, callData);
+
+              // Set a timeout to clean up the call if it stays inactive too long
+              setTimeout(() => {
+                // If the call still exists and the participant hasn't rejoined
+                const currentCallData = activeCalls.get(callId);
+                if (
+                  currentCallData &&
+                  currentCallData.participantStatus &&
+                  currentCallData.participantStatus[from] === 'left_temporarily'
+                ) {
+                  log.info(
+                    `Call ${callId} cleanup - participant ${from} never rejoined`
+                  );
+
+                  // Only fully clean up if both participants left or if the waiting time exceeded
+                  const allParticipantsLeft = Object.values(
+                    currentCallData.participantStatus
+                  ).every(status => status === 'left_temporarily');
+
+                  const waitingTimeExceeded =
+                    Date.now() - (currentCallData.lastActivity || Date.now()) >
+                    3600000; // 1 hour
+
+                  if (allParticipantsLeft || waitingTimeExceeded) {
+                    // Clean up call resources
+                    activeCalls.delete(callId);
+                    pendingIceCandidates.delete(callId);
+                    callSetupStatus.delete(callId);
+
+                    // Notify any connected participants that the call expired
+                    Object.keys(currentCallData.participantStatus).forEach(
+                      participantId => {
+                        const participantSocketId =
+                          getSocketIdForUser(participantId);
+                        if (participantSocketId) {
+                          io.to(participantSocketId).emit('webrtc_signal', {
+                            type: 'call-expired',
+                            to: participantId,
+                            callId,
+                          });
+                        }
+                      }
+                    );
+                  }
+                }
+              }, 3600000); // 1 hour timeout
+            }
+
+            // Forward the temporary leave signal to the other participant
+            const recipientSocketId = getSocketIdForUser(to);
+            if (recipientSocketId) {
+              io.to(recipientSocketId).emit('webrtc_signal', data);
+            }
+          } else if (type === 'rejoin-call') {
+            log.info(`User ${from} is rejoining call ${callId}`);
+
+            // Update participant status if the call exists
+            const callData = activeCalls.get(callId);
+            if (callData) {
+              // Update participant status
+              callData.participantStatus = {
+                ...(callData.participantStatus || {}),
+                [from]: 'active', // Mark this participant as active
+              };
+
+              // Track last activity for timeouts
+              callData.lastActivity = Date.now();
+
+              // Update other call properties as needed
+              if (callData.status === 'waiting') {
+                callData.status = 'connecting';
+              }
+
+              activeCalls.set(callId, callData);
+            } else {
+              // If call data doesn't exist anymore, let the client know
+              log.warn(
+                `User ${from} tried to rejoin non-existent call ${callId}`
+              );
+              const callerSocketId = getSocketIdForUser(from);
+              if (callerSocketId) {
+                io.to(callerSocketId).emit('webrtc_signal', {
+                  type: 'call-expired',
+                  to: from,
+                  from: to,
+                  callId: callId,
+                });
+              }
+              return;
+            }
+
+            // Forward the rejoin signal to recipient
+            const recipientSocketId = getSocketIdForUser(to);
+            if (recipientSocketId) {
+              io.to(recipientSocketId).emit('webrtc_signal', data);
+            }
           } else {
             // For any other signal types, just forward
             io.to(recipientSocketId).emit('webrtc_signal', data);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Mic,
   MicOff,
@@ -11,6 +11,10 @@ import {
   Maximize2,
   ChevronUp,
   Clock,
+  RefreshCw,
+  AlertCircle,
+  Phone,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,15 +45,60 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
     toggleMute,
     toggleVideo,
     endCall,
+    reconnectCall,
     toggleMinimized,
     isCallMinimized,
-    sessionTimeRemaining,
+    callStats,
   } = useVideoCall();
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
 
   // Auto-hide controls after inactivity
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      setControlsVisible(true);
+
+      // Only auto-hide controls when call is connected and active
+      if (callStatus === CallStatus.CONNECTED) {
+        timer = setTimeout(() => {
+          setControlsVisible(false);
+        }, 5000); // Hide after 5 seconds of inactivity
+      } else {
+        // For other states, keep controls visible
+        setControlsVisible(true);
+      }
+    };
+
+    // Set up initial timer
+    resetTimer();
+
+    // Set up event listeners for mouse movement and touches
+    const handleActivity = () => resetTimer();
+
+    // Only add listeners when call is connected to avoid interfering with modal actions
+    if (callStatus === CallStatus.CONNECTED) {
+      document.addEventListener('mousemove', handleActivity);
+      document.addEventListener('touchstart', handleActivity);
+
+      // Additional events to handle actions that should show controls
+      document.addEventListener('click', handleActivity);
+      document.addEventListener('keydown', handleActivity);
+    }
+
+    // Cleanup
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousemove', handleActivity);
+      document.removeEventListener('touchstart', handleActivity);
+      document.removeEventListener('click', handleActivity);
+      document.removeEventListener('keydown', handleActivity);
+    };
+  }, [callStatus]);
+
   // Ensure video elements get the streams properly
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -61,52 +110,42 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
     }
   }, [localStream, remoteStream]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-
-    const resetTimer = () => {
-      clearTimeout(timer);
-      setControlsVisible(true);
-
-      timer = setTimeout(() => {
-        if (callStatus === CallStatus.CONNECTED) {
-          setControlsVisible(false);
-        }
-      }, 5000); // Hide after 5 seconds of inactivity
-    };
-
-    // Set up initial timer
-    resetTimer();
-
-    // Set up event listeners for mouse movement and touches
-    const handleActivity = () => resetTimer();
-    document.addEventListener('mousemove', handleActivity);
-    document.addEventListener('touchstart', handleActivity);
-
-    // Cleanup
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousemove', handleActivity);
-      document.removeEventListener('touchstart', handleActivity);
-    };
-  }, [callStatus]);
-
   // Call duration timer
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
+    let startTime = Date.now(); // Record start time when connecting
+
+    const updateDuration = () => {
+      // Only increment when actually connected
+      if (callStatus === CallStatus.CONNECTED) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        setCallDuration(elapsed);
+      }
+    };
 
     if (callStatus === CallStatus.CONNECTED) {
+      // When first connected, update the start time
+      if (callDuration === 0) {
+        startTime = Date.now();
+      }
+
+      // Start the timer to update every second
+      timer = setInterval(updateDuration, 1000);
+    } else if (callStatus === CallStatus.RECONNECTING) {
+      // Keep the timer running during reconnection, but don't update duration
+      if (timer) clearInterval(timer);
       timer = setInterval(() => {
-        setCallDuration(prev => prev + 1);
+        // Just keep the timer alive but don't update
       }, 1000);
     } else {
+      // Reset duration for other states
       setCallDuration(0);
     }
 
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [callStatus]);
+  }, [callStatus, callDuration]);
 
   // Format duration as MM:SS
   const formatDuration = (seconds: number) => {
@@ -116,6 +155,50 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
       .toString()
       .padStart(2, '0')}`;
   };
+
+  // Get participant details
+  const getParticipantName = useCallback(() => {
+    if (!currentCall) return 'Connecting...';
+
+    const participant =
+      callStatus === CallStatus.RINGING ||
+      (currentCall.initiator.userId !== currentCall.receiver.userId &&
+        currentCall.initiator.firstName)
+        ? currentCall.receiver
+        : currentCall.initiator;
+
+    return (
+      `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
+      'Participant'
+    );
+  }, [currentCall, callStatus]);
+
+  // Get participant profile image
+  const getParticipantImage = useCallback(() => {
+    if (!currentCall) return '';
+
+    const participant =
+      callStatus === CallStatus.RINGING ||
+      (currentCall.initiator.userId !== currentCall.receiver.userId &&
+        currentCall.initiator.firstName)
+        ? currentCall.receiver
+        : currentCall.initiator;
+
+    return participant.profileImage || '';
+  }, [currentCall, callStatus]);
+
+  // Get initials for avatar fallback
+  const getInitials = useCallback(() => {
+    const name = getParticipantName();
+    return (
+      name
+        .split(' ')
+        .map(part => part[0] || '')
+        .join('')
+        .toUpperCase()
+        .substring(0, 2) || 'US'
+    );
+  }, [getParticipantName]);
 
   // If minimized mode is active
   if (isCallMinimized && callStatus === CallStatus.CONNECTED) {
@@ -155,50 +238,6 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
     );
   }
 
-  // Get participant details
-  const getParticipantName = () => {
-    if (!currentCall) return 'Connecting...';
-
-    const participant =
-      callStatus === CallStatus.RINGING ||
-      (currentCall.initiator.userId !== currentCall.receiver.userId &&
-        currentCall.initiator.firstName)
-        ? currentCall.receiver
-        : currentCall.initiator;
-
-    return (
-      `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
-      'Participant'
-    );
-  };
-
-  // Get participant profile image
-  const getParticipantImage = () => {
-    if (!currentCall) return '';
-
-    const participant =
-      callStatus === CallStatus.RINGING ||
-      (currentCall.initiator.userId !== currentCall.receiver.userId &&
-        currentCall.initiator.firstName)
-        ? currentCall.receiver
-        : currentCall.initiator;
-
-    return participant.profileImage || '';
-  };
-
-  // Get initials for avatar fallback
-  const getInitials = () => {
-    const name = getParticipantName();
-    return (
-      name
-        .split(' ')
-        .map(part => part[0] || '')
-        .join('')
-        .toUpperCase()
-        .substring(0, 2) || 'US'
-    );
-  };
-
   // Handle call status message and UI
   const getCallStatusContent = () => {
     switch (callStatus) {
@@ -218,7 +257,14 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             <h3 className="text-white text-xl font-medium mb-2">
               {getParticipantName()}
             </h3>
-            <p className="text-white/70 mb-6">Calling...</p>
+            <div className="flex flex-col items-center">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="animate-pulse bg-primary/20 h-3 w-3 rounded-full"></div>
+                <div className="animate-pulse bg-primary/40 h-3 w-3 rounded-full delay-150"></div>
+                <div className="animate-pulse bg-primary/60 h-3 w-3 rounded-full delay-300"></div>
+              </div>
+              <p className="text-white/70 mb-6">Calling... Please wait</p>
+            </div>
             <div className="flex space-x-4">
               <Button
                 variant="destructive"
@@ -248,7 +294,10 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             <h3 className="text-white text-xl font-medium mb-2">
               {getParticipantName()}
             </h3>
-            <p className="text-white/70 mb-6">Incoming call...</p>
+            <div className="animate-bounce mb-6">
+              <Phone className="h-10 w-10 text-primary" />
+            </div>
+            <p className="text-white/70 mb-6">Incoming call... Connecting</p>
             <div className="flex space-x-4">
               <Button
                 variant="destructive"
@@ -278,7 +327,53 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                   <div className="h-8 w-8 bg-primary rounded-full"></div>
                 </div>
               </div>
-              <p className="text-white text-lg">Connecting...</p>
+              <div className="space-y-2 text-center">
+                <p className="text-white text-lg">
+                  Establishing secure connection...
+                </p>
+                <p className="text-white/60 text-sm">This may take a moment</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case CallStatus.WAITING:
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
+            <div className="flex flex-col items-center mb-4">
+              <Avatar className="h-24 w-24 mb-4">
+                <AvatarImage
+                  src={getParticipantImage()}
+                  alt={getParticipantName()}
+                />
+                <AvatarFallback className="text-2xl">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+              <h3 className="text-white text-xl font-medium mb-2">
+                {getParticipantName()}
+              </h3>
+            </div>
+            <div className="p-4 bg-yellow-500/20 rounded-md max-w-md mb-6">
+              <p className="text-white/90 mb-2 text-center">
+                Participant left temporarily... waiting for them to rejoin
+              </p>
+              <div className="flex justify-center space-x-2">
+                <div className="animate-bounce h-2 w-2 bg-yellow-500 rounded-full"></div>
+                <div className="animate-bounce h-2 w-2 bg-yellow-500 rounded-full delay-150"></div>
+                <div className="animate-bounce h-2 w-2 bg-yellow-500 rounded-full delay-300"></div>
+              </div>
+            </div>
+            <div className="flex space-x-4">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  endCall('user_ended');
+                  onClose();
+                }}
+              >
+                End Call
+              </Button>
             </div>
           </div>
         );
@@ -287,7 +382,19 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
         return (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
             <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
-            <p className="text-white text-lg">Reconnecting...</p>
+            <p className="text-white text-lg mb-2">Reconnecting...</p>
+            <p className="text-white/60 text-sm mb-6">
+              Please wait, attempting to reestablish connection
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                endCall('user_cancelled_reconnect');
+                onClose();
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         );
 
@@ -297,15 +404,35 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             <div className="rounded-full bg-red-600 p-4 mb-4">
               <PhoneOff className="h-10 w-10 text-white" />
             </div>
-            <p className="text-white text-lg mb-4">Call Failed</p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                onClose();
-              }}
-            >
-              Close
-            </Button>
+            <p className="text-white text-lg mb-2">Call Failed</p>
+            <p className="text-white/60 text-sm mb-4">
+              There was a problem connecting to the session
+            </p>
+            <div className="flex space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onClose();
+                }}
+                className="bg-transparent text-white border-white/50 hover:bg-white/10"
+              >
+                Close
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  // Attempt to reconnect if call failed
+                  if (currentCall) {
+                    reconnectCall().catch(err =>
+                      console.error('Error reconnecting call:', err)
+                    );
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Try Again
+              </Button>
+            </div>
           </div>
         );
 
@@ -401,14 +528,49 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                 </div>
               </div>
 
-              {sessionTimeRemaining > 0 && (
-                <Badge
-                  variant="outline"
-                  className="border-yellow-500 text-yellow-500"
-                >
-                  <Clock className="mr-1 h-3 w-3" />
-                  <span>{sessionTimeRemaining} min remaining</span>
-                </Badge>
+              {/* Connection quality indicator */}
+              {callStatus === CallStatus.CONNECTED && (
+                <div className="flex items-center ml-auto">
+                  <div className="flex items-center space-x-1">
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        (callStats?.bitrate ?? 0) > 500
+                          ? 'bg-green-500'
+                          : (callStats?.bitrate ?? 0) > 200
+                          ? 'bg-yellow-500'
+                          : 'bg-red-500'
+                      }`}
+                    />
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        (callStats?.packetLoss ?? 0) < 2
+                          ? 'bg-green-500'
+                          : (callStats?.packetLoss ?? 0) < 5
+                          ? 'bg-yellow-500'
+                          : 'bg-red-500'
+                      }`}
+                    />
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        (callStats?.jitter ?? 100) < 30
+                          ? 'bg-green-500'
+                          : (callStats?.jitter ?? 100) < 80
+                          ? 'bg-yellow-500'
+                          : 'bg-red-500'
+                      }`}
+                    />
+                  </div>
+                  <span className="text-xs text-white/70 ml-2">
+                    {(callStats?.bitrate ?? 0) > 500 &&
+                    (callStats?.packetLoss ?? 100) < 2
+                      ? 'Good'
+                      : (callStats?.bitrate ?? 0) > 200 &&
+                        (callStats?.packetLoss ?? 100) < 5
+                      ? 'Fair'
+                      : 'Poor'}{' '}
+                    Connection
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -420,6 +582,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             }`}
           >
             <div className="flex items-center justify-center space-x-4">
+              {/* Mute button */}
               <Button
                 variant="outline"
                 size="icon"
@@ -436,6 +599,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                   <Mic className="h-6 w-6" />
                 )}
               </Button>
+
+              {/* Video toggle button */}
               <Button
                 variant="outline"
                 size="icon"
@@ -452,6 +617,23 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                   <Video className="h-6 w-6" />
                 )}
               </Button>
+
+              {/* Connection boost button - only show when needed */}
+              {callStatus === CallStatus.CONNECTED &&
+                ((callStats?.packetLoss ?? 0) > 5 ||
+                  (callStats?.jitter ?? 0) > 80) && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-full bg-yellow-600/80 hover:bg-yellow-600 border-2 border-yellow-500 text-white"
+                    onClick={() => reconnectCall()}
+                    title="Connection issues detected - click to attempt reconnection"
+                  >
+                    <RefreshCw className="h-6 w-6" />
+                  </Button>
+                )}
+
+              {/* End call button */}
               <Button
                 variant="destructive"
                 size="icon"
@@ -460,9 +642,12 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                   endCall();
                   onClose();
                 }}
+                title="End call"
               >
                 <PhoneOff className="h-8 w-8" />
               </Button>
+
+              {/* Minimize button */}
               <Button
                 variant="outline"
                 size="icon"

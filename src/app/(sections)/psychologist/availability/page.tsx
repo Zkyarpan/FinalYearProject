@@ -260,6 +260,8 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       const response = await fetch('/api/availability/psychologist');
       const data: ApiResponse<AvailabilitySlot[]> = await response.json();
 
+      console.log('API Response Raw Data:', data);
+
       if (!response.ok) {
         if (data.ErrorMessage && data.ErrorMessage.length > 0) {
           throw new Error(data.ErrorMessage[0].message);
@@ -269,7 +271,24 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       }
 
       if (data.IsSuccess && data.Result) {
-        setAvailabilitySlots(data.Result.availability);
+        console.log('Availability data structure:', data.Result);
+
+        const slots = data.Result.availability || [];
+        console.log('Slots before setting state:', slots);
+
+        const validSlots = slots.map(slot => {
+          if (!slot._id) {
+            console.warn('Found slot without ID:', slot);
+            // If no _id exists, create a temporary one or use another identifier
+            return {
+              ...slot,
+              _id:
+                slot._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+            };
+          }
+          return slot;
+        });
+        setAvailabilitySlots(validSlots);
       }
     } catch (error) {
       toast.error(
@@ -567,6 +586,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     });
 
     availabilitySlots.forEach(slot => {
+      console.log('Processing slot with _id:', slot._id);
       slot.daysOfWeek.forEach(day => {
         const daySlot = daysMap.get(day)!;
         daySlot.slots.push({
@@ -601,11 +621,16 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
   const handleDeleteAvailability = async (): Promise<void> => {
     if (!deleteDialog.slotId) return;
 
+    console.log('Deleting slot:', deleteDialog.slotId);
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/availability/${deleteDialog.slotId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/availability/psychologist?id=${deleteDialog.slotId}`,
+        {
+          method: 'DELETE',
+        }
+      );
 
       const data: ApiResponse<unknown> = await response.json();
 
@@ -619,6 +644,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
 
       if (data.IsSuccess) {
         toast.success('Availability slot removed successfully');
+
+        // Update the local state immediately without waiting for fetchAvailability
+        setAvailabilitySlots(prevSlots =>
+          prevSlots.filter(slot => slot._id !== deleteDialog.slotId)
+        );
+
+        // Still fetch from the server to ensure consistency, but don't block the UI update
         void fetchAvailability();
         onRefresh?.();
         setDeleteDialog({ isOpen: false, slotId: null });
@@ -656,7 +688,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     <div className="space-y-6 mt-5 max-w-7xl mx-auto">
       <div className="grid gap-6 md:grid-cols-3">
         {/* Time Zone Card */}
-        <Card className="dark:bg-input">
+        <Card className="">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <div className="p-2 rounded-lg">
@@ -666,7 +698,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                 <p className="text-sm font-medium dark:text-muted-foreground">
                   Current Time Zone
                 </p>
-                <p className="text-2xl font-extrabold tracking-tight">
+                <p className="text-2xl font-extrabold tracking-wide">
                   {currentTime.toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -681,7 +713,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
         </Card>
 
         {/* Current Date Card */}
-        <Card className="dark:bg-input">
+        <Card className="">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <div className="p-2 bg-secondary/10 rounded-lg">
@@ -699,7 +731,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
         </Card>
 
         {/* Quick Stats Card */}
-        <Card className="dark:bg-input">
+        <Card className="">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <div className="p-2 rounded-lg">
@@ -829,13 +861,16 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                                onClick={() =>
+                                onClick={() => {
+                                  console.log(
+                                    'Setting up deletion for slot with ID:',
+                                    slot.id
+                                  );
                                   setDeleteDialog({
                                     isOpen: true,
-                                    slotId: slot.id,
-                                  })
-                                }
+                                    slotId: slot.id, 
+                                  });
+                                }}
                               >
                                 <Delete />
                               </Button>
@@ -1251,7 +1286,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={handleDeleteAvailability}
+                  onClick={() => {
+                    handleDeleteAvailability();
+                  }}
                   disabled={isLoading}
                   className="gap-2 flex-1 sm:flex-none"
                 >

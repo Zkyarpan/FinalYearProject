@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
           isActive: true,
         }).select('daysOfWeek startTime endTime timePeriods');
 
-        const availabilityEvents = availability.map(slot => ({
-          id: slot._id,
+        const availabilityEvents = availability.map((slot: any) => ({
+          _id: slot._id.toString(), 
           daysOfWeek: slot.daysOfWeek,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -60,6 +60,15 @@ export async function DELETE(req: NextRequest) {
           return NextResponse.json(
             createErrorResponse(400, 'Availability ID is required'),
             { status: 400 }
+          );
+        }
+
+        if (availabilityId.startsWith('temp-')) {
+          return NextResponse.json(
+            createSuccessResponse(200, {
+              message: 'Temporary availability slot removed',
+              availability: null,
+            })
           );
         }
 

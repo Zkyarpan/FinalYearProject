@@ -12,7 +12,6 @@ import { useSocket } from './SocketContext';
 import { useUserStore } from '@/store/userStore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { useNotifications } from './NotificationContext';
 
 // Define call status types
 export enum CallStatus {
@@ -23,6 +22,7 @@ export enum CallStatus {
   CONNECTING = 'connecting',
   CONNECTED = 'connected',
   RECONNECTING = 'reconnecting',
+  WAITING = 'waiting', // When other participant left temporarily
   ENDED = 'ended',
   ERROR = 'error',
 }
@@ -46,7 +46,6 @@ export interface CallParticipant {
 // Define call type
 export interface Call {
   callId: string;
-  conversationId?: string;
   appointmentId?: string;
   callType: 'video' | 'audio';
   status: CallStatus;
@@ -57,17 +56,6 @@ export interface Call {
   duration: number;
   reconnectionAttempts: number;
   error?: string;
-}
-
-// Define call session info
-export interface CallSessionInfo {
-  appointmentId: string;
-  psychologistId: string;
-  userId: string;
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  sessionFormat: 'video' | 'in-person';
 }
 
 // Define call stats
@@ -89,9 +77,9 @@ interface WebRTCSignalData {
   signal?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
   appointmentId?: string;
+  conversationId?: string;
   response?: string;
   reason?: string;
-  minutes?: number;
 }
 
 // Define ICE candidate data type
@@ -113,8 +101,6 @@ interface VideoCallContextType {
   isMuted: boolean;
   isVideoOff: boolean;
   callStats: CallStats;
-  sessionInfo: CallSessionInfo | null;
-  sessionTimeRemaining: number;
   isCallMinimized: boolean;
 
   // DOM references
@@ -130,12 +116,8 @@ interface VideoCallContextType {
   toggleMinimized: () => void;
   rejectCall: (reason?: string) => Promise<void>;
   reconnectCall: () => Promise<void>;
-
-  // Session management
-  checkCallAvailability: (appointmentId: string) => Promise<boolean>;
-  updateSessionStatus: (status: string) => Promise<boolean>;
-  startSessionTimer: (endTime: Date) => void;
-  stopSessionTimer: () => void;
+  leaveCallTemporarily: () => Promise<void>;
+  rejoinCall: (appointmentId: string) => Promise<void>;
 }
 
 // Create context
@@ -167,6 +149,8 @@ const getIceServers = () => {
     ],
     iceCandidatePoolSize: 10,
     iceTransportPolicy: 'all' as RTCIceTransportPolicy,
+    bundlePolicy: 'max-bundle' as RTCBundlePolicy,
+    rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy,
   };
 };
 
@@ -185,7 +169,6 @@ export const VideoCallProvider = ({
   const { socket, isConnected } = useSocket();
   const { user } = useUserStore();
   const router = useRouter();
-  const { fetchNotifications } = useNotifications();
 
   // Refs
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -197,10 +180,11 @@ export const VideoCallProvider = ({
   const callTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionEndNotifiedRef = useRef<boolean>(false);
   const pendingIceCandidatesRef = useRef<RTCIceCandidate[]>([]);
   const eventListenersAddedRef = useRef<boolean>(false);
+  const lastQualityAlertTime = useRef<number | null>(null);
+  const hasReducedQuality = useRef<boolean>(false);
+  const connectionHealthIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // State
   const [currentCall, setCurrentCall] = useState<Call | null>(null);
@@ -213,32 +197,20 @@ export const VideoCallProvider = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isVideoOff, setIsVideoOff] = useState<boolean>(false);
   const [callStats, setCallStats] = useState<CallStats>({});
-  const [sessionInfo, setSessionInfo] = useState<CallSessionInfo | null>(null);
-  const [sessionTimeRemaining, setSessionTimeRemaining] = useState<number>(0);
   const [isCallMinimized, setIsCallMinimized] = useState<boolean>(false);
 
   // Debug function with timestamp
   const logDebug = useCallback((message: string, ...args: any[]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `[VideoCall] [${new Date().toISOString()}] ${message}`,
-        ...args
-      );
-    }
+    console.log(
+      `[VideoCall] [${new Date().toISOString()}] ${message}`,
+      ...args
+    );
   }, []);
 
-  // Function declarations first to avoid "used before defined" errors
-
-  // Stop session timer
-  const stopSessionTimer = useCallback(() => {
-    if (sessionTimerRef.current) {
-      clearInterval(sessionTimerRef.current);
-      sessionTimerRef.current = null;
-    }
-  }, []);
-
-  // Clean up resources - declare early as it's used by many functions
+  // Clean up resources
   const cleanupCall = useCallback(() => {
+    logDebug('Cleaning up call resources');
+
     // Stop all tracks in the local stream
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
@@ -282,15 +254,21 @@ export const VideoCallProvider = ({
       statsIntervalRef.current = null;
     }
 
+    if (connectionHealthIntervalRef.current) {
+      clearInterval(connectionHealthIntervalRef.current);
+      connectionHealthIntervalRef.current = null;
+    }
+
     // Reset pending ICE candidates
     pendingIceCandidatesRef.current = [];
 
     // Reset state
-    setCallStatus(CallStatus.IDLE);
     setMediaStatus(MediaStatus.LOADING);
-  }, []);
 
-  // Send buffered ICE candidates - declare early as it's used by other functions
+    logDebug('Call cleanup complete');
+  }, [logDebug]);
+
+  // Send buffered ICE candidates
   const sendBufferedIceCandidates = useCallback(() => {
     if (!socket || !isConnected || !currentCall || !user?._id) {
       return;
@@ -321,140 +299,6 @@ export const VideoCallProvider = ({
     }
   }, [socket, isConnected, currentCall, user?._id, logDebug]);
 
-  // Update session status (ongoing, completed, etc.)
-  const updateSessionStatus = useCallback(
-    async (status: string): Promise<boolean> => {
-      if (!sessionInfo || !sessionInfo.appointmentId) return false;
-
-      try {
-        logDebug(`Updating session status to ${status}`);
-
-        // Call API to update appointment status
-        const response = await fetch(
-          `/api/appointments/${sessionInfo.appointmentId}/${status}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to update session status: ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-
-        if (!data.IsSuccess) {
-          throw new Error(data.ErrorMessage || 'Unknown error');
-        }
-
-        logDebug(`Session status updated to ${status} successfully`);
-
-        // Refresh notifications to get the latest updates
-        fetchNotifications();
-
-        return true;
-      } catch (error) {
-        logDebug('Error updating session status:', error);
-        toast.error('Failed to update session status');
-        return false;
-      }
-    },
-    [sessionInfo, fetchNotifications, logDebug]
-  );
-
-  // Declare endCall earlier so it can be used in other functions
-  const endCall = useCallback(
-    async (reason?: string): Promise<void> => {
-      if (!socket || !currentCall || !user?._id) {
-        logDebug('Cannot end call - prerequisites not met');
-        cleanupCall();
-        setCurrentCall(null);
-        setCallStatus(CallStatus.IDLE);
-        return;
-      }
-
-      logDebug('Ending call', reason);
-
-      // Stop timer
-      stopSessionTimer();
-
-      // If the call was connected, update session status to completed
-      if (callStatus === CallStatus.CONNECTED && sessionInfo?.appointmentId) {
-        await updateSessionStatus('complete');
-      }
-
-      // Send call-ended signal
-      socket.emit('webrtc_signal', {
-        type: 'call-ended',
-        from: user._id,
-        to:
-          currentCall.initiator.userId === user._id
-            ? currentCall.receiver.userId
-            : currentCall.initiator.userId,
-        callId: currentCall.callId,
-        reason: reason || 'ended',
-        appointmentId: currentCall.appointmentId,
-      });
-
-      // Send call summary to socket server for logging
-      if (currentCall.startTime && callStatus === CallStatus.CONNECTED) {
-        const endTime = new Date();
-        const duration = Math.floor(
-          (endTime.getTime() - currentCall.startTime.getTime()) / 1000
-        );
-
-        socket.emit('call_summary', {
-          callId: currentCall.callId,
-          from: currentCall.initiator.userId,
-          to: currentCall.receiver.userId,
-          callType: currentCall.callType,
-          duration,
-          startedAt: currentCall.startTime.toISOString(),
-          endedAt: endTime.toISOString(),
-          status:
-            reason === 'timeout' || reason === 'rejected' ? 'missed' : 'ended',
-          conversationId: currentCall.conversationId,
-          appointmentId: currentCall.appointmentId,
-        });
-      }
-
-      // Clean up
-      cleanupCall();
-
-      // Reset call state with a slight delay to allow animations
-      setTimeout(() => {
-        setCurrentCall(null);
-        setCallStatus(CallStatus.IDLE);
-      }, 500);
-
-      logDebug('Call ended');
-
-      // If this was in the session context, navigate back to appointments
-      if (sessionInfo?.appointmentId) {
-        setTimeout(() => {
-          router.push('/appointments');
-        }, 1000);
-      }
-    },
-    [
-      socket,
-      currentCall,
-      user?._id,
-      callStatus,
-      sessionInfo,
-      stopSessionTimer,
-      updateSessionStatus,
-      cleanupCall,
-      router,
-      logDebug,
-    ]
-  );
-
   // Start collecting and reporting call statistics
   const startStatsReporting = useCallback(() => {
     if (!peerConnection.current || statsIntervalRef.current) {
@@ -478,6 +322,7 @@ export const VideoCallProvider = ({
         let roundTripTime = 0;
         let videoWidth = 0;
         let videoHeight = 0;
+        let lastResult: any = {};
 
         stats.forEach(report => {
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
@@ -517,7 +362,7 @@ export const VideoCallProvider = ({
           audioLevel: audioInputLevel,
         });
 
-        // Report stats to socket for monitoring
+        // Report stats to socket for monitoring (if needed)
         if (socket && isConnected && currentCall && user?._id) {
           socket.emit('call_metrics', {
             callId: currentCall.callId,
@@ -540,6 +385,48 @@ export const VideoCallProvider = ({
     }, 5000); // Every 5 seconds
   }, [socket, isConnected, currentCall, user?._id, logDebug]);
 
+  // End call
+  const endCall = useCallback(
+    async (reason?: string): Promise<void> => {
+      if (!currentCall || !user?._id) {
+        logDebug('Cannot end call - prerequisites not met');
+        cleanupCall();
+        setCurrentCall(null);
+        setCallStatus(CallStatus.IDLE);
+        return;
+      }
+
+      logDebug('Ending call', reason);
+
+      // Send call-ended signal
+      if (socket && isConnected) {
+        socket.emit('webrtc_signal', {
+          type: 'call-ended',
+          from: user._id,
+          to:
+            currentCall.initiator.userId === user._id
+              ? currentCall.receiver.userId
+              : currentCall.initiator.userId,
+          callId: currentCall.callId,
+          reason: reason || 'ended',
+          appointmentId: currentCall.appointmentId,
+        });
+      }
+
+      // Clean up
+      cleanupCall();
+
+      // Reset call state with a slight delay to allow animations
+      setTimeout(() => {
+        setCurrentCall(null);
+        setCallStatus(CallStatus.IDLE);
+      }, 500);
+
+      logDebug('Call ended');
+    },
+    [socket, isConnected, currentCall, user?._id, cleanupCall, logDebug]
+  );
+
   // Initialize WebRTC
   const initializeWebRTC = useCallback(async (): Promise<boolean> => {
     try {
@@ -548,40 +435,100 @@ export const VideoCallProvider = ({
 
       logDebug('Initializing WebRTC...');
 
-      // Create peer connection
+      // Create peer connection with enhanced options for better connectivity
       peerConnection.current = new RTCPeerConnection(getIceServers());
 
-      // Create data channel for metadata exchange
-      dataChannelRef.current = peerConnection.current.createDataChannel(
-        'metadata',
-        {
-          ordered: true,
-        }
-      );
+      // Add connection state logging for better debugging
+      peerConnection.current.addEventListener('connectionstatechange', () => {
+        if (!peerConnection.current) return;
+        logDebug(
+          'Connection state changed:',
+          peerConnection.current.connectionState
+        );
+      });
 
-      dataChannelRef.current.onopen = () => {
-        logDebug('Data channel opened');
-      };
+      peerConnection.current.addEventListener('signalingstatechange', () => {
+        if (!peerConnection.current) return;
+        logDebug(
+          'Signaling state changed:',
+          peerConnection.current.signalingState
+        );
+      });
 
-      dataChannelRef.current.onclose = () => {
-        logDebug('Data channel closed');
-      };
-
-      dataChannelRef.current.onmessage = event => {
-        try {
-          const data = JSON.parse(event.data);
-          logDebug('Data channel message:', data);
-
-          // Handle message types
-          if (data.type === 'mute-status') {
-            // Handle remote mute status
-          } else if (data.type === 'video-status') {
-            // Handle remote video status
+      // Create data channel with retry mechanism
+      try {
+        dataChannelRef.current = peerConnection.current.createDataChannel(
+          'metadata',
+          {
+            ordered: true,
+            maxRetransmits: 3, // Retry up to 3 times
           }
-        } catch (error) {
-          logDebug('Error parsing data channel message:', error);
-        }
-      };
+        );
+
+        dataChannelRef.current.onopen = () => {
+          logDebug('Data channel opened');
+
+          // Send initial status update once channel is open
+          if (
+            dataChannelRef.current &&
+            dataChannelRef.current.readyState === 'open'
+          ) {
+            try {
+              dataChannelRef.current.send(
+                JSON.stringify({
+                  type: 'status-update',
+                  isMuted,
+                  isVideoOff,
+                })
+              );
+            } catch (err) {
+              logDebug('Error sending initial status update:', err);
+            }
+          }
+        };
+
+        dataChannelRef.current.onclose = () => {
+          logDebug('Data channel closed');
+        };
+
+        dataChannelRef.current.onerror = error => {
+          logDebug('Data channel error:', error);
+        };
+
+        dataChannelRef.current.onmessage = event => {
+          try {
+            const data = JSON.parse(event.data);
+            logDebug('Data channel message:', data);
+
+            // Handle different message types
+            if (data.type === 'mute-status') {
+              // Handle remote mute status
+            } else if (data.type === 'video-status') {
+              // Handle remote video status
+            } else if (data.type === 'ping') {
+              // Respond to ping with pong
+              if (
+                dataChannelRef.current &&
+                dataChannelRef.current.readyState === 'open'
+              ) {
+                dataChannelRef.current.send(
+                  JSON.stringify({
+                    type: 'pong',
+                    timestamp: Date.now(),
+                  })
+                );
+              }
+            }
+          } catch (error) {
+            logDebug('Error parsing data channel message:', error);
+          }
+        };
+      } catch (err) {
+        logDebug(
+          'Error creating data channel, will rely on ondatachannel event:',
+          err
+        );
+      }
 
       // Handle incoming data channels
       peerConnection.current.ondatachannel = event => {
@@ -599,17 +546,17 @@ export const VideoCallProvider = ({
             logDebug('Remote data channel closed');
           };
 
+          channel.onerror = error => {
+            logDebug('Remote data channel error:', error);
+          };
+
           channel.onmessage = event => {
             try {
               const data = JSON.parse(event.data);
               logDebug('Remote data channel message:', data);
 
               // Handle message types
-              if (data.type === 'mute-status') {
-                // Handle remote mute status
-              } else if (data.type === 'video-status') {
-                // Handle remote video status
-              }
+              // Implementation similar to above
             } catch (error) {
               logDebug('Error parsing remote data channel message:', error);
             }
@@ -617,32 +564,79 @@ export const VideoCallProvider = ({
         }
       };
 
-      // Get local media stream with audio and video
-      const constraints = {
-        audio: true,
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          aspectRatio: { ideal: 1.7777777778 },
-          facingMode: 'user',
-        },
-      };
+      // Get local media stream with more specific constraints for better compatibility
+      try {
+        const constraints = {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            aspectRatio: { ideal: 1.7777777778 },
+            facingMode: 'user',
+            // Lower framerate for better performance on slow connections
+            frameRate: { max: 30, min: 15 },
+          },
+        };
 
-      logDebug('Requesting media with constraints:', constraints);
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+        logDebug('Requesting media with constraints:', constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStreamRef.current = stream;
+        setLocalStream(stream);
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      // Add tracks to peer connection
-      stream.getTracks().forEach(track => {
-        if (peerConnection.current) {
-          peerConnection.current.addTrack(track, stream);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
         }
-      });
+
+        // Add tracks to peer connection
+        stream.getTracks().forEach(track => {
+          if (peerConnection.current) {
+            logDebug(`Adding ${track.kind} track to peer connection`);
+            peerConnection.current.addTrack(track, stream);
+          }
+        });
+      } catch (err) {
+        // Fallback to audio-only if video fails
+        if (
+          err.name === 'NotFoundError' ||
+          err.name === 'DevicesNotFoundError'
+        ) {
+          logDebug('Camera not found, trying audio only');
+          toast.warning('Camera not found. Connecting with audio only.');
+
+          const audioConstraints = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          };
+
+          const audioStream = await navigator.mediaDevices.getUserMedia(
+            audioConstraints
+          );
+          localStreamRef.current = audioStream;
+          setLocalStream(audioStream);
+          setIsVideoOff(true);
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = audioStream;
+          }
+
+          // Add audio track to peer connection
+          audioStream.getTracks().forEach(track => {
+            if (peerConnection.current) {
+              logDebug(`Adding ${track.kind} track to peer connection`);
+              peerConnection.current.addTrack(track, audioStream);
+            }
+          });
+        } else {
+          throw err; // Re-throw other errors
+        }
+      }
 
       // Set up remote stream
       const remoteStream = new MediaStream();
@@ -655,7 +649,14 @@ export const VideoCallProvider = ({
 
       // Handle ICE candidate events
       peerConnection.current.onicecandidate = event => {
-        if (!event.candidate) return;
+        if (!event.candidate) {
+          logDebug('ICE gathering complete');
+          return;
+        }
+
+        logDebug(
+          `Generated ICE candidate for ${event.candidate.sdpMid}:${event.candidate.sdpMLineIndex}`
+        );
 
         if (socket && isConnected && currentCall && user?._id) {
           logDebug('Sending ICE candidate');
@@ -791,13 +792,6 @@ export const VideoCallProvider = ({
                 };
               });
             }
-
-            // Mark the appointment as ongoing
-            if (sessionInfo) {
-              updateSessionStatus('ongoing').catch(err =>
-                logDebug('Error updating session status:', err)
-              );
-            }
             break;
         }
       };
@@ -855,194 +849,120 @@ export const VideoCallProvider = ({
 
       return false;
     }
-  }, [cleanupCall, logDebug, startStatsReporting, endCall]);
+  }, [
+    cleanupCall,
+    socket,
+    isConnected,
+    currentCall,
+    user?._id,
+    callStatus,
+    isMuted,
+    isVideoOff,
+    endCall,
+    startStatsReporting,
+    logDebug,
+  ]);
 
-  // Session timer to track remaining time
-  const startSessionTimer = useCallback(
-    (endTime: Date) => {
-      // Clear any existing timer
-      if (sessionTimerRef.current) {
-        clearInterval(sessionTimerRef.current);
-        sessionTimerRef.current = null;
+  // Helper to wait for ICE gathering - waits up to 3 seconds
+  const waitForIceGathering = (pc: RTCPeerConnection): Promise<void> => {
+    return new Promise(resolve => {
+      if (!pc) {
+        resolve();
+        return;
       }
 
-      // Reset notification flag
-      sessionEndNotifiedRef.current = false;
-
-      // Set up interval to update remaining time
-      sessionTimerRef.current = setInterval(() => {
-        const now = new Date();
-        const endTimeDate = new Date(endTime);
-        const remainingMs = endTimeDate.getTime() - now.getTime();
-        const remainingMinutes = Math.max(0, Math.floor(remainingMs / 60000));
-
-        setSessionTimeRemaining(remainingMinutes);
-
-        // Send notification 5 minutes before end
-        if (remainingMinutes <= 5 && !sessionEndNotifiedRef.current) {
-          sessionEndNotifiedRef.current = true;
-
-          // Send notification to both participants
-          toast.warning(
-            `Session ending in ${remainingMinutes} minute${
-              remainingMinutes === 1 ? '' : 's'
-            }`,
-            {
-              duration: 10000,
-            }
-          );
-
-          // Send notification through socket if available
-          if (socket && isConnected && currentCall && user?._id) {
-            const otherParticipantId =
-              currentCall.initiator.userId === user._id
-                ? currentCall.receiver.userId
-                : currentCall.initiator.userId;
-
-            socket.emit('webrtc_signal', {
-              type: 'session-ending-soon',
-              from: user._id,
-              to: otherParticipantId,
-              callId: currentCall.callId,
-              minutes: remainingMinutes,
-            });
-          }
-        }
-
-        // If session time is up, notify user
-        if (remainingMs <= 0) {
-          toast.error('Session time has ended', {
-            duration: 10000,
-            description: 'The scheduled time for this session has ended.',
-          });
-
-          // Clear interval
-          clearInterval(sessionTimerRef.current as NodeJS.Timeout);
-          sessionTimerRef.current = null;
-        }
-      }, 30000); // Check every 30 seconds
-    },
-    [socket, isConnected, currentCall, user?._id]
-  );
-
-  // Fetch appointment details for call
-  const fetchAppointmentDetails = useCallback(
-    async (appointmentId: string): Promise<CallSessionInfo | null> => {
-      try {
-        logDebug(`Fetching appointment details for ${appointmentId}`);
-
-        // Call API to get appointment details
-        const response = await fetch(`/api/appointments/${appointmentId}`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch appointment: ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-
-        if (!data.IsSuccess) {
-          throw new Error(data.ErrorMessage || 'Unknown error');
-        }
-
-        const appointment = data.Result;
-        logDebug('Appointment details:', appointment);
-
-        // Extract session info
-        const sessionInfo: CallSessionInfo = {
-          appointmentId: appointment._id,
-          psychologistId: appointment.psychologistId,
-          userId: appointment.userId,
-          startTime: new Date(appointment.startTime || appointment.dateTime),
-          endTime: new Date(appointment.endTime),
-          duration: appointment.duration || 60,
-          sessionFormat: appointment.sessionFormat || 'video',
-        };
-
-        setSessionInfo(sessionInfo);
-
-        // Start session timer
-        startSessionTimer(sessionInfo.endTime);
-
-        return sessionInfo;
-      } catch (error) {
-        logDebug('Error fetching appointment details:', error);
-        toast.error('Failed to fetch appointment details');
-        return null;
+      if (pc.iceGatheringState === 'complete') {
+        resolve();
+        return;
       }
-    },
-    [logDebug, startSessionTimer]
-  );
 
-  // Check if a call is available for an appointment
-  const checkCallAvailability = useCallback(
-    async (appointmentId: string): Promise<boolean> => {
-      try {
-        logDebug(`Checking call availability for appointment ${appointmentId}`);
-
-        // Check if socket is connected
-        if (!socket || !isConnected) {
-          logDebug('Socket not connected, cannot check call availability');
-          return false;
+      // Wait for gathering to complete with timeout
+      const checkState = () => {
+        if (pc.iceGatheringState === 'complete') {
+          pc.removeEventListener('icegatheringstatechange', checkState);
+          resolve();
         }
+      };
 
-        // Get appointment details
-        const appointmentDetails = await fetchAppointmentDetails(appointmentId);
+      pc.addEventListener('icegatheringstatechange', checkState);
 
-        if (!appointmentDetails) {
-          logDebug('Failed to get appointment details');
-          return false;
-        }
+      // Set a timeout in case gathering takes too long
+      setTimeout(() => {
+        pc.removeEventListener('icegatheringstatechange', checkState);
+        logDebug('ICE gathering timed out, but proceeding anyway');
+        resolve();
+      }, 3000); // 3 second timeout
+    });
+  };
 
-        // Check if it's a video appointment
-        if (appointmentDetails.sessionFormat !== 'video') {
-          logDebug('Appointment is not a video session');
-          toast.error('This appointment is not a video session');
-          return false;
-        }
+  // Leave call temporarily
+  const leaveCallTemporarily = useCallback(async (): Promise<void> => {
+    if (!socket || !isConnected || !currentCall || !user?._id) {
+      logDebug('Cannot leave call temporarily - prerequisites not met');
+      return;
+    }
 
-        // Check if the appointment time is valid
-        const now = new Date();
-        const startTime = new Date(appointmentDetails.startTime);
-        const endTime = new Date(appointmentDetails.endTime);
+    logDebug('Leaving call temporarily');
 
-        // Calculate how far we are from the appointment time
-        const minutesUntilStart = Math.floor(
-          (startTime.getTime() - now.getTime()) / 60000
-        );
-        const minutesAfterEnd = Math.floor(
-          (now.getTime() - endTime.getTime()) / 60000
-        );
+    // Send participant-left signal instead of call-ended
+    socket.emit('webrtc_signal', {
+      type: 'participant-left',
+      from: user._id,
+      to:
+        currentCall.initiator.userId === user._id
+          ? currentCall.receiver.userId
+          : currentCall.initiator.userId,
+      callId: currentCall.callId,
+      reason: 'left_temporarily',
+      appointmentId: currentCall.appointmentId,
+    });
 
-        // Verify it's within the allowed time window (5 minutes before start to 15 minutes after end)
-        if (minutesUntilStart > 5) {
-          logDebug(
-            `Appointment starts in ${minutesUntilStart} minutes, too early to join`
-          );
-          toast.error(
-            `This session will be available in ${minutesUntilStart} minutes`
-          );
-          return false;
-        }
+    // Clean up local resources but don't reset call state completely
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+      localStreamRef.current = null;
+      setLocalStream(null);
+    }
 
-        if (minutesAfterEnd > 15) {
-          logDebug(
-            `Appointment ended ${minutesAfterEnd} minutes ago, too late to join`
-          );
-          toast.error('This session has ended');
-          return false;
-        }
+    // Close data channel
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close();
+      dataChannelRef.current = null;
+    }
 
-        return true;
-      } catch (error) {
-        logDebug('Error checking call availability:', error);
-        toast.error('Failed to check call availability');
-        return false;
-      }
-    },
-    [socket, isConnected, fetchAppointmentDetails, logDebug]
-  );
+    // Close peer connection but keep call state
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+
+    // Clear timeouts and intervals
+    if (callTimeoutRef.current) {
+      clearTimeout(callTimeoutRef.current);
+      callTimeoutRef.current = null;
+    }
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (statsIntervalRef.current) {
+      clearInterval(statsIntervalRef.current);
+      statsIntervalRef.current = null;
+    }
+
+    // Reset pending ICE candidates
+    pendingIceCandidatesRef.current = [];
+
+    // Update call status but don't nullify the call object
+    setCallStatus(CallStatus.IDLE);
+    setMediaStatus(MediaStatus.LOADING);
+
+    logDebug('Call left temporarily, can rejoin later');
+  }, [socket, isConnected, currentCall, user?._id, logDebug]);
 
   // Create and send offer
   const createAndSendOffer = useCallback(async () => {
@@ -1133,28 +1053,6 @@ export const VideoCallProvider = ({
       }
     },
     [currentCall, user?._id, createAndSendOffer, endCall, logDebug]
-  );
-
-  // Send pre-offer to check if recipient can accept the call
-  const sendPreOffer = useCallback(
-    (receiverId: string, appointmentId: string, callId: string) => {
-      if (!socket || !isConnected || !user?._id) {
-        logDebug('Cannot send pre-offer - socket not connected');
-        return;
-      }
-
-      logDebug(`Sending pre-offer to ${receiverId} for call ${callId}`);
-
-      socket.emit('webrtc_signal', {
-        type: 'pre-offer',
-        from: user._id,
-        to: receiverId,
-        callId,
-        callType: 'video',
-        appointmentId,
-      });
-    },
-    [socket, isConnected, user?._id, logDebug]
   );
 
   // Process incoming offer
@@ -1304,81 +1202,6 @@ export const VideoCallProvider = ({
     [peerConnection, logDebug]
   );
 
-  // Handle incoming pre-offer
-  const handleIncomingPreOffer = useCallback(
-    (data: WebRTCSignalData) => {
-      if (!user?._id) {
-        logDebug('Cannot handle pre-offer - user not authenticated');
-        return;
-      }
-
-      logDebug('Handling incoming pre-offer');
-
-      // Check if already in a call
-      if (
-        currentCall &&
-        callStatus !== CallStatus.IDLE &&
-        callStatus !== CallStatus.ENDED
-      ) {
-        logDebug('Already in a call, sending busy response');
-
-        // Send busy response
-        socket?.emit('webrtc_signal', {
-          type: 'pre-offer-answer',
-          from: user._id,
-          to: data.from,
-          callId: data.callId,
-          response: 'busy',
-        });
-        return;
-      }
-
-      // Check if the call is for an appointment
-      if (data.appointmentId) {
-        // Auto-accept if it's an appointment call
-        logDebug('Auto-accepting appointment call');
-
-        // Navigate to the join page
-        router.push(`/sessions/join/${data.appointmentId}?caller=${data.from}`);
-      }
-    },
-    [socket, user?._id, currentCall, callStatus, router, logDebug]
-  );
-
-  // Reject call
-  const rejectCall = useCallback(
-    async (reason?: string): Promise<void> => {
-      if (!socket || !isConnected || !currentCall || !user?._id) {
-        logDebug('Cannot reject call - prerequisites not met');
-        return;
-      }
-
-      logDebug('Rejecting call', reason);
-
-      // Send rejection
-      socket.emit('webrtc_signal', {
-        type: 'call-rejected',
-        from: user._id,
-        to:
-          currentCall.initiator.userId === user._id
-            ? currentCall.receiver.userId
-            : currentCall.initiator.userId,
-        callId: currentCall.callId,
-        reason: reason || 'rejected',
-      });
-
-      // Clean up
-      cleanupCall();
-
-      // Reset call state
-      setCurrentCall(null);
-      setCallStatus(CallStatus.IDLE);
-
-      logDebug('Call rejected');
-    },
-    [socket, isConnected, currentCall, user?._id, cleanupCall, logDebug]
-  );
-
   // Handle call reconnection
   const reconnectCall = useCallback(async (): Promise<void> => {
     if (!peerConnection.current || !currentCall || !user?._id) {
@@ -1473,6 +1296,40 @@ export const VideoCallProvider = ({
     logDebug,
   ]);
 
+  // Reject call
+  const rejectCall = useCallback(
+    async (reason?: string): Promise<void> => {
+      if (!socket || !isConnected || !currentCall || !user?._id) {
+        logDebug('Cannot reject call - prerequisites not met');
+        return;
+      }
+
+      logDebug('Rejecting call', reason);
+
+      // Send rejection
+      socket.emit('webrtc_signal', {
+        type: 'call-rejected',
+        from: user._id,
+        to:
+          currentCall.initiator.userId === user._id
+            ? currentCall.receiver.userId
+            : currentCall.initiator.userId,
+        callId: currentCall.callId,
+        reason: reason || 'rejected',
+      });
+
+      // Clean up
+      cleanupCall();
+
+      // Reset call state
+      setCurrentCall(null);
+      setCallStatus(CallStatus.IDLE);
+
+      logDebug('Call rejected');
+    },
+    [socket, isConnected, currentCall, user?._id, cleanupCall, logDebug]
+  );
+
   // Start a call (caller)
   const startCall = useCallback(
     async (appointmentId: string, receiverId: string): Promise<void> => {
@@ -1501,22 +1358,6 @@ export const VideoCallProvider = ({
 
         // Set call status to checking
         setCallStatus(CallStatus.CHECKING);
-
-        // Check call availability
-        const isAvailable = await checkCallAvailability(appointmentId);
-
-        if (!isAvailable) {
-          setCallStatus(CallStatus.IDLE);
-          return;
-        }
-
-        // Get appointment details
-        const appointmentDetails = await fetchAppointmentDetails(appointmentId);
-
-        if (!appointmentDetails) {
-          setCallStatus(CallStatus.IDLE);
-          return;
-        }
 
         // Generate call ID
         const callId = generateCallId();
@@ -1565,7 +1406,14 @@ export const VideoCallProvider = ({
           }
 
           // Proceed with pre-offer check
-          sendPreOffer(receiverId, appointmentId, callId);
+          socket.emit('webrtc_signal', {
+            type: 'pre-offer',
+            from: user._id,
+            to: receiverId,
+            callId,
+            callType: 'video',
+            appointmentId,
+          });
         });
 
         // Set timeout for call offer
@@ -1595,12 +1443,67 @@ export const VideoCallProvider = ({
       user,
       currentCall,
       callStatus,
-      checkCallAvailability,
-      fetchAppointmentDetails,
       initializeWebRTC,
       cleanupCall,
       endCall,
-      sendPreOffer,
+      logDebug,
+    ]
+  );
+
+  // Rejoin a call after leaving temporarily
+  const rejoinCall = useCallback(
+    async (appointmentId: string): Promise<void> => {
+      try {
+        logDebug(`Rejoining call for appointment ${appointmentId}`);
+
+        // Check if we still have call state
+        if (!currentCall) {
+          logDebug('No active call to rejoin, starting fresh');
+          // Fall back to regular join logic
+          return;
+        }
+
+        // If we have current call state, use it to rejoin
+        setCallStatus(CallStatus.CONNECTING);
+
+        // Initialize WebRTC
+        const initialized = await initializeWebRTC();
+
+        if (!initialized) {
+          toast.error('Failed to initialize video call');
+          return;
+        }
+
+        // Get the other participant
+        const otherParticipantId =
+          currentCall.initiator.userId === user?._id
+            ? currentCall.receiver.userId
+            : currentCall.initiator.userId;
+
+        // Send rejoin signal
+        socket?.emit('webrtc_signal', {
+          type: 'rejoin-call',
+          from: user?._id,
+          to: otherParticipantId,
+          callId: currentCall.callId,
+          appointmentId: appointmentId,
+        });
+
+        // Create and send offer
+        await createAndSendOffer();
+
+        logDebug('Rejoining call - sent new offer');
+      } catch (error) {
+        logDebug('Error rejoining call:', error);
+        toast.error('Failed to rejoin call');
+      }
+    },
+    [
+      currentCall,
+      user?._id,
+      socket,
+      initializeWebRTC,
+      createAndSendOffer,
       logDebug,
     ]
   );
@@ -1633,22 +1536,6 @@ export const VideoCallProvider = ({
 
         // Set call status to checking
         setCallStatus(CallStatus.CHECKING);
-
-        // Check call availability
-        const isAvailable = await checkCallAvailability(appointmentId);
-
-        if (!isAvailable) {
-          setCallStatus(CallStatus.IDLE);
-          return;
-        }
-
-        // Get appointment details
-        const appointmentDetails = await fetchAppointmentDetails(appointmentId);
-
-        if (!appointmentDetails) {
-          setCallStatus(CallStatus.IDLE);
-          return;
-        }
 
         // Generate call ID (will be replaced by the actual one from the incoming offer)
         const tempCallId = generateCallId();
@@ -1724,8 +1611,6 @@ export const VideoCallProvider = ({
       user,
       currentCall,
       callStatus,
-      checkCallAvailability,
-      fetchAppointmentDetails,
       initializeWebRTC,
       cleanupCall,
       endCall,
@@ -1763,7 +1648,7 @@ export const VideoCallProvider = ({
 
       logDebug(`Microphone ${newMuteState ? 'muted' : 'unmuted'}`);
     }
-  }, [localStreamRef, isMuted, logDebug]);
+  }, [isMuted, logDebug]);
 
   // Toggle video
   const toggleVideo = useCallback(() => {
@@ -1795,7 +1680,7 @@ export const VideoCallProvider = ({
 
       logDebug(`Camera ${newVideoState ? 'turned off' : 'turned on'}`);
     }
-  }, [localStreamRef, isVideoOff, logDebug]);
+  }, [isVideoOff, logDebug]);
 
   // Toggle minimized state
   const toggleMinimized = useCallback(() => {
@@ -1825,7 +1710,7 @@ export const VideoCallProvider = ({
 
       switch (data.type) {
         case 'pre-offer':
-          handleIncomingPreOffer(data);
+          // This is handled in startCall function
           break;
 
         case 'pre-offer-answer':
@@ -1875,21 +1760,25 @@ export const VideoCallProvider = ({
           }
           break;
 
-        case 'resend-candidates':
-          logDebug('Received request to resend ICE candidates');
-          sendBufferedIceCandidates();
+        case 'participant-left':
+          if (currentCall && data.callId === currentCall.callId) {
+            logDebug('Other participant left temporarily');
+            toast.info(
+              'Other participant left the call. They may rejoin shortly.'
+            );
+
+            // Update call status but don't end the call completely
+            setCallStatus(CallStatus.WAITING);
+          }
           break;
 
-        case 'session-ending-soon':
-          logDebug(`Session ending in ${data.minutes} minutes`);
-          toast.warning(
-            `Session ending in ${data.minutes} minute${
-              data.minutes === 1 ? '' : 's'
-            }`,
-            {
-              duration: 10000,
-            }
-          );
+        case 'rejoin-call':
+          logDebug('Participant is rejoining the call');
+          toast.info('The other participant is rejoining the call');
+          // Update call status
+          if (callStatus === CallStatus.WAITING) {
+            setCallStatus(CallStatus.CONNECTING);
+          }
           break;
       }
     };
@@ -1927,13 +1816,12 @@ export const VideoCallProvider = ({
     isConnected,
     user?._id,
     currentCall,
-    handleIncomingPreOffer,
+    callStatus,
+    peerConnection,
     handlePreOfferAnswer,
     handleIncomingOffer,
     handleIncomingAnswer,
     handleIncomingIceCandidate,
-    sendBufferedIceCandidates,
-    peerConnection,
     endCall,
     logDebug,
   ]);
@@ -1941,28 +1829,10 @@ export const VideoCallProvider = ({
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      // Stop timers
-      stopSessionTimer();
-
-      if (callTimeoutRef.current) {
-        clearTimeout(callTimeoutRef.current);
-        callTimeoutRef.current = null;
-      }
-
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-
-      if (statsIntervalRef.current) {
-        clearInterval(statsIntervalRef.current);
-        statsIntervalRef.current = null;
-      }
-
-      // Clean up media
+      // Clean up all resources
       cleanupCall();
     };
-  }, [stopSessionTimer, cleanupCall]);
+  }, [cleanupCall]);
 
   // Sync local references with state
   useEffect(() => {
@@ -1980,8 +1850,6 @@ export const VideoCallProvider = ({
     isMuted,
     isVideoOff,
     callStats,
-    sessionInfo,
-    sessionTimeRemaining,
     isCallMinimized,
 
     localVideoRef,
@@ -1995,11 +1863,8 @@ export const VideoCallProvider = ({
     toggleMinimized,
     rejectCall,
     reconnectCall,
-
-    checkCallAvailability,
-    updateSessionStatus,
-    startSessionTimer,
-    stopSessionTimer,
+    leaveCallTemporarily,
+    rejoinCall,
   };
 
   return (

@@ -36,6 +36,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AppointmentSkeleton } from './skeleton/AppointmentSkeleton';
 import { useRouter } from 'next/navigation';
 import { useVideoCall } from '@/contexts/VideoCallContext';
+import { useSocket } from '@/contexts/SocketContext';
 import VideoCallModal from './VideoCallModal';
 import { verifyAppointmentStatus } from '@/helpers/verifyAppointmentStatus';
 import { Appointment, formatDate, Psychologist } from '@/types/manager';
@@ -66,8 +67,8 @@ interface AppointmentManagerProps {
   firstName?: string;
   lastName?: string;
 }
-
 const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
+  const { socket, isConnected } = useSocket();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] =
@@ -178,7 +179,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
     }
   };
 
-  const handleJoinSession = (appointment: Appointment) => {
+  const handleJoinSession = async (appointment: Appointment) => {
     // Re-verify canJoin status in case page has been open a while
     const verifiedAppointment = verifyAppointmentStatus(appointment);
 
@@ -229,42 +230,122 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       return;
     }
 
-    console.log(
-      `Starting call between ${userRole} and participant ID ${participantId}`
-    );
+    // Show connecting toast message
+    toast.info('Preparing video session...', { id: 'connecting-call' });
 
-    // Open the video call modal
-    setIsVideoCallModalOpen(true);
+    try {
+      // Check if the other participant is online first
+      if (socket && isConnected) {
+        socket.emit('check_user_online', participantId, (isOnline: boolean) => {
+          if (!isOnline) {
+            toast.warning(
+              'The other participant is currently offline. They will be notified when they return.',
+              { id: 'connecting-call', duration: 5000 }
+            );
+            // Continue anyway as they might join later
+          } else {
+            toast.success('Participant is online. Connecting...', {
+              id: 'connecting-call',
+              duration: 3000,
+            });
+          }
 
-    // Add a small delay to ensure the modal is open before starting the call
-    setTimeout(() => {
-      // Start or join the call based on role
-      if (userRole === 'psychologist') {
-        // Psychologist initiates the call
-        startCall(verifiedAppointment._id, participantId)
-          .then(() => {
-            console.log('Call started successfully');
-          })
-          .catch(error => {
-            console.error('Failed to start call:', error);
-            toast.error('Failed to start video session. Please try again.');
-            setIsVideoCallModalOpen(false);
-          });
+          // Proceed with the connection process
+          proceedWithCallSetup();
+        });
       } else {
-        // User joins the call
-        joinCall(verifiedAppointment._id, participantId)
-          .then(() => {
-            console.log('Joined call successfully');
-          })
-          .catch(error => {
-            console.error('Failed to join call:', error);
-            toast.error('Failed to join video session. Please try again.');
-            setIsVideoCallModalOpen(false);
-          });
+        // If socket isn't available, proceed anyway
+        proceedWithCallSetup();
       }
-    }, 500);
+    } catch (error) {
+      console.error('Error checking participant status:', error);
+      // Continue with call anyway as the socket check is just informational
+      proceedWithCallSetup();
+    }
 
-    toast.info('Joining session...');
+    // Helper function to proceed with the actual call setup
+    function proceedWithCallSetup() {
+      // Perform direct time-based validation instead of using checkCallAvailability
+      const now = new Date();
+      const appointmentDate = new Date(
+        verifiedAppointment.startTime || verifiedAppointment.dateTime || ''
+      );
+      const appointmentEndDate = new Date(verifiedAppointment.endTime);
+
+      // Check if we're within the allowed window (5 minutes before to 15 minutes after)
+      const millisBeforeStart = appointmentDate.getTime() - now.getTime();
+      const millisAfterEnd = now.getTime() - appointmentEndDate.getTime();
+      const minutesBeforeStart = Math.floor(millisBeforeStart / 60000);
+      const minutesAfterEnd = Math.floor(millisAfterEnd / 60000);
+
+      const isWithinTimeWindow =
+        (minutesBeforeStart <= 5 && minutesBeforeStart >= -60) ||
+        (minutesAfterEnd >= 0 && minutesAfterEnd <= 15);
+
+      if (!isWithinTimeWindow) {
+        if (minutesBeforeStart > 5) {
+          toast.error(
+            `Session starts in ${minutesBeforeStart} minutes. You can join 5 minutes before.`,
+            {
+              id: 'connecting-call',
+            }
+          );
+        } else if (minutesAfterEnd > 15) {
+          toast.error(
+            'This session has ended. The joining window has closed.',
+            {
+              id: 'connecting-call',
+            }
+          );
+        } else {
+          toast.error('Cannot join session - outside of allowed time window.', {
+            id: 'connecting-call',
+          });
+        }
+        return;
+      }
+
+      // Open the video call modal
+      setIsVideoCallModalOpen(true);
+
+      // Add a small delay to ensure the modal is open before starting the call
+      setTimeout(() => {
+        // Start or join the call based on role
+        if (userRole === 'psychologist') {
+          // Psychologist initiates the call
+          startCall(verifiedAppointment._id, participantId)
+            .then(() => {
+              console.log('Call started successfully');
+              toast.success('Session started successfully', {
+                id: 'connecting-call',
+              });
+            })
+            .catch(error => {
+              console.error('Failed to start call:', error);
+              toast.error('Failed to start video session. Please try again.', {
+                id: 'connecting-call',
+              });
+              setIsVideoCallModalOpen(false);
+            });
+        } else {
+          // User joins the call
+          joinCall(verifiedAppointment._id, participantId)
+            .then(() => {
+              console.log('Joined call successfully');
+              toast.success('Joining session...', {
+                id: 'connecting-call',
+              });
+            })
+            .catch(error => {
+              console.error('Failed to join call:', error);
+              toast.error('Failed to join video session. Please try again.', {
+                id: 'connecting-call',
+              });
+              setIsVideoCallModalOpen(false);
+            });
+        }
+      }, 500);
+    }
   };
 
   // Add a helper function to get role-appropriate search text
@@ -654,7 +735,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                 !verifiedAppointment.isPast && (
                   <div className="flex space-x-2">
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       onClick={() => {
                         setSelectedAppointment(verifiedAppointment);
@@ -664,7 +745,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                       Details
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       onClick={() => {
                         setSelectedAppointment(verifiedAppointment);
@@ -673,18 +754,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
                     >
                       Cancel
                     </Button>
-                    {verifiedAppointment.sessionFormat === 'video' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleJoinSession(verifiedAppointment)}
-                        disabled={!verifiedAppointment.canJoin}
-                        className="bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        {verifiedAppointment.canJoin
-                          ? 'Join Session'
-                          : 'Join Soon'}
-                      </Button>
-                    )}
+                    {verifiedAppointment.sessionFormat === 'video' &&
+                      renderJoinButton(verifiedAppointment)}
                   </div>
                 )
               )}
@@ -785,7 +856,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="default"
               onClick={() => {
                 setCancellationNote('');
                 setCancelDialogOpen(false);
@@ -1129,6 +1200,150 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
     );
   };
 
+  const renderJoinButton = (appointment: Appointment) => {
+    // Skip if not a video session
+    if (appointment.sessionFormat !== 'video') {
+      return null;
+    }
+
+    // Re-verify the appointment status
+    const verifiedApt = verifyAppointmentStatus(appointment);
+
+    // Check if this appointment is currently being connected to
+    const isConnecting =
+      selectedAppointment?._id === verifiedApt._id && isVideoCallModalOpen;
+
+    // Get button appearance based on appointment status
+    let buttonProps: {
+      disabled: boolean;
+      className: string;
+      onClick?: () => void;
+      children: React.ReactNode;
+    };
+
+    if (isConnecting) {
+      // Currently connecting to this session
+      buttonProps = {
+        disabled: true,
+        className: 'bg-blue-600 text-primary-foreground opacity-70',
+        children: (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Connecting...
+          </>
+        ),
+      };
+    } else if (!verifiedApt.canJoin) {
+      // Not yet joinable (either too early or too late)
+      const now = new Date();
+      const appointmentDate = new Date(
+        verifiedApt.startTime || verifiedApt.dateTime || ''
+      );
+      const minutesToStart = Math.round(
+        (appointmentDate.getTime() - now.getTime()) / 60000
+      );
+
+      buttonProps = {
+        disabled: true,
+        className: 'dark:bg-blue-600 text-primary-foreground cursor-not-allowed',
+        children: (
+          <>
+            <Clock className="h-4 w-4 mr-2" />
+            {minutesToStart > 0 ? `Join in ${minutesToStart}m` : 'Join Soon'}
+          </>
+        ),
+      };
+    } else {
+      // Ready to join
+      buttonProps = {
+        disabled: false,
+        className: 'bg-green-600 hover:bg-green-700 text-primary-foreground',
+        onClick: () => handleJoinSession(verifiedApt),
+        children: (
+          <>
+            <Video className="h-4 w-4 mr-2" />
+            Join Session
+          </>
+        ),
+      };
+    }
+
+    return (
+      <Button
+        size="sm"
+        className={buttonProps.className}
+        disabled={buttonProps.disabled}
+        onClick={buttonProps.onClick}
+      >
+        {buttonProps.children}
+      </Button>
+    );
+  };
+  const renderSessionStatusIndicator = (appointment: Appointment) => {
+    const verifiedApt = verifyAppointmentStatus(appointment);
+
+    // Only show for video sessions that are today and not canceled
+    if (
+      verifiedApt.sessionFormat !== 'video' ||
+      !verifiedApt.isToday ||
+      verifiedApt.isPast ||
+      verifiedApt.status === 'canceled'
+    ) {
+      return null;
+    }
+
+    // Calculate time remaining
+    const now = new Date();
+    const aptDate = new Date(
+      verifiedApt.startTime || verifiedApt.dateTime || ''
+    );
+    const minutesToStart = Math.round(
+      (aptDate.getTime() - now.getTime()) / 60000
+    );
+
+    // Get appropriate status text
+    let statusText = '';
+    let isActive = false;
+
+    if (verifiedApt.canJoin) {
+      statusText = 'This session is available to join now';
+      isActive = true;
+    } else if (minutesToStart > 0) {
+      statusText = `Session will be available in ${minutesToStart} minute${
+        minutesToStart === 1 ? '' : 's'
+      }`;
+    } else {
+      statusText = 'Session window has passed';
+    }
+
+    return (
+      <div
+        className={`mt-4 pt-4 border-t border-border/50 ${
+          isActive ? 'bg-green-50/50 dark:bg-green-900/10 p-2 rounded-md' : ''
+        }`}
+      >
+        <div className="flex items-center">
+          <Video
+            className={`h-4 w-4 mr-2 ${
+              isActive
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-muted-foreground'
+            }`}
+          />
+          <span
+            className={`text-sm ${
+              isActive
+                ? 'text-green-600 dark:text-green-400 font-medium'
+                : 'text-muted-foreground'
+            }`}
+          >
+            {statusText}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 dark:border-[#333333]">
@@ -1264,6 +1479,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
       {renderCancelDialog()}
       {renderDetailsDialog()}
+      {selectedAppointment && renderSessionStatusIndicator(selectedAppointment)}
       <VideoCallModal
         open={isVideoCallModalOpen}
         onClose={() => {

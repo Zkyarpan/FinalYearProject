@@ -16,6 +16,7 @@ import { NewAvailabilityAlert } from './AvailabilityNotificationBadge';
 import { getAppointmentCountByPeriod } from '@/utils/getAppointmentCountByPeriod';
 import { CalendarEvent } from '@/types/calendar';
 import { EventApi } from '@fullcalendar/core';
+import { toast } from 'sonner';
 
 const TIME_PERIODS = {
   MORNING: { start: '00:00:00', end: '11:59:59', icon: Sun, label: 'Morning' },
@@ -185,13 +186,22 @@ export function CalendarView({
 
   const handleEventClick = useCallback(
     info => {
-      if (!info.event.extendedProps.isBooked) {
+      // Check if the event is in the past
+      const now = new Date();
+      const eventStart = new Date(info.event.start);
+      const isPast = eventStart < now;
+
+      // Only allow clicking on future events that aren't booked
+      if (!isPast && !info.event.extendedProps.isBooked) {
         const clickedEvent = {
           start: info.event.start,
           end: info.event.end,
           ...info.event.extendedProps,
         };
         onEventClick({ event: clickedEvent });
+      } else if (isPast) {
+        // Optional: Show toast notification that past slots cannot be booked
+        toast.info('Cannot book appointments in the past');
       }
     },
     [onEventClick]
@@ -200,12 +210,8 @@ export function CalendarView({
   const renderEventContent = useCallback(eventInfo => {
     const isBooked = eventInfo.event.extendedProps.isBooked;
     const isNewlyAdded = eventInfo.event.extendedProps.isNewlyAdded;
-
-    const eventId =
-      eventInfo.event.id ||
-      `${eventInfo.event.start.toISOString()}-${
-        eventInfo.event.extendedProps.psychologistId
-      }`;
+    const now = new Date();
+    const isPast = new Date(eventInfo.event.start) < now;
 
     const startTime = format(eventInfo.event.start, 'h:mm');
     const endTime = format(eventInfo.event.end, 'h:mm');
@@ -214,25 +220,39 @@ export function CalendarView({
     return (
       <div
         className={`
-            p-3 rounded-lg shadow-sm 
-            ${
-              isBooked
-                ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
-                : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
-            } 
-            ${isNewlyAdded ? 'border-2 border-blue-500 pulse-animation' : ''}
-            transition-all hover:shadow-md
-          `}
+          p-3 rounded-lg shadow-sm 
+          ${
+            isPast
+              ? 'bg-gray-100 dark:bg-gray-800/20 border-l-2 border-gray-400 opacity-60'
+              : isBooked
+              ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
+              : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
+          } 
+          ${
+            isNewlyAdded && !isPast
+              ? 'border-2 border-blue-500 pulse-animation'
+              : ''
+          }
+          transition-all hover:shadow-md ${
+            isPast ? 'cursor-not-allowed' : 'cursor-pointer'
+          }
+        `}
       >
         <div className="flex items-center gap-2">
           <div className="relative">
             <div
               className={`
-                  w-3 h-3 rounded-full shrink-0
-                  ${isBooked ? 'bg-red-500' : 'bg-green-500'}
-                `}
+                w-3 h-3 rounded-full shrink-0
+                ${
+                  isPast
+                    ? 'bg-gray-400'
+                    : isBooked
+                    ? 'bg-red-500'
+                    : 'bg-green-500'
+                }
+              `}
             />
-            {!isBooked && (
+            {!isBooked && !isPast && (
               <span
                 className={`absolute inset-0 rounded-full bg-green-400 opacity-75 ${
                   isNewlyAdded ? 'animate-ping' : ''
@@ -242,22 +262,32 @@ export function CalendarView({
           </div>
           <span
             className={`
-                text-sm font-medium
-                ${
-                  isBooked
-                    ? 'text-red-700 dark:text-red-300'
-                    : 'text-green-700 dark:text-green-300'
-                }
-              `}
+              text-sm font-medium
+              ${
+                isPast
+                  ? 'text-gray-500 dark:text-gray-400'
+                  : isBooked
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-green-700 dark:text-green-300'
+              }
+            `}
           >
-            {isBooked ? 'Booked' : isNewlyAdded ? 'New!' : 'Available'}
+            {isPast
+              ? 'Past'
+              : isBooked
+              ? 'Booked'
+              : isNewlyAdded
+              ? 'New!'
+              : 'Available'}
           </span>
         </div>
 
         <div className="flex items-center text-sm mt-0.5">
           <span
             className={cn(
-              isBooked
+              isPast
+                ? 'text-gray-600 dark:text-gray-400'
+                : isBooked
                 ? 'text-yellow-800 dark:text-yellow-200'
                 : 'text-emerald-800 dark:text-emerald-200'
             )}

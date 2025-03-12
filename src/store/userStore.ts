@@ -20,6 +20,7 @@
 //   lastName: string | null;
 //   email: string | null;
 //   profileImage: string | null;
+//   image?: string | null; // Added image property for compatibility
 //   country?: string | null;
 //   streetAddress?: string | null;
 //   city?: string | null;
@@ -60,7 +61,7 @@
 //   isVerified: boolean;
 //   profileComplete: boolean;
 //   isAuthenticated?: boolean;
-//   image?: string;
+//   image?: string; // Allow image property from API
 // }
 
 // interface UserStore extends User {
@@ -83,6 +84,7 @@
 //       firstName: null,
 //       lastName: null,
 //       profileImage: null,
+//       image: null, // Added image property with default value
 //       country: null,
 //       streetAddress: null,
 //       city: null,
@@ -114,7 +116,8 @@
 //           profileComplete: user.profileComplete,
 //           firstName: user.firstName,
 //           lastName: user.lastName,
-//           profileImage: user.profileImage,
+//           profileImage: user.profileImage || user.image || null, // Use image as fallback
+//           image: user.image || user.profileImage || null, // Set both properties
 //           country: user.country,
 //           streetAddress: user.streetAddress,
 //           city: user.city,
@@ -134,7 +137,13 @@
 //           availability: user.availability || {},
 //           acceptingNewClients: user.acceptingNewClients || false,
 //           ageGroups: user.ageGroups || [],
-//           user: { ...user, isAuthenticated: user.isAuthenticated ?? true },
+//           user: {
+//             ...user,
+//             isAuthenticated: user.isAuthenticated ?? true,
+//             // Ensure user object also has both image properties
+//             profileImage: user.profileImage || user.image || null,
+//             image: user.image || user.profileImage || null,
+//           },
 //         }),
 
 //       setProfileComplete: complete =>
@@ -144,12 +153,24 @@
 //         })),
 
 //       updateProfile: profile =>
-//         set(state => ({
-//           ...state,
-//           ...profile,
-//           profileComplete: true,
-//           isAuthenticated: true,
-//         })),
+//         set(state => {
+//           // If profile update includes either image property, update both
+//           const updatedImage =
+//             profile.image ||
+//             profile.profileImage ||
+//             state.image ||
+//             state.profileImage;
+
+//           return {
+//             ...state,
+//             ...profile,
+//             // Keep both properties in sync
+//             profileImage: updatedImage,
+//             image: updatedImage,
+//             profileComplete: true,
+//             isAuthenticated: true,
+//           };
+//         }),
 
 //       logout: async () => {
 //         set({
@@ -162,6 +183,7 @@
 //           firstName: null,
 //           lastName: null,
 //           profileImage: null,
+//           image: null, // Clear image property too
 //           country: null,
 //           streetAddress: null,
 //           city: null,
@@ -242,7 +264,7 @@ interface UserProfile {
 
 interface User extends UserProfile {
   _id: string | null;
-  role: string | null;
+  role: string | null; // This is the role property we need
   isAuthenticated: boolean;
   isVerified: boolean;
   profileComplete: boolean;
@@ -263,11 +285,13 @@ interface UserStore extends User {
   setProfileComplete: (complete: boolean) => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
   logout: () => Promise<void>;
+  // Add a helper method to get display role
+  getDisplayRole: () => string;
 }
 
 export const useUserStore = create(
   persist<UserStore>(
-    set => ({
+    (set, get) => ({
       _id: null,
       email: null,
       role: null,
@@ -299,11 +323,18 @@ export const useUserStore = create(
       ageGroups: [],
       user: null,
 
+      // Add helper method to get formatted display role
+      getDisplayRole: () => {
+        const role = get().role;
+        if (!role) return 'User';
+        return role.charAt(0).toUpperCase() + role.slice(1);
+      },
+
       setUser: user =>
         set({
           _id: user._id,
           email: user.email,
-          role: user.role,
+          role: user.role, // Ensure role is properly set
           isAuthenticated: user.isAuthenticated ?? true,
           isVerified: user.isVerified,
           profileComplete: user.profileComplete,

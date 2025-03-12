@@ -26,6 +26,7 @@ import {
 } from '@/types/appointment';
 import { checkAvailability } from '@/helpers/checkAvailability';
 import { CalendarEvent } from '@/types/calendar';
+import { useSocket } from '@/contexts/SocketContext';
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
@@ -41,6 +42,8 @@ export default function AppointmentScheduler() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const { firstName, lastName, email } = useUserStore();
   const { notifications } = useNotifications();
+  const { socket, isConnected } = useSocket();
+  const userStore = useUserStore();
 
   const [newAvailabilityData, setNewAvailabilityData] = useState<{
     psychologistId: string;
@@ -187,18 +190,28 @@ export default function AppointmentScheduler() {
 
       // Use events directly from the Result
       if (data.Result?.events) {
-        const formattedEvents = data.Result.events.map(event => ({
-          id: event.id,
-          title: event.title,
-          start: new Date(event.start),
-          end: new Date(event.end),
-          display: event.display,
-          backgroundColor: event.backgroundColor,
-          borderColor: event.borderColor,
-          textColor: event.textColor,
-          className: event.className,
-          extendedProps: event.extendedProps,
-        }));
+        const now = new Date();
+        const formattedEvents = data.Result.events.map(event => {
+          const eventStart = new Date(event.start);
+          const isPast = eventStart < now;
+
+          return {
+            id: event.id,
+            title: event.title,
+            start: eventStart,
+            end: new Date(event.end),
+            display: event.display,
+            backgroundColor: isPast ? '#e5e7eb' : event.backgroundColor,
+            borderColor: isPast ? '#9ca3af' : event.borderColor,
+            textColor: isPast ? '#6b7280' : event.textColor,
+            className: event.className + (isPast ? ' past-slot' : ''),
+            extendedProps: {
+              ...event.extendedProps,
+              isPast,
+            },
+          };
+        });
+
         console.log('Formatted events:', formattedEvents); // Debug log
         setAvailableSlots(formattedEvents);
       }
@@ -336,6 +349,46 @@ export default function AppointmentScheduler() {
 
         const paymentData = await paymentResponse.json();
 
+        // Emit socket event for real-time notifications
+        // Use the socket that was initialized at the component level
+        if (socket && isConnected) {
+          console.log('Emitting appointment_booked event');
+
+          // Get user ID from userStore that's already initialized
+          const userId = firstName ? useUserStore.getState().user?._id : null;
+
+          if (userId) {
+            // Emit the appointment booking event
+            socket.emit('appointment_booked', {
+              appointmentId: appointmentId.toString(),
+              psychologistId: selectedSlot.psychologistId,
+              userId: userId,
+              appointmentDetails: {
+                dateTime: new Date(selectedSlot.start).toISOString(),
+                endTime: new Date(selectedSlot.end).toISOString(),
+                sessionFormat: bookingDetails.sessionFormat,
+                patientName: bookingDetails.patientName.trim(),
+                email: bookingDetails.email.trim(),
+                phone: bookingDetails.phone.replace(/\D/g, ''),
+                reasonForVisit: bookingDetails.reasonForVisit.trim(),
+                notes: bookingDetails.notes?.trim() || '',
+                insuranceProvider:
+                  bookingDetails.insuranceProvider?.trim() || '',
+                sessionFee: selectedSlot.sessionFee,
+                psychologistName: selectedSlot.psychologistName || '',
+              },
+            });
+
+            console.log('Appointment booking event emitted successfully');
+          } else {
+            console.warn('User ID not available, cannot send notification');
+          }
+        } else {
+          console.warn(
+            'Socket not connected, cannot send real-time notification'
+          );
+        }
+
         if (paymentData.IsSuccess) {
           toast.success('Appointment booked successfully');
           handleCloseDialog();
@@ -426,7 +479,6 @@ export default function AppointmentScheduler() {
         </p>
       </div>
 
-      {/* Display notification badge for new availability */}
       <AvailabilityNotificationBadge />
 
       <CalendarView

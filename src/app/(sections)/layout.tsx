@@ -79,7 +79,8 @@ const RootLayout = ({ children }) => {
           item =>
             !item.href.includes('dashboard') &&
             !item.href.includes('appointments') &&
-            !item.href.includes('inbox')
+            !item.href.includes('inbox') &&
+            !item.href.includes('sessions')
         );
 
   const isAccountPage =

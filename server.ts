@@ -6,7 +6,6 @@ import connectDB from './src/db/db';
 import Message from './src/models/Message';
 import Conversation from './src/models/Conversation';
 import CallHistory from './src/models/CallHistory';
-import { getStatusChangeMessage } from './src/helpers/getStatusChangeMessage';
 import mongoose from 'mongoose';
 import Notification from './src/models/Notification';
 import User from './src/models/User';
@@ -329,6 +328,8 @@ app
               conversationId,
               connectionState: 'new',
               mediaTracksAdded: false,
+              participantStatus: {},
+              lastActivity: Date.now(),
             });
 
             // Forward the offer immediately
@@ -560,6 +561,118 @@ app
 
             // Forward to other party
             io.to(recipientSocketId).emit('webrtc_signal', data);
+          } else if (type === 'participant-left') {
+            log.info(`Participant ${from} temporarily left call ${callId}`);
+
+            // Do NOT delete the call from activeCalls map - keep it active
+            // But update its status to indicate the participant left
+            const callData = activeCalls.get(callId);
+            if (callData) {
+              callData.participantStatus = {
+                ...(callData.participantStatus || {}),
+                [from]: 'left_temporarily',
+              };
+
+              // Keep the call active but mark it as waiting
+              callData.status = 'waiting';
+              callData.lastActivity = Date.now();
+              activeCalls.set(callId, callData);
+
+              // Set a timeout to clean up the call if it stays inactive too long
+              setTimeout(() => {
+                // If the call still exists and the participant hasn't rejoined
+                const currentCallData = activeCalls.get(callId);
+                if (
+                  currentCallData &&
+                  currentCallData.participantStatus &&
+                  currentCallData.participantStatus[from] === 'left_temporarily'
+                ) {
+                  log.info(
+                    `Call ${callId} cleanup - participant ${from} never rejoined`
+                  );
+
+                  // Only fully clean up if both participants left or if the waiting time exceeded
+                  const allParticipantsLeft = Object.values(
+                    currentCallData.participantStatus
+                  ).every(status => status === 'left_temporarily');
+
+                  const waitingTimeExceeded =
+                    Date.now() - (currentCallData.lastActivity || Date.now()) >
+                    3600000; // 1 hour
+
+                  if (allParticipantsLeft || waitingTimeExceeded) {
+                    // Clean up call resources
+                    activeCalls.delete(callId);
+                    pendingIceCandidates.delete(callId);
+                    callSetupStatus.delete(callId);
+
+                    // Notify any connected participants that the call expired
+                    Object.keys(currentCallData.participantStatus).forEach(
+                      participantId => {
+                        const participantSocketId =
+                          getSocketIdForUser(participantId);
+                        if (participantSocketId) {
+                          io.to(participantSocketId).emit('webrtc_signal', {
+                            type: 'call-expired',
+                            to: participantId,
+                            callId,
+                          });
+                        }
+                      }
+                    );
+                  }
+                }
+              }, 3600000); // 1 hour timeout
+            }
+
+            // Forward the temporary leave signal to the other participant
+            const recipientSocketId = getSocketIdForUser(to);
+            if (recipientSocketId) {
+              io.to(recipientSocketId).emit('webrtc_signal', data);
+            }
+          } else if (type === 'rejoin-call') {
+            log.info(`User ${from} is rejoining call ${callId}`);
+
+            // Update participant status if the call exists
+            const callData = activeCalls.get(callId);
+            if (callData) {
+              // Update participant status
+              callData.participantStatus = {
+                ...(callData.participantStatus || {}),
+                [from]: 'active', // Mark this participant as active
+              };
+
+              // Track last activity for timeouts
+              callData.lastActivity = Date.now();
+
+              // Update other call properties as needed
+              if (callData.status === 'waiting') {
+                callData.status = 'connecting';
+              }
+
+              activeCalls.set(callId, callData);
+            } else {
+              // If call data doesn't exist anymore, let the client know
+              log.warn(
+                `User ${from} tried to rejoin non-existent call ${callId}`
+              );
+              const callerSocketId = getSocketIdForUser(from);
+              if (callerSocketId) {
+                io.to(callerSocketId).emit('webrtc_signal', {
+                  type: 'call-expired',
+                  to: from,
+                  from: to,
+                  callId: callId,
+                });
+              }
+              return;
+            }
+
+            // Forward the rejoin signal to recipient
+            const recipientSocketId = getSocketIdForUser(to);
+            if (recipientSocketId) {
+              io.to(recipientSocketId).emit('webrtc_signal', data);
+            }
           } else {
             // For any other signal types, just forward
             io.to(recipientSocketId).emit('webrtc_signal', data);
@@ -1031,8 +1144,12 @@ app
                 $and: [
                   { startTime: { $lt: new Date() } }, // Past appointments
                   // Limit to last 3 months for relevance
-                  { startTime: { $gt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } }
-                ]
+                  {
+                    startTime: {
+                      $gt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+                    },
+                  },
+                ],
               })
               .toArray();
 
@@ -1109,7 +1226,22 @@ app
         }
       });
 
-      async function createNotification(data) {
+      interface NotificationDocument extends mongoose.Document {
+        _id: mongoose.Types.ObjectId;
+        recipient: string;
+        sender: string | null;
+        type: string;
+        title: string;
+        content: string;
+        isRead: boolean;
+        relatedId: string | null;
+        relatedModel: string | null;
+        meta: Record<string, any>;
+      }
+
+      async function createNotification(
+        data
+      ): Promise<NotificationDocument | null> {
         try {
           const {
             recipientId,
@@ -1156,74 +1288,253 @@ app
           }
 
           log.info(`New appointment booked: ${appointmentId}`);
+          console.log('⚡ appointment_booked event received:', data);
 
-          // Create notification for psychologist in database
-          const psychNotification = await createNotification({
-            recipientId: psychologistId,
-            senderId: userId,
-            type: 'appointment',
-            title: 'New Appointment Booked',
-            content: 'You have a new appointment booked',
-            relatedId: appointmentId,
-            relatedModel: 'Appointment',
-            meta: {
-              appointmentDetails,
-              type: 'new_booking',
-            },
-          });
-
-          // Create notification for patient in database
-          const userNotification = await createNotification({
-            recipientId: userId,
-            senderId: psychologistId,
-            type: 'appointment',
-            title: 'Appointment Confirmed',
-            content: 'Your appointment has been confirmed',
-            relatedId: appointmentId,
-            relatedModel: 'Appointment',
-            meta: {
-              appointmentDetails,
-              type: 'booking_confirmed',
-            },
-          });
-
-          // Notify the psychologist via socket
-          const psychologistSocketId = getSocketIdForUser(psychologistId);
-          if (psychologistSocketId) {
-            io.to(psychologistSocketId).emit('appointment_notification', {
-              type: 'new_booking',
-              appointmentId,
-              userId,
-              details: appointmentDetails,
-              message: 'New appointment booked',
-              timestamp: new Date().toISOString(),
-              notificationId: psychNotification?._id,
-            });
+          // Fetch additional psychologist details to include in the notification
+          let psychologist: any = null;
+          try {
+            psychologist = await User.findById(psychologistId).select(
+              '_id firstName lastName email profilePhotoUrl specializations sessionFee'
+            );
+            console.log('⚡ Found psychologist:', psychologist ? 'yes' : 'no');
+          } catch (err) {
+            console.error('⚡ Error fetching psychologist details:', err);
           }
 
-          // Notify the user via socket
+          // Create a rich notification object with all needed details
+          // Use fallback values if psychologist is not found
+          const notificationData = {
+            appointmentId,
+            appointmentDetails,
+            psychologistInfo: {
+              id: psychologist ? psychologist._id : psychologistId,
+              name: psychologist
+                ? `${psychologist.firstName} ${psychologist.lastName}`
+                : appointmentDetails.psychologistName || 'Your Provider',
+              profilePhoto:
+                psychologist && psychologist.profilePhotoUrl
+                  ? psychologist.profilePhotoUrl
+                  : '',
+              specializations: psychologist
+                ? psychologist.specializations || []
+                : [],
+              sessionFee: psychologist
+                ? psychologist.sessionFee
+                : appointmentDetails.sessionFee,
+            },
+            dateTime: appointmentDetails.dateTime,
+            endTime: appointmentDetails.endTime,
+            sessionFormat: appointmentDetails.sessionFormat,
+            timestamp: new Date().toISOString(),
+          };
+
+          console.log('⚡ Creating notification for psychologist and user');
+
+          // FIXED: Create notification for psychologist in database
+          let psychNotification: NotificationDocument | null = null;
+          try {
+            psychNotification = await createNotification({
+              recipientId: psychologistId,
+              senderId: userId,
+              type: 'appointment',
+              title: 'New Appointment Booked',
+              content: 'You have a new appointment booked',
+              relatedId: appointmentId,
+              relatedModel: 'Appointment',
+              meta: {
+                ...notificationData,
+                type: 'new_booking', // This is important for client-side role filtering
+              },
+            });
+
+            console.log(
+              '⚡ Created psychologist notification:',
+              psychNotification
+                ? (psychNotification as any)._id
+                : 'No ID available'
+            );
+          } catch (err) {
+            console.error('⚡ Error creating psychologist notification:', err);
+          }
+
+          // FIXED: Create notification for patient in database
+          let userNotification: NotificationDocument | null = null;
+          try {
+            userNotification = await createNotification({
+              recipientId: userId,
+              senderId: psychologistId,
+              type: 'appointment',
+              title: 'Appointment Confirmed',
+              content: 'Your appointment has been confirmed',
+              relatedId: appointmentId,
+              relatedModel: 'Appointment',
+              meta: {
+                ...notificationData,
+                type: 'booking_confirmed', // This is important for client-side role filtering
+              },
+            });
+
+            console.log(
+              '⚡ Created user notification:',
+              userNotification ? userNotification._id : 'No ID available'
+            );
+          } catch (err) {
+            console.error('⚡ Error creating user notification:', err);
+          }
+
+          // Notify the psychologist via socket with rich data
+          const psychologistSocketId = getSocketIdForUser(psychologistId);
+          if (psychologistSocketId) {
+            console.log(
+              '⚡ Emitting notification to psychologist socket:',
+              psychologistSocketId
+            );
+
+            try {
+              io.to(psychologistSocketId).emit('appointment_notification', {
+                type: 'new_booking', // Match the meta.type in the database notification
+                appointmentId,
+                userId,
+                details: notificationData,
+                message: 'New appointment booked',
+                timestamp: new Date().toISOString(),
+                notificationId: psychNotification
+                  ? psychNotification._id
+                  : null,
+              });
+
+              // Also emit the general notification event
+              if (psychNotification) {
+                let unreadCount = 0;
+                try {
+                  unreadCount = await Notification.countDocuments({
+                    recipient: psychologistId,
+                    isRead: false,
+                  });
+                } catch (err) {
+                  console.error('⚡ Error counting notifications:', err);
+                }
+
+                io.to(psychologistSocketId).emit('new_notification', {
+                  notification: psychNotification,
+                  unreadCount: unreadCount,
+                });
+              }
+            } catch (err) {
+              console.error(
+                '⚡ Error emitting notification to psychologist:',
+                err
+              );
+            }
+          } else {
+            console.log('⚡ No socket found for psychologist:', psychologistId);
+          }
+
+          // Notify the user via socket with rich data
           const userSocketId = getSocketIdForUser(userId);
           if (userSocketId) {
-            io.to(userSocketId).emit('appointment_notification', {
-              type: 'booking_confirmed',
-              appointmentId,
-              psychologistId,
-              details: appointmentDetails,
-              message: 'Your appointment has been confirmed',
-              timestamp: new Date().toISOString(),
-              notificationId: userNotification?._id,
-            });
+            console.log(
+              '⚡ Emitting notification to user socket:',
+              userSocketId
+            );
+
+            try {
+              io.to(userSocketId).emit('appointment_notification', {
+                type: 'booking_confirmed', // Match the meta.type in the database notification
+                appointmentId,
+                psychologistId,
+                details: notificationData,
+                message: 'Your appointment has been confirmed',
+                timestamp: new Date().toISOString(),
+                notificationId: userNotification ? userNotification._id : null,
+              });
+
+              // Also emit the general notification event
+              if (userNotification) {
+                let unreadCount = 0;
+                try {
+                  unreadCount = await Notification.countDocuments({
+                    recipient: userId,
+                    isRead: false,
+                  });
+                } catch (err) {
+                  console.error('⚡ Error counting notifications:', err);
+                }
+
+                io.to(userSocketId).emit('new_notification', {
+                  notification: userNotification,
+                  unreadCount: unreadCount,
+                });
+              }
+            } catch (err) {
+              console.error('⚡ Error emitting notification to user:', err);
+            }
+          } else {
+            console.log('⚡ No socket found for user:', userId);
           }
 
           // Broadcast calendar update to all relevant parties
-          io.emit('calendar_update', {
-            type: 'new_appointment',
-            appointmentId,
-            psychologistId,
-            timestamp: new Date().toISOString(),
-          });
+          try {
+            io.emit('calendar_update', {
+              type: 'new_appointment',
+              appointmentId,
+              psychologistId,
+              timestamp: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error('⚡ Error broadcasting calendar update:', err);
+          }
+
+          console.log(
+            '⚡ appointment_booked event processing completed successfully'
+          );
         } catch (error) {
           log.error('Error in appointment_booked handler:', error);
+          console.error('⚡ Error in appointment_booked handler:', error);
+        }
+      });
+
+      socket.on('update_availability', async data => {
+        const selfNotification = new Notification({
+          recipient: data.psychologistId,
+          sender: data.psychologistId, // Self-notification
+          type: 'system',
+          title: 'Availability Updated',
+          content: 'You have successfully updated your availability schedule',
+          isRead: false,
+          relatedId: null,
+          relatedModel: null,
+          meta: {
+            type: 'availability_self_change',
+            timestamp: new Date().toISOString(),
+            slots: data?.slots,
+            dayRange: data?.dayRange,
+          },
+        });
+
+        await selfNotification.save();
+        log.info(
+          `Created self-notification for psychologist ${data.psychologistId}`
+        );
+
+        // Send socket notification to the psychologist
+        const psychologistSocketId = getSocketIdForUser(data.psychologistId);
+        if (psychologistSocketId) {
+          io.to(psychologistSocketId).emit('appointment_notification', {
+            type: 'availability_self_change',
+            message: 'You have successfully updated your availability schedule',
+            timestamp: new Date().toISOString(),
+            notificationId: selfNotification._id,
+          });
+
+          // Also emit a more general notification event
+          io.to(psychologistSocketId).emit('new_notification', {
+            notification: selfNotification.toObject(),
+            unreadCount: await Notification.countDocuments({
+              recipient: data.psychologistId,
+              isRead: false,
+            }),
+          });
         }
       });
 

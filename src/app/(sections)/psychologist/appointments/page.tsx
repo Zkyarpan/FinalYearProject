@@ -25,6 +25,7 @@ import { AppointmentCard } from '@/components/AppointmentCard';
 import AppointmentDialog from '@/components/AppointmentDialog';
 import CalendarStyles from '@/components/CalenderStyles';
 import { getAppointmentCountByPeriod } from '@/utils/getAppointmentCountByPeriod';
+import { AvailabilitySelfNotification } from '@/components/AvailabilitySelfNotification';
 
 const TIME_PERIODS = {
   MORNING: { start: '00:00:00', end: '11:59:59', icon: Sun, label: 'Morning' },
@@ -191,67 +192,63 @@ const PsychologistAppointments = () => {
     const isBooked = event.extendedProps.type === 'appointment';
     const isNewOrChanged = event.extendedProps.isNewOrChanged;
 
-    // Calculate duration for display
-    const durationMs = event.end.getTime() - event.start.getTime();
-    const durationMinutes = Math.round(durationMs / (1000 * 60));
-
-    let durationText;
-    if (durationMinutes === 30) {
-      durationText = '30 min';
-    } else if (durationMinutes === 45) {
-      durationText = '45 min';
-    } else if (durationMinutes === 60) {
-      durationText = '1 hr';
-    } else if (durationMinutes === 90) {
-      durationText = '1.5 hrs';
-    } else if (durationMinutes === 120) {
-      durationText = '2 hrs';
-    } else {
-      durationText = `${durationMinutes} min`;
-    }
+    // Check if appointment is in the past
+    const isPast = new Date(event.start) < new Date();
 
     return (
       <div
         className={`
-              p-3 rounded-lg shadow-sm 
-              ${
-                isBooked
-                  ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
-                  : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
-              } 
-              transition-all hover:shadow-md
-            `}
+            p-3 rounded-lg shadow-sm 
+            ${
+              isPast
+                ? 'bg-gray-100 dark:bg-gray-800/20 border-l-2 border-gray-400 opacity-70'
+                : isBooked
+                ? 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500'
+                : 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-500'
+            } 
+            transition-all hover:shadow-md
+          `}
       >
         <div className="flex items-center gap-2">
           <div className="relative">
             <div
               className={`
-                    w-3 h-3 rounded-full shrink-0
-                    ${isBooked ? 'bg-red-500' : 'bg-green-500'}
-                  `}
+                  w-3 h-3 rounded-full shrink-0
+                  ${
+                    isPast
+                      ? 'bg-gray-500'
+                      : isBooked
+                      ? 'bg-red-500'
+                      : 'bg-green-500'
+                  }
+                `}
             />
-            {!isBooked && (
+            {!isBooked && !isPast && (
               <span className="absolute inset-0 rounded-full bg-green-400 opacity-75 animate-ping"></span>
             )}
           </div>
           <span
             className={`
-                  text-sm font-medium
-                  ${
-                    isBooked
-                      ? 'text-red-700 dark:text-red-300'
-                      : 'text-green-700 dark:text-green-300'
-                  }
-                `}
+                text-sm font-medium
+                ${
+                  isPast
+                    ? 'text-gray-600 dark:text-gray-400'
+                    : isBooked
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-green-700 dark:text-green-300'
+                }
+              `}
           >
-            {isBooked ? 'Booked' : 'Available'}
+            {isPast ? 'Past' : isBooked ? 'Booked' : 'Available'}
           </span>
         </div>
 
         <div className="flex items-center text-sm mt-0.5">
           <span
             className={cn(
-              isBooked
+              isPast
+                ? 'text-gray-600 dark:text-gray-400'
+                : isBooked
                 ? 'text-yellow-800 dark:text-yellow-200'
                 : 'text-emerald-800 dark:text-emerald-200'
             )}
@@ -263,10 +260,51 @@ const PsychologistAppointments = () => {
     );
   }, []);
 
+  // Add this before the return statement in your component
+  const availabilityCountsByPeriod = React.useMemo(() => {
+    const counts = {
+      MORNING: 0,
+      AFTERNOON: 0,
+      EVENING: 0,
+      NIGHT: 0,
+    };
+
+    calendarEvents.forEach(event => {
+      // Only count available slots, not booked appointments
+      if (
+        event.extendedProps?.type === 'appointment' ||
+        event.extendedProps?.isBooked
+      ) {
+        return;
+      }
+
+      try {
+        const eventStart = new Date(event.start);
+        const hours = eventStart.getHours();
+
+        // Categorize based on hour
+        if (hours >= 0 && hours < 12) {
+          counts.MORNING++;
+        } else if (hours >= 12 && hours < 17) {
+          counts.AFTERNOON++;
+        } else if (hours >= 17 && hours < 21) {
+          counts.EVENING++;
+        } else {
+          counts.NIGHT++;
+        }
+      } catch (error) {
+        // Skip invalid dates
+      }
+    });
+
+    return counts;
+  }, [calendarEvents]);
+
   return (
     <div className="min-h-screen bg-background mt-5">
       <Card>
         {CalendarStyles()}
+        <AvailabilitySelfNotification />
         <CardContent className="p-4">
           <Tabs value={view} onValueChange={setView}>
             <div className="flex items-center justify-between mb-4">
@@ -307,31 +345,70 @@ const PsychologistAppointments = () => {
                     <TabsList className="w-full grid grid-cols-4 p-1 h-12 dark:bg-input">
                       {Object.entries(TIME_PERIODS).map(
                         ([key, { label, icon: Icon }]) => {
-                          const appointmentCount = getAppointmentCountByPeriod(
-                            calendarEvents,
-                            key
-                          );
+                          // Calculate available slots count for this time period
+                          const availableSlotCount = calendarEvents.filter(
+                            event => {
+                              // Skip booked slots
+                              if (
+                                event.extendedProps?.type === 'appointment' ||
+                                event.extendedProps?.isBooked
+                              ) {
+                                return false;
+                              }
+
+                              // Check if the event start time falls within this time period
+                              try {
+                                const eventStart = new Date(event.start);
+                                const hours = eventStart.getHours();
+                                const minutes = eventStart.getMinutes();
+                                const timeString = `${hours
+                                  .toString()
+                                  .padStart(2, '0')}:${minutes
+                                  .toString()
+                                  .padStart(2, '0')}:00`;
+
+                                return (
+                                  timeString >= TIME_PERIODS[key].start &&
+                                  timeString <= TIME_PERIODS[key].end
+                                );
+                              } catch (error) {
+                                return false;
+                              }
+                            }
+                          ).length;
+
                           return (
                             <TabsTrigger
                               key={key}
                               value={key}
                               className={cn(
-                                'flex items-center justify-center gap-2 h-full',
+                                'flex items-center justify-center gap-2 h-full relative',
                                 'rounded-md transition-all duration-200'
                               )}
                             >
                               <div className="flex items-center gap-2">
                                 <Icon className="h-4 w-4" />
                                 <span>{label}</span>
+
+                                {/* Add badge showing available slot count */}
+                                {availableSlotCount > 0 && (
+                                  <Badge
+                                    variant={
+                                      selectedPeriod === key
+                                        ? 'default'
+                                        : 'outline'
+                                    }
+                                    className={cn(
+                                      'ml-1 h-5 px-1.5 rounded-full',
+                                      selectedPeriod === key
+                                        ? 'bg-white text-primary'
+                                        : 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+                                    )}
+                                  >
+                                    {availableSlotCount}
+                                  </Badge>
+                                )}
                               </div>
-                              {appointmentCount > 0 && (
-                                <Badge
-                                  variant="default"
-                                  className="bg-blue-500 hover:bg-blue-500/90 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-medium"
-                                >
-                                  {appointmentCount}
-                                </Badge>
-                              )}
                             </TabsTrigger>
                           );
                         }

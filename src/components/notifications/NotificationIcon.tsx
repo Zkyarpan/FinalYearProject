@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/userStore';
-import { Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 // Define a global event name for notification count updates
 const NOTIFICATION_COUNT_EVENT = 'notification-count-changed';
@@ -32,48 +32,71 @@ const NotificationIcon = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [animate, setAnimate] = useState(false);
 
+  // Get notifications directly from context if available
+  let notificationsContext;
+  try {
+    notificationsContext = useNotifications();
+  } catch (e) {
+    // Context not available, will fallback to other methods
+  }
+
   // Safely access user data
   const user = userStore?.user;
 
   // Centralized function to update the unread count
-  const updateUnreadCount = useCallback(count => {
-    setUnreadCount(count);
-    // Trigger animation when count increases
-    setAnimate(true);
-    setTimeout(() => setAnimate(false), 1000);
-  }, []);
-
-  // Load unread count from notification context or localStorage on mount
-  useEffect(() => {
-    const loadInitialCount = async () => {
-      if (!user?._id) return;
-
-      try {
-        // First try to dynamically import the context
-        const { useNotifications } = await import(
-          '@/contexts/NotificationContext'
-        );
-        const notificationContext = useNotifications();
-
-        if (notificationContext?.unreadCount !== undefined) {
-          updateUnreadCount(notificationContext.unreadCount);
-          return;
+  const updateUnreadCount = useCallback(
+    count => {
+      if (count !== unreadCount) {
+        setUnreadCount(count);
+        // Trigger animation when count increases
+        if (count > unreadCount) {
+          setAnimate(true);
+          setTimeout(() => setAnimate(false), 1000);
         }
-      } catch (e) {
-        console.log('NotificationContext not available, using localStorage');
       }
+    },
+    [unreadCount]
+  );
 
-      // Fall back to localStorage if context fails
-      const storedCount = localStorage.getItem(
-        `notification_count_${user._id}`
-      );
-      if (storedCount) {
-        updateUnreadCount(parseInt(storedCount, 10) || 0);
-      }
-    };
+  // IMPORTANT: Use this effect to immediately sync with NotificationContext
+  useEffect(() => {
+    if (
+      notificationsContext &&
+      typeof notificationsContext.unreadCount === 'number'
+    ) {
+      updateUnreadCount(notificationsContext.unreadCount);
+    }
+  }, [notificationsContext?.unreadCount, updateUnreadCount]);
 
-    loadInitialCount();
-  }, [user?._id, updateUnreadCount]);
+  // Load unread count from localStorage on mount if not available from context
+  useEffect(() => {
+    if (!user?._id) return;
+
+    // If we already have count from context, don't override
+    if (
+      notificationsContext &&
+      typeof notificationsContext.unreadCount === 'number'
+    ) {
+      return;
+    }
+
+    // Try localStorage as fallback
+    const storedCount = localStorage.getItem(`notification_count_${user._id}`);
+    if (storedCount) {
+      const count = parseInt(storedCount, 10) || 0;
+      updateUnreadCount(count);
+    }
+
+    // Also make a direct API call to get the most recent count
+    fetch('/api/notifications/count')
+      .then(res => res.json())
+      .then(data => {
+        if (data.IsSuccess && typeof data.Result.unreadCount === 'number') {
+          updateUnreadCount(data.Result.unreadCount);
+        }
+      })
+      .catch(err => console.error('Failed to fetch notification count:', err));
+  }, [user?._id, updateUnreadCount, notificationsContext]);
 
   // Listen for global notification count updates
   useEffect(() => {
@@ -96,32 +119,59 @@ const NotificationIcon = () => {
       }
     );
 
+    // Also listen for general notifications updates
+    window.addEventListener('notifications-updated', () => {
+      // If context is available, sync with it
+      if (
+        notificationsContext &&
+        typeof notificationsContext.unreadCount === 'number'
+      ) {
+        updateUnreadCount(notificationsContext.unreadCount);
+      }
+    });
+
     return () => {
       window.removeEventListener(NOTIFICATION_COUNT_EVENT, handleCountUpdate);
       window.removeEventListener(
         'notification-count-updated',
         handleCountUpdate
       );
+      window.removeEventListener('notifications-updated', handleCountUpdate);
     };
-  }, [updateUnreadCount]);
+  }, [updateUnreadCount, notificationsContext]);
 
-  // Listen for socket events if available
+  // Socket events handler - simplified for clarity
   useEffect(() => {
+    let socket;
     try {
       const { useSocket } = require('@/contexts/SocketContext');
       const socketContext = useSocket();
-      const socket = socketContext?.socket;
+      socket = socketContext?.socket;
 
       if (socket && socketContext?.isConnected) {
-        const handleNewNotification = () => {
-          setUnreadCount(prev => prev + 1);
-          setAnimate(true);
-          setTimeout(() => setAnimate(false), 1000);
+        // Immediate request for notification count when socket connects
+        socket.emit(
+          'get_notification_count',
+          { userId: user?._id },
+          response => {
+            if (response?.success && typeof response.unreadCount === 'number') {
+              updateUnreadCount(response.unreadCount);
+            }
+          }
+        );
+
+        // Listen for updates
+        const handleNewNotification = data => {
+          if (data?.notification && !data.notification.isRead) {
+            setUnreadCount(prev => prev + 1);
+            setAnimate(true);
+            setTimeout(() => setAnimate(false), 1000);
+          }
         };
 
         socket.on('new_notification', handleNewNotification);
         socket.on('notification_count_update', data => {
-          if (data && data.unreadCount !== undefined) {
+          if (data && typeof data.unreadCount === 'number') {
             updateUnreadCount(data.unreadCount);
           }
         });
@@ -132,9 +182,9 @@ const NotificationIcon = () => {
         };
       }
     } catch (error) {
-      // Socket not available, already handled by other listeners
+      // Socket not available
     }
-  }, [updateUnreadCount]);
+  }, [user?._id, updateUnreadCount]);
 
   const handleNotificationClick = useCallback(
     e => {
@@ -144,14 +194,18 @@ const NotificationIcon = () => {
     [router]
   );
 
+  // For debugging - add this console.log
+  useEffect(() => {
+    console.log('Current unread count:', unreadCount);
+  }, [unreadCount]);
+
   return (
     <div
-      className="relative"
+      className="relative cursor-pointer"
       onClick={handleNotificationClick}
       aria-label="View notifications"
     >
       <button
-        onClick={handleNotificationClick}
         type="button"
         className="justify-center shrink-0 flex items-center font-semibold
           transition-all duration-200 ease-in-out select-none
@@ -197,8 +251,8 @@ const NotificationIcon = () => {
         <Badge
           variant="secondary"
           className={`absolute -top-2 -right-2 h-6 w-6 flex items-center justify-center p-0 
-          text-xs font-bold rounded-full border-2  dark:border-[#333333] 
-          bg-red-500  text-white ${animate ? 'animate-pulse' : ''}`}
+          text-xs font-bold rounded-full border-2 dark:border-[#333333] 
+          bg-red-500 text-white ${animate ? 'animate-pulse' : ''}`}
         >
           {unreadCount > 9 ? '9+' : unreadCount}
         </Badge>

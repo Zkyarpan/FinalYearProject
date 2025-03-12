@@ -4,92 +4,226 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose, { Types } from 'mongoose';
 import connectDB from '@/db/db';
 import { withAuth } from '@/middleware/authMiddleware';
-import { stripe } from '@/lib/stripe';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
-import Appointment from '@/models/Appointment';
 
-export async function DELETE(req: NextRequest, { params }) {
+// GET appointment details by ID
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   return withAuth(async (req: NextRequest, token: any) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
       await connectDB();
-      const appointmentId = await params.id;
+      const { id } = params;
 
-      const body = await req.json();
-      const { cancellationNotes } = body;
-
-      if (!cancellationNotes) {
+      if (!id || !Types.ObjectId.isValid(id)) {
         return NextResponse.json(
-          createErrorResponse(400, 'Cancellation notes are required')
+          createErrorResponse(400, 'Invalid appointment ID')
         );
       }
 
-      const appointment = await Appointment.findOne({
-        _id: appointmentId,
-      }).session(session);
+      // Find the appointment with user and psychologist details
+      const appointment = await mongoose.connection
+        .collection('appointments')
+        .aggregate([
+          { $match: { _id: new Types.ObjectId(id) } },
+          // Lookup user details
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'userId',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          // Lookup psychologist details
+          {
+            $lookup: {
+              from: 'psychologists',
+              localField: 'psychologistId',
+              foreignField: '_id',
+              as: 'psychologist',
+            },
+          },
+          {
+            $unwind: {
+              path: '$psychologist',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          // Project necessary fields
+          {
+            $project: {
+              _id: 1,
+              startTime: 1,
+              endTime: 1,
+              dateTime: 1,
+              duration: 1,
+              sessionFormat: 1,
+              status: 1,
+              reasonForVisit: 1,
+              notes: 1,
+              userId: 1,
+              psychologistId: 1,
+              'user._id': 1,
+              'user.firstName': 1,
+              'user.lastName': 1,
+              'user.email': 1,
+              'user.profilePhotoUrl': 1,
+              'psychologist._id': 1,
+              'psychologist.firstName': 1,
+              'psychologist.lastName': 1,
+              'psychologist.email': 1,
+              'psychologist.profilePhotoUrl': 1,
+              'psychologist.specialty': 1,
+              'psychologist.licenseType': 1,
+            },
+          },
+        ])
+        .toArray();
 
-      if (!appointment) {
-        await session.abortTransaction();
+      if (!appointment || appointment.length === 0) {
         return NextResponse.json(
           createErrorResponse(404, 'Appointment not found')
         );
       }
 
-      if (appointment.userId.toString() !== token.id) {
-        await session.abortTransaction();
-        return NextResponse.json(
-          createErrorResponse(403, 'Not authorized to cancel this appointment')
-        );
-      }
+      const appointmentData = appointment[0];
 
-      if (new Date(appointment.startTime) < new Date()) {
-        await session.abortTransaction();
-        return NextResponse.json(
-          createErrorResponse(400, 'Cannot cancel past appointments')
-        );
-      }
-
-      const updatedAppointment = await Appointment.findByIdAndUpdate(
-        appointmentId,
-        {
-          status: 'canceled',
-          isCanceled: true,
-          cancelationReason:
-            cancellationNotes || 'Appointment cancelled by user',
-          canceledAt: new Date(),
-          canceledBy: new Types.ObjectId(token.id),
-        },
-        {
-          session,
-          new: true,
-        }
+      // Calculate if the appointment can be joined
+      const now = new Date();
+      const appointmentTime = new Date(
+        appointmentData.startTime || appointmentData.dateTime
       );
 
-      if (!updatedAppointment) {
-        await session.abortTransaction();
-        return NextResponse.json(
-          createErrorResponse(500, 'Failed to cancel appointment')
-        );
-      }
+      // Create time window: 5 minutes before to 15 minutes after
+      const joinWindowStart = new Date(appointmentTime);
+      joinWindowStart.setMinutes(joinWindowStart.getMinutes() - 5);
 
-      await session.commitTransaction();
+      const joinWindowEnd = new Date(appointmentTime);
+      joinWindowEnd.setMinutes(
+        joinWindowEnd.getMinutes() + appointmentData.duration + 15
+      ); // Add duration + 15min buffer
+
+      const canJoin =
+        (appointmentData.status === 'confirmed' ||
+          appointmentData.status === 'ongoing') &&
+        now >= joinWindowStart &&
+        now <= joinWindowEnd;
 
       return NextResponse.json(
         createSuccessResponse(200, {
-          message: 'Appointment cancelled successfully',
-          appointment: updatedAppointment,
+          appointment: appointmentData,
+          canJoin,
         })
       );
     } catch (error: any) {
-      await session.abortTransaction();
-      console.error('Error cancelling appointment:', error);
+      console.error('Error fetching appointment details:', error);
       return NextResponse.json(
-        createErrorResponse(500, error.message || 'Internal Server Error')
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
       );
-    } finally {
-      session.endSession();
+    }
+  }, req);
+}
+
+// Update appointment complete status
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(async (req: NextRequest, token: any) => {
+    try {
+      await connectDB();
+      const { id } = params;
+      const { notes } = await req.json();
+
+      if (!id || !Types.ObjectId.isValid(id)) {
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid appointment ID')
+        );
+      }
+
+      // Find and update the appointment
+      const result = await mongoose.connection
+        .collection('appointments')
+        .updateOne(
+          { _id: new Types.ObjectId(id) },
+          {
+            $set: {
+              status: 'completed',
+              notes: notes || '',
+              completedAt: new Date(),
+            },
+          }
+        );
+
+      if (result.matchedCount === 0) {
+        return NextResponse.json(
+          createErrorResponse(404, 'Appointment not found')
+        );
+      }
+
+      return NextResponse.json(
+        createSuccessResponse(200, {
+          message: 'Appointment completed successfully',
+        })
+      );
+    } catch (error: any) {
+      console.error('Error completing appointment:', error);
+      return NextResponse.json(
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      );
+    }
+  }, req);
+}
+
+// Update appointment notes
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(async (req: NextRequest, token: any) => {
+    try {
+      await connectDB();
+      const { id } = params;
+      const { notes } = await req.json();
+
+      if (!id || !Types.ObjectId.isValid(id)) {
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid appointment ID')
+        );
+      }
+
+      // Find and update the appointment
+      const result = await mongoose.connection
+        .collection('appointments')
+        .updateOne(
+          { _id: new Types.ObjectId(id) },
+          { $set: { notes: notes || '' } }
+        );
+
+      if (result.matchedCount === 0) {
+        return NextResponse.json(
+          createErrorResponse(404, 'Appointment not found')
+        );
+      }
+
+      return NextResponse.json(
+        createSuccessResponse(200, {
+          message: 'Notes updated successfully',
+        })
+      );
+    } catch (error: any) {
+      console.error('Error updating notes:', error);
+      return NextResponse.json(
+        createErrorResponse(500, 'Internal Server Error: ' + error.message)
+      );
     }
   }, req);
 }

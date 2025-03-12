@@ -6,7 +6,6 @@ import FooterWrapper from '@/components/FooterWrapper';
 import { Toaster } from 'sonner';
 import { ThemeProviders } from '@/providers/ThemeProviders';
 import NextTopLoader from 'nextjs-toploader';
-import AuthGuard from '@/providers/AuthGuard';
 import { StripeProvider } from '@/providers/stripe-provider';
 import { SocketProvider } from '@/contexts/SocketContext';
 import { ChatProvider } from '../contexts/ChatContext';
@@ -62,17 +61,15 @@ export default function RootLayout({
           />
           <Toaster position="bottom-right" richColors />
           <NavbarWrapper />
-          <AuthGuard>
-            <StripeProvider>
-              <SocketProvider>
-                <NotificationProvider>
-                  <VideoCallProvider>
-                    <ChatProvider>{children}</ChatProvider>
-                  </VideoCallProvider>
-                </NotificationProvider>
-              </SocketProvider>
-            </StripeProvider>
-          </AuthGuard>
+          <StripeProvider>
+            <SocketProvider>
+              <NotificationProvider>
+                <VideoCallProvider>
+                  <ChatProvider>{children}</ChatProvider>
+                </VideoCallProvider>
+              </NotificationProvider>
+            </SocketProvider>
+          </StripeProvider>
           <FooterWrapper />
         </ThemeProviders>
       </body>

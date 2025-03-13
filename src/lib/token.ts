@@ -16,6 +16,7 @@ type TokenPayload = {
   isVerified?: boolean;
   hashedPassword?: string;
   profileComplete?: boolean;
+  approvalStatus?: string;
   exp?: number;
   iat?: number;
 };

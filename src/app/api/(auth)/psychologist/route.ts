@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
       education: safeJSONParse(fields.education, []),
       specializations: safeJSONParse(fields.specializations, []),
       languages: safeJSONParse(fields.languages, []),
-      sessionDuration: 60, // Fixed at 1 hour
+      sessionDuration: 60, 
       sessionFee: parseFloat(fields.sessionFee) || 0,
       sessionFormats: safeJSONParse(fields.sessionFormats, []),
       acceptsInsurance: Boolean(fields.acceptsInsurance),

@@ -126,7 +126,7 @@ export const ADMIN_NAV_ITEMS = [
   {
     icon: <PsychologistIcon />,
     text: 'Psychologists',
-    href: '/dashboard/psychologist',
+    href: '/dashboard/admin/psychologist',
   },
   {
     icon: <ArticlesIcon />,

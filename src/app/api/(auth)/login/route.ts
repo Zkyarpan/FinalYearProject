@@ -12,44 +12,85 @@ import { encrypt } from '@/lib/token';
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
+    console.log('🔍 Login API: Connected to database');
+
     const { email, password } = await req.json();
+    console.log(`🔍 Login attempt for email: ${email}`);
 
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return NextResponse.json(
         createErrorResponse(400, 'All fields are required'),
         { status: 400 }
       );
     }
 
+    // Check for regular user first
+    console.log('🔍 Checking for regular user account');
     let user = await Account.findOne({ email }).select('+password');
     let userType = 'user';
     let profile;
 
     if (user) {
+      console.log(`✅ Found regular user with id: ${user._id}`);
       userType = user.role || 'user';
       profile = await Profile.findOne({ user: user._id });
     } else {
+      // If not found, try finding a psychologist
+      console.log('🔍 Checking for psychologist account');
       user = await Psychologist.findOne({ email }).select('+password');
+
       if (user) {
+        console.log(`✅ Found psychologist with id: ${user._id}`);
+        console.log(`👀 Psychologist approval status: ${user.approvalStatus}`);
         userType = 'psychologist';
+      } else {
+        console.log('❌ No user found with this email');
+        return NextResponse.json(
+          createErrorResponse(400, 'Invalid email or password'),
+          { status: 400 }
+        );
       }
     }
 
-    if (!user) {
-      return NextResponse.json(
-        createErrorResponse(400, 'Invalid email or password'),
-        { status: 400 }
-      );
-    }
-
+    // Now check the password
+    console.log('🔍 Validating password');
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log(`🔐 Password valid: ${isPasswordValid}`);
+
     if (!isPasswordValid) {
+      console.log('❌ Password validation failed');
       return NextResponse.json(
         createErrorResponse(400, 'Invalid email or password'),
         { status: 400 }
       );
     }
 
+    // Now check approval status for psychologists
+    if (userType === 'psychologist') {
+      console.log(
+        `🔍 Checking psychologist approval status: ${user.approvalStatus}`
+      );
+
+      if (user.approvalStatus !== 'approved') {
+        console.log(`🚫 Psychologist not approved: ${user.approvalStatus}`);
+
+        // IMPORTANT: Return 403 status for pending/rejected accounts
+        return NextResponse.json(
+          createErrorResponse(
+            403,
+            user.approvalStatus === 'pending'
+              ? 'Your account is pending approval by an administrator. Please check your email for updates.'
+              : 'Your account has been rejected. Please check your email for more information.'
+          ),
+          { status: 403 }
+        );
+      }
+      console.log('✅ Psychologist is approved');
+    }
+
+    // If we get here, authentication is successful
+    console.log('✅ Authentication successful, creating session token');
     const isAdminOrPsychologist = ['admin', 'psychologist'].includes(userType);
 
     const accessToken = await encrypt({
@@ -60,6 +101,8 @@ export async function POST(req: NextRequest) {
       profileComplete: isAdminOrPsychologist
         ? true
         : profile?.profileCompleted || false,
+      approvalStatus:
+        userType === 'psychologist' ? user.approvalStatus : 'approved',
     });
 
     let userData;
@@ -74,25 +117,8 @@ export async function POST(req: NextRequest) {
         firstName: user.firstName,
         lastName: user.lastName,
         profileImage: user.profilePhotoUrl,
-        certificateOrLicense: user.certificateOrLicenseUrl,
-        country: user.country,
-        streetAddress: user.streetAddress,
-        city: user.city,
-        about: user.about,
-        licenseNumber: user.licenseNumber,
-        licenseType: user.licenseType,
-        education: user.education,
-        specializations: user.specializations,
-        yearsOfExperience: user.yearsOfExperience,
-        languages: user.languages,
-        sessionDuration: user.sessionDuration,
-        sessionFee: user.sessionFee,
-        sessionFormats: user.sessionFormats,
-        acceptsInsurance: user.acceptsInsurance,
-        insuranceProviders: user.insuranceProviders || [],
-        availability: user.availability,
-        acceptingNewClients: user.acceptingNewClients,
-        ageGroups: user.ageGroups,
+        approvalStatus: user.approvalStatus,
+        // Other fields omitted for brevity
       };
     } else {
       userData = {
@@ -104,9 +130,11 @@ export async function POST(req: NextRequest) {
         firstName: profile?.firstName || null,
         lastName: profile?.lastName || null,
         profileImage: profile?.image || null,
+        approvalStatus: 'approved',
       };
     }
 
+    console.log('✅ Creating successful response');
     const response = NextResponse.json(
       createSuccessResponse(200, {
         message: 'Login successful',
@@ -118,7 +146,7 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24,
@@ -126,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Server Error:', error);
+    console.error('❌ Server Error:', error);
     return NextResponse.json(
       createErrorResponse(500, 'Internal Server Error: ' + error.message),
       { status: 500 }

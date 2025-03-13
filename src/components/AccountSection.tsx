@@ -40,7 +40,7 @@ export default function AccountSection({
     >
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full overflow-hidden border shadow-sm">
-          <Image
+          <img
             src={profileImage || DEFAULT_AVATAR}
             alt={`${firstName}'s profile picture`}
             width={32}

@@ -885,8 +885,8 @@ const PsychologistRegister = () => {
                   >
                     <SelectTrigger
                       className="mt-2 w-full h-9 dark:bg-input border rounded-md 
-        focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-        data-[state=open]:border-input dark:border-foreground/30"
+    focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+    data-[state=open]:border-input dark:border-foreground/30"
                     >
                       <SelectValue placeholder="Select duration" />
                     </SelectTrigger>
@@ -894,6 +894,7 @@ const PsychologistRegister = () => {
                       <SelectItem value="30">30 minutes</SelectItem>
                       <SelectItem value="50">50 minutes</SelectItem>
                       <SelectItem value="60">60 minutes</SelectItem>
+                      <SelectItem value="80">80 minutes</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

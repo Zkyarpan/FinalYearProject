@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
         ...payload,
         email: payload.email.toLowerCase(),
         isVerified: true,
+        approvalStatus: 'pending', // Ensure approval status is set to pending
+        sessionDuration: '60',
         createdAt: new Date(),
       });
     } else {
@@ -104,21 +106,28 @@ export async function POST(req: NextRequest) {
       role: newAccount.role,
       isVerified: true,
       profileComplete: false,
+      approvalStatus: isPsychologist ? 'pending' : 'approved', // Include approval status in token
     };
 
     const sessionToken = await encrypt(tokenPayload, '24h');
     const expires = await getTokenExpirationDate('24h');
 
+    // Include a clear message about approval status for psychologists
+    const message = isPsychologist
+      ? 'Account verified. Your account requires admin approval before you can log in.'
+      : 'Account verified and created successfully.';
+
     const response = NextResponse.json(
       createSuccessResponse(201, {
-        message: 'Account verified and created successfully.',
-        redirectUrl: '/dashboard',
+        message,
+        redirectUrl: isPsychologist ? '/login' : '/dashboard',
         user: {
           id: newAccount._id.toString(),
           email: newAccount.email,
           role: newAccount.role,
           isVerified: true,
           profileComplete: false,
+          approvalStatus: isPsychologist ? 'pending' : 'approved',
         },
       }),
       { status: 201 }

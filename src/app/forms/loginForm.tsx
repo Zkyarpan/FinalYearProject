@@ -1,16 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import Loader from '@/components/common/Loader';
 import { useUserStore } from '@/store/userStore';
 import Link from 'next/link';
 import SpinnerLoader from '@/components/SpinnerLoader';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -25,21 +32,45 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalMessage, setApprovalMessage] = useState('');
+  const [dialogTitle, setDialogTitle] = useState('Account Approval Required');
+  const [dialogIcon, setDialogIcon] = useState('warning');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Clear any static notifications in parent components
+  useEffect(() => {
+    // Remove any static notification elements that might be present
+    const notificationElement = document.querySelector('[role="alert"]');
+    if (notificationElement) {
+      notificationElement.remove();
+    }
+  }, []);
+
+  const handleSubmit = async e => {
     e.preventDefault();
+
+    // Remove any static notification elements before processing
+    const notificationElement = document.querySelector('[role="alert"]');
+    if (notificationElement) {
+      notificationElement.remove();
+    }
 
     const result = loginSchema.safeParse({ email, password });
 
     if (!result.success) {
       toast.error(result.error.errors[0].message);
-      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
 
     try {
+      // Clear console for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.clear();
+        console.log('Submitting login with email:', email);
+      }
+
       const response = await fetch('/api/login', {
         method: 'POST',
         credentials: 'include',
@@ -50,15 +81,73 @@ export default function LoginForm() {
       const data = await response.json();
       setIsLoading(false);
 
+      // Log complete response for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Login response status:', response.status);
+        console.log('Login response data:', data);
+      }
+
+      // IMPORTANT: Check for 403 Forbidden status first - this is crucial for psychologist approvals
+      if (response.status === 403) {
+        // Extract message from API response
+        const message =
+          data.ErrorMessage?.[0]?.message ||
+          'Your account requires approval before you can log in.';
+
+        // Configure dialog based on message content
+        if (message.includes('rejected')) {
+          setDialogIcon('error');
+          setDialogTitle('Account Access Denied');
+        } else if (message.toLowerCase().includes('psychologist')) {
+          setDialogIcon('info');
+          setDialogTitle('Psychologist Verification Required');
+        } else {
+          setDialogIcon('warning');
+          setDialogTitle('Account Approval Required');
+        }
+
+        setApprovalMessage(message);
+        setShowApprovalDialog(true);
+        return;
+      }
+
+      // Handle other errors
       if (!response.ok) {
         const errorMessage = data.ErrorMessage?.[0]?.message || 'Login failed';
         toast.error(errorMessage);
         return;
       }
 
+      // Handle successful login with token
       if (data.Result?.accessToken) {
         const userData = data.Result.user_data;
 
+        // Double-check approval status before proceeding
+        if (userData.approvalStatus && userData.approvalStatus !== 'approved') {
+          let message = 'Your account requires approval before you can log in.';
+          let icon = 'warning';
+          let title = 'Account Approval Required';
+
+          if (userData.approvalStatus === 'rejected') {
+            message =
+              'Your account has been rejected. Please contact support for more information.';
+            icon = 'error';
+            title = 'Account Access Denied';
+          } else if (userData.role === 'psychologist') {
+            message =
+              'Your psychologist credentials are pending verification. Our team will review your qualifications and approve your account shortly.';
+            icon = 'info';
+            title = 'Psychologist Verification Required';
+          }
+
+          setApprovalMessage(message);
+          setDialogIcon(icon);
+          setDialogTitle(title);
+          setShowApprovalDialog(true);
+          return;
+        }
+
+        // Create user object and set in store
         const userObj = {
           _id: userData.id,
           email: userData.email,
@@ -68,12 +157,11 @@ export default function LoginForm() {
           firstName: userData.firstName || null,
           lastName: userData.lastName || null,
           profileImage: userData.profileImage || null,
+          approvalStatus: userData.approvalStatus || 'approved',
         };
 
         setUser(userObj);
-
         toast.success('Login successful!');
-        setIsLoading(false);
         setIsRedirecting(true);
 
         setTimeout(() => {
@@ -93,6 +181,28 @@ export default function LoginForm() {
       console.error('Login error:', err);
       toast.error('Something went wrong. Please try again.');
       setIsLoading(false);
+    }
+  };
+
+  const closeApprovalDialog = () => {
+    setShowApprovalDialog(false);
+    // Optional: clear credentials for security
+    setEmail('');
+    setPassword('');
+  };
+
+  // Get the appropriate icon component based on dialog type
+  const getDialogIcon = () => {
+    switch (dialogIcon) {
+      case 'error':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case 'success':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'info':
+        return <AlertCircle className="h-5 w-5 text-blue-500" />;
+      case 'warning':
+      default:
+        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
     }
   };
 
@@ -206,6 +316,95 @@ export default function LoginForm() {
           </form>
         </div>
       </div>
+
+      {/* Approval Status Dialog - using portal to ensure it's at root level */}
+      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center flex items-center justify-center gap-2">
+              {getDialogIcon()}
+              {dialogTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 px-2">
+            <div
+              className={`${
+                dialogIcon === 'error'
+                  ? 'bg-red-50 dark:bg-red-900/20'
+                  : dialogIcon === 'info'
+                  ? 'bg-blue-50 dark:bg-blue-900/20'
+                  : dialogIcon === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20'
+                  : 'bg-yellow-50 dark:bg-yellow-900/20'
+              } p-4 rounded-md`}
+            >
+              <p
+                className={`text-sm ${
+                  dialogIcon === 'error'
+                    ? 'text-red-700 dark:text-red-200'
+                    : dialogIcon === 'info'
+                    ? 'text-blue-700 dark:text-blue-200'
+                    : dialogIcon === 'success'
+                    ? 'text-green-700 dark:text-green-200'
+                    : 'text-yellow-700 dark:text-yellow-200'
+                }`}
+              >
+                {approvalMessage}
+              </p>
+              <p
+                className={`mt-3 text-sm ${
+                  dialogIcon === 'error'
+                    ? 'text-red-700 dark:text-red-200'
+                    : dialogIcon === 'info'
+                    ? 'text-blue-700 dark:text-blue-200'
+                    : dialogIcon === 'success'
+                    ? 'text-green-700 dark:text-green-200'
+                    : 'text-yellow-700 dark:text-yellow-200'
+                }`}
+              >
+                Please check your email for updates on your account status.
+              </p>
+            </div>
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+              <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                What happens next?
+              </h4>
+              <ol className="mt-2 space-y-1 text-sm text-blue-600 dark:text-blue-200 list-decimal pl-4">
+                {dialogIcon === 'error' ? (
+                  <>
+                    <li>
+                      You can contact our support team for more information
+                    </li>
+                    <li>
+                      You may reapply with corrected information if applicable
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li>
+                      {dialogTitle.includes('Psychologist')
+                        ? 'Our team will review your credentials and qualifications'
+                        : 'Our administrators will review your account information'}
+                    </li>
+                    <li>
+                      You'll receive an email once your account is{' '}
+                      {dialogIcon === 'error' ? 'reviewed' : 'approved'}
+                    </li>
+                    <li>
+                      After approval, you can log in and access the platform
+                    </li>
+                  </>
+                )}
+              </ol>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={closeApprovalDialog} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

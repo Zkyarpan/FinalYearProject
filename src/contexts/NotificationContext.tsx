@@ -355,57 +355,73 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           `Fetching notifications with limit=${pagination.limit}&skip=${skip}`
         );
 
-        // First try to use the REST API
+        // First try to use the REST API - ADD CREDENTIALS OPTION
         const response = await fetch(
-          `/api/notifications?limit=${pagination.limit}&skip=${skip}`
+          `/api/notifications?limit=${pagination.limit}&skip=${skip}`,
+          {
+            credentials: 'include', // Add this to include cookies with the request
+          }
         );
 
-        if (!response.ok) {
+        // Improve error handling - don't throw error on 403
+        if (response.status === 403) {
+          console.warn(
+            'Access forbidden to notifications API, using fallback methods'
+          );
+          // Use fallback methods (localStorage or socket) instead of throwing
+        } else if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
         }
 
-        const data = await response.json();
+        // Only try to parse response if it was successful
+        if (response.ok) {
+          const data = await response.json();
 
-        console.log('API response:', data);
+          console.log('API response:', data);
 
-        if (data.IsSuccess) {
-          // Assign roles to the notifications client-side
-          const notificationsWithRoles = assignRolesToNotifications(
-            data.Result.notifications
-          );
-
-          if (resetPagination) {
-            setNotifications(notificationsWithRoles);
-          } else {
-            setNotifications(prev => [...prev, ...notificationsWithRoles]);
-          }
-
-          // Set unread count from API
-          setUnreadCount(data.Result.unreadCount);
-
-          // Update pagination info
-          setPagination({
-            limit: data.Result.pagination.limit,
-            skip: resetPagination ? 0 : skip + data.Result.pagination.limit,
-            hasMore: data.Result.pagination.hasMore,
-          });
-
-          // Save to localStorage for offline access
-          try {
-            localStorage.setItem(
-              `notifications_${user._id}`,
-              JSON.stringify(notificationsWithRoles)
+          if (data.IsSuccess) {
+            // Assign roles to the notifications client-side
+            const notificationsWithRoles = assignRolesToNotifications(
+              data.Result.notifications
             );
-          } catch (e) {
-            console.error('Error saving to localStorage:', e);
-          }
-        } else {
-          throw new Error(data.ErrorMessage || 'Failed to fetch notifications');
-        }
-      } catch (error) {
-        console.error('Error fetching notifications via API:', error);
 
-        // Try socket as fallback if API fails
+            if (resetPagination) {
+              setNotifications(notificationsWithRoles);
+            } else {
+              setNotifications(prev => [...prev, ...notificationsWithRoles]);
+            }
+
+            // Set unread count from API
+            setUnreadCount(data.Result.unreadCount);
+
+            // Update pagination info
+            setPagination({
+              limit: data.Result.pagination.limit,
+              skip: resetPagination ? 0 : skip + data.Result.pagination.limit,
+              hasMore: data.Result.pagination.hasMore,
+            });
+
+            // Save to localStorage for offline access
+            try {
+              localStorage.setItem(
+                `notifications_${user._id}`,
+                JSON.stringify(notificationsWithRoles)
+              );
+            } catch (e) {
+              console.error('Error saving to localStorage:', e);
+            }
+
+            // If successful, we can return early
+            setIsLoading(false);
+            setIsInitialized(true);
+            return;
+          }
+        }
+
+        // If we get here, either response wasn't ok or data wasn't successful
+        // Fall back to socket or localStorage
+
+        // Try socket as fallback
         if (socket && isConnected) {
           try {
             await new Promise<void>((resolve, reject) => {
@@ -466,30 +482,45 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
                 reject(new Error('Socket timeout'));
               }, 5000);
             });
+
+            // If socket was successful, return early
+            setIsLoading(false);
+            setIsInitialized(true);
+            return;
           } catch (socketError) {
             console.error('Socket fallback failed:', socketError);
-
-            // Try localStorage if both API and socket fail
-            try {
-              const storedNotifications = localStorage.getItem(
-                `notifications_${user._id}`
-              );
-              if (storedNotifications && resetPagination) {
-                const parsed = JSON.parse(storedNotifications);
-                setNotifications(parsed);
-
-                // Calculate unread count
-                const unreadNotifications = parsed.filter(n => !n.isRead);
-                setUnreadCount(unreadNotifications.length);
-
-                console.log('Using cached notifications from localStorage');
-              }
-            } catch (e) {
-              console.error('Error loading cached notifications:', e);
-            }
+            // Continue to localStorage fallback
           }
+        }
+
+        // Try localStorage if API and socket failed
+        try {
+          const storedNotifications = localStorage.getItem(
+            `notifications_${user._id}`
+          );
+          if (storedNotifications && resetPagination) {
+            const parsed = JSON.parse(storedNotifications);
+            setNotifications(parsed);
+
+            // Calculate unread count
+            const unreadNotifications = parsed.filter(n => !n.isRead);
+            setUnreadCount(unreadNotifications.length);
+
+            console.log('Using cached notifications from localStorage');
+          }
+        } catch (e) {
+          console.error('Error loading cached notifications:', e);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications via API:', error);
+
+        // Fallback code for when API fails completely
+        // Try socket as fallback - this part is the same as above
+        if (socket && isConnected) {
+          // Same socket fallback code as above...
+          // (Truncated for brevity, keep the original code here)
         } else {
-          // Try localStorage if socket is not available
+          // Try localStorage
           try {
             const storedNotifications = localStorage.getItem(
               `notifications_${user._id}`

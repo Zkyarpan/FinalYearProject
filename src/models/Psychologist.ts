@@ -280,9 +280,9 @@ const PsychologistSchema: Schema = new Schema(
       },
     ],
     sessionDuration: {
-      type: Number,
-      required: true,
-      enum: [30, 50, 80],
+      type: String,
+      enum: ['30', '45', '60', '90'],
+      default: '60' 
     },
     sessionFee: {
       type: Number,

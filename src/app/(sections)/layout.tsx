@@ -223,7 +223,7 @@ const RootLayout = ({ children }) => {
     <>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[60]">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[10]">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center">

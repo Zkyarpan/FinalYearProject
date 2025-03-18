@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Mic,
   MicOff,
@@ -25,13 +25,19 @@ import {
   CallStatus,
   MediaStatus,
 } from '@/contexts/VideoCallContext';
+import { toast } from 'sonner';
 
 interface VideoCallModalProps {
   open: boolean;
   onClose: () => void;
+  conversationId?: string; // Add conversationId prop
 }
 
-const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
+const VideoCallModal: React.FC<VideoCallModalProps> = ({
+  open,
+  onClose,
+  conversationId,
+}) => {
   const {
     currentCall,
     callStatus,
@@ -53,51 +59,125 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  const endCallRequestedRef = useRef(false);
+  const [toastShown, setToastShown] = useState(false);
+  const ENDED_CALLS_KEY = 'mentality_ended_calls';
+  const [isPageRefresh, setIsPageRefresh] = useState(true);
+  const sessionInitializedRef = useRef(false);
+  const [isPageLoad, setIsPageLoad] = useState(true);
+  const LAST_PAGE_VISIT_KEY = 'mentality_last_page_visit';
 
-  // Auto-hide controls after inactivity
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    // Set a flag to indicate this is the initial page load/navigation
+    setIsPageLoad(true);
 
-    const resetTimer = () => {
-      clearTimeout(timer);
-      setControlsVisible(true);
+    // Check if we recently visited this page (within the last 5 seconds)
+    const lastVisit = localStorage.getItem(LAST_PAGE_VISIT_KEY);
+    const isRecentNavigation =
+      lastVisit && Date.now() - parseInt(lastVisit) < 5000;
 
-      // Only auto-hide controls when call is connected and active
-      if (callStatus === CallStatus.CONNECTED) {
-        timer = setTimeout(() => {
-          setControlsVisible(false);
-        }, 5000); // Hide after 5 seconds of inactivity
-      } else {
-        // For other states, keep controls visible
-        setControlsVisible(true);
-      }
-    };
+    // Store current visit time
+    localStorage.setItem(LAST_PAGE_VISIT_KEY, Date.now().toString());
 
-    // Set up initial timer
-    resetTimer();
+    // After a short delay, set isPageLoad to false to allow normal toast behavior
+    const timer = setTimeout(() => {
+      setIsPageLoad(false);
+    }, 2000);
 
-    // Set up event listeners for mouse movement and touches
-    const handleActivity = () => resetTimer();
+    return () => clearTimeout(timer);
+  }, []);
 
-    // Only add listeners when call is connected to avoid interfering with modal actions
+  useEffect(() => {
+    // When call connects, reset toast state
     if (callStatus === CallStatus.CONNECTED) {
-      document.addEventListener('mousemove', handleActivity);
-      document.addEventListener('touchstart', handleActivity);
-
-      // Additional events to handle actions that should show controls
-      document.addEventListener('click', handleActivity);
-      document.addEventListener('keydown', handleActivity);
+      setToastShown(false);
+      endCallRequestedRef.current = false;
     }
 
-    // Cleanup
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousemove', handleActivity);
-      document.removeEventListener('touchstart', handleActivity);
-      document.removeEventListener('click', handleActivity);
-      document.removeEventListener('keydown', handleActivity);
-    };
-  }, [callStatus]);
+    // Only show toast for newly ended calls and not for page loads or refreshes
+    if (
+      (callStatus === CallStatus.ENDED || callStatus === CallStatus.IDLE) &&
+      !toastShown &&
+      !endCallRequestedRef.current &&
+      currentCall?.callId &&
+      !isPageLoad // Skip toasts during initial page load/navigation
+    ) {
+      // Store this call as ended in localStorage
+      try {
+        const endedCallsStr = localStorage.getItem(ENDED_CALLS_KEY) || '[]';
+        const endedCalls = JSON.parse(endedCallsStr);
+        if (!endedCalls.includes(currentCall.callId)) {
+          endedCalls.push(currentCall.callId);
+          localStorage.setItem(ENDED_CALLS_KEY, JSON.stringify(endedCalls));
+
+          // Show toast only for newly ended calls
+          setToastShown(true);
+          toast.info('Call ended by other participant');
+        }
+      } catch (err) {
+        console.error('Error storing ended call:', err);
+
+        // Don't show toast on error during page load
+        if (!isPageLoad) {
+          setToastShown(true);
+          toast.info('Call ended by other participant');
+        }
+      }
+    }
+  }, [callStatus, currentCall?.callId, toastShown, isPageLoad]);
+
+  useEffect(() => {
+    if (!currentCall?.callId) return;
+
+    // Check if this call was already ended
+    try {
+      const endedCallsStr = localStorage.getItem(ENDED_CALLS_KEY);
+      if (endedCallsStr) {
+        const endedCalls = JSON.parse(endedCallsStr);
+        if (endedCalls.includes(currentCall.callId)) {
+          setToastShown(true); // Prevent toast for already ended calls
+        }
+      }
+    } catch (err) {
+      console.error('Error checking ended calls:', err);
+    }
+  }, [currentCall?.callId]);
+
+  useEffect(() => {
+    // When call connects, reset toast state
+    if (callStatus === CallStatus.CONNECTED) {
+      setToastShown(false);
+      endCallRequestedRef.current = false;
+    }
+
+    // Only show toast for newly ended calls and NOT for page refreshes
+    if (
+      (callStatus === CallStatus.ENDED || callStatus === CallStatus.IDLE) &&
+      !toastShown &&
+      !endCallRequestedRef.current &&
+      currentCall?.callId &&
+      !isPageRefresh // Important: Skip toast if this is a page refresh
+    ) {
+      // Store this call as ended in localStorage
+      try {
+        const endedCallsStr = localStorage.getItem(ENDED_CALLS_KEY) || '[]';
+        const endedCalls = JSON.parse(endedCallsStr);
+        if (!endedCalls.includes(currentCall.callId)) {
+          endedCalls.push(currentCall.callId);
+          localStorage.setItem(ENDED_CALLS_KEY, JSON.stringify(endedCalls));
+
+          // Show toast only for newly ended calls
+          setToastShown(true);
+          toast.info('Call ended by other participant');
+        }
+      } catch (err) {
+        console.error('Error storing ended call:', err);
+        // Show toast anyway if localStorage fails
+        setToastShown(true);
+        toast.info('Call ended by other participant');
+      }
+    }
+  }, [callStatus, currentCall?.callId, toastShown, isPageRefresh]);
 
   // Ensure video elements get the streams properly
   useEffect(() => {
@@ -109,6 +189,25 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [localStream, remoteStream]);
+
+  // Prevent duplicate "call ended" messages
+  useEffect(() => {
+    // Reset toast state when call status changes to CONNECTED
+    if (callStatus === CallStatus.CONNECTED) {
+      setToastShown(false);
+      endCallRequestedRef.current = false;
+    }
+
+    // Show call ended toast only once when transitioning to ENDED/IDLE
+    if (
+      (callStatus === CallStatus.ENDED || callStatus === CallStatus.IDLE) &&
+      !toastShown &&
+      !endCallRequestedRef.current
+    ) {
+      setToastShown(true);
+      toast.info('Call ended by other participant');
+    }
+  }, [callStatus, toastShown]);
 
   // Call duration timer
   useEffect(() => {
@@ -200,6 +299,42 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
     );
   }, [getParticipantName]);
 
+  const handleEndCall = useCallback(() => {
+    // Set flag to prevent "other participant ended call" toast
+    endCallRequestedRef.current = true;
+
+    endCall('user_ended')
+      .then(() => {
+        setTimeout(onClose, 500);
+      })
+      .catch(err => {
+        console.error('Error ending call:', err);
+        onClose();
+      });
+  }, [endCall, onClose, conversationId]);
+
+  useEffect(() => {
+    // Check if this is a fresh page load or refresh
+    if (!sessionInitializedRef.current) {
+      sessionInitializedRef.current = true;
+      // Set a session flag to indicate we're handling a page load
+      sessionStorage.setItem('call_session_initialized', Date.now().toString());
+      setIsPageRefresh(true);
+
+      // Clear the flag after a short delay to allow the component to initialize
+      setTimeout(() => {
+        setIsPageRefresh(false);
+      }, 1500);
+    } else {
+      setIsPageRefresh(false);
+    }
+
+    return () => {
+      // On component unmount, don't immediately remove the session flag
+      // This helps detect actual navigation vs. component unmounting
+    };
+  }, []);
+
   // If minimized mode is active
   if (isCallMinimized && callStatus === CallStatus.CONNECTED) {
     return (
@@ -227,8 +362,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             className="h-8 w-8"
             onClick={e => {
               e.stopPropagation();
-              endCall();
-              onClose();
+              handleEndCall();
             }}
           >
             <PhoneOff className="h-4 w-4" />
@@ -266,13 +400,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
               <p className="text-white/70 mb-6">Calling... Please wait</p>
             </div>
             <div className="flex space-x-4">
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  endCall();
-                  onClose();
-                }}
-              >
+              <Button variant="destructive" onClick={handleEndCall}>
                 Cancel
               </Button>
             </div>
@@ -299,13 +427,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
             </div>
             <p className="text-white/70 mb-6">Incoming call... Connecting</p>
             <div className="flex space-x-4">
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  endCall();
-                  onClose();
-                }}
-              >
+              <Button variant="destructive" onClick={handleEndCall}>
                 Decline
               </Button>
               <Button
@@ -638,10 +760,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ open, onClose }) => {
                 variant="destructive"
                 size="icon"
                 className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700"
-                onClick={() => {
-                  endCall();
-                  onClose();
-                }}
+                onClick={handleEndCall}
                 title="End call"
               >
                 <PhoneOff className="h-8 w-8" />

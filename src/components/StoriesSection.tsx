@@ -7,7 +7,7 @@ import Journey from '@/icons/Journey';
 import Author from '@/icons/Author';
 import Community from '@/icons/Community';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
   const [isNavigating, setIsNavigating] = useState(false);
@@ -75,22 +75,27 @@ const StoriesSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           </span>
         </div>
 
-        <Button
-          onClick={() => navigate('/stories/create')}
-          disabled={isNavigating}
-          className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full flex justify-center items-center gap-2"
+        <Link
+          href="/stories/create"
+          onClick={e => {
+            if (isNavigating) {
+              e.preventDefault();
+              return;
+            }
+            navigate('/stories/create');
+          }}
+          className={`bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full flex justify-center items-center gap-2 disabled:opacity-50`}
         >
           {isNavigating ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 font-bold">
               <Loader className="h-4 w-4 animate-spin" />
-              <span>Publishing...</span>
             </div>
           ) : (
             <>
-              Share your story <RightIcon className="w-4 h-4" />
+              Share your story <RightIcon className="w-5 h-5" />
             </>
           )}
-        </Button>
+        </Link>
 
         <p className="text-xs text-center main-font text-muted-foreground">
           Join our community of mental health storytellers

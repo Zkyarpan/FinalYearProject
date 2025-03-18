@@ -15,6 +15,30 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
+interface ParticipantStatus {
+  status: string;
+  timestamp: number;
+  reason?: string;
+}
+
+interface CallData {
+  callId: string;
+  from: string;
+  to: string;
+  status: string;
+  startTime: Date;
+  acceptTime?: Date;
+  participantStatus?: Record<string, ParticipantStatus>;
+  lastActivity?: number;
+  conversationId?: string;
+  appointmentId?: string;
+  reconnectAttempt?: number;
+  reconnectTimestamp?: number;
+  callType?: string;
+  isRejoinRecovery?: boolean;
+  // Add other properties your CallData has
+}
+
 // Store for connected users
 const connectedUsers = new Map();
 
@@ -487,50 +511,91 @@ app
                 const duration = Math.floor(
                   (new Date().getTime() - callData.acceptTime.getTime()) / 1000
                 );
+
+                // Get conversationId with fallback options
                 const callConversationId =
                   callData.conversationId || data.conversationId;
 
-                if (!callConversationId) {
-                  log.warn(
-                    `Missing conversationId for call ${callId} - call history may be incomplete`
-                  );
-                }
-
                 try {
-                  await saveCallHistory({
-                    from: callData.from,
-                    to: callData.to,
-                    fromModel: 'User', // Using default model
-                    toModel: 'User', // Using default model
-                    callType: callData.callType || 'video',
-                    duration,
-                    status: 'ended',
-                    endedAt: new Date().toISOString(),
-                    conversationId: callConversationId, // Use the value we verified
-                  });
+                  // If we still don't have a conversationId, try to find one from previous appointments
+                  let finalConversationId = callConversationId;
+
+                  if (!finalConversationId) {
+                    log.warn(
+                      `Missing conversationId for call ${callId} - attempting to find from appointments`
+                    );
+
+                    // Try to find a conversation between these users
+                    try {
+                      const existingConversation = await mongoose.connection
+                        .collection('conversations')
+                        .findOne({
+                          $or: [
+                            {
+                              user: new mongoose.Types.ObjectId(callData.from),
+                              psychologist: new mongoose.Types.ObjectId(
+                                callData.to
+                              ),
+                            },
+                            {
+                              user: new mongoose.Types.ObjectId(callData.to),
+                              psychologist: new mongoose.Types.ObjectId(
+                                callData.from
+                              ),
+                            },
+                          ],
+                        });
+
+                      if (existingConversation) {
+                        finalConversationId =
+                          existingConversation._id.toString();
+                        log.info(
+                          `Found existing conversation: ${finalConversationId}`
+                        );
+                      } else {
+                        // Create a new conversation as fallback
+                        const newConversation = {
+                          user: callData.from,
+                          psychologist: callData.to,
+                          createdAt: new Date(),
+                          updatedAt: new Date(),
+                        };
+
+                        const result = await mongoose.connection
+                          .collection('conversations')
+                          .insertOne(newConversation);
+
+                        finalConversationId = result.insertedId.toString();
+                        log.info(
+                          `Created new conversation: ${finalConversationId}`
+                        );
+                      }
+                    } catch (err) {
+                      log.error('Error finding/creating conversation:', err);
+                    }
+                  }
+
+                  if (finalConversationId) {
+                    await saveCallHistory({
+                      from: callData.from,
+                      to: callData.to,
+                      fromModel: 'User',
+                      toModel: 'User',
+                      callType: callData.callType || 'video',
+                      duration,
+                      status: 'ended',
+                      endedAt: new Date().toISOString(),
+                      conversationId: finalConversationId,
+                    });
+                  } else {
+                    log.error(
+                      `Could not save call history - no conversationId available for call ${callId}`
+                    );
+                  }
                 } catch (error) {
                   log.error('Error saving call history:', error);
                 }
-              } else if (type === 'call-rejected') {
-                const callConversationId =
-                  callData.conversationId || data.conversationId;
-                try {
-                  await saveCallHistory({
-                    from: callData.from,
-                    to: callData.to,
-                    fromModel: 'User',
-                    toModel: 'User',
-                    callType: callData.callType || 'video',
-                    duration: 0,
-                    status: 'rejected',
-                    endedAt: new Date().toISOString(),
-                    conversationId: callConversationId,
-                  });
-                } catch (error) {
-                  log.error('Error saving rejected call history:', error);
-                }
               }
-
               // Clean up call tracking
               activeCalls.delete(callId);
               pendingIceCandidates.delete(callId);
@@ -561,74 +626,156 @@ app
 
             // Forward to other party
             io.to(recipientSocketId).emit('webrtc_signal', data);
-          } else if (type === 'participant-left') {
+          } // Handle participant-left event
+          else if (type === 'participant-left') {
             log.info(`Participant ${from} temporarily left call ${callId}`);
 
             // Do NOT delete the call from activeCalls map - keep it active
-            // But update its status to indicate the participant left
-            const callData = activeCalls.get(callId);
+            const callData = activeCalls.get(callId) as CallData | undefined;
             if (callData) {
-              callData.participantStatus = {
-                ...(callData.participantStatus || {}),
-                [from]: 'left_temporarily',
-              };
-
-              // Keep the call active but mark it as waiting
-              callData.status = 'waiting';
-              callData.lastActivity = Date.now();
-              activeCalls.set(callId, callData);
-
-              // Set a timeout to clean up the call if it stays inactive too long
-              setTimeout(() => {
-                // If the call still exists and the participant hasn't rejoined
-                const currentCallData = activeCalls.get(callId);
-                if (
-                  currentCallData &&
-                  currentCallData.participantStatus &&
-                  currentCallData.participantStatus[from] === 'left_temporarily'
-                ) {
-                  log.info(
-                    `Call ${callId} cleanup - participant ${from} never rejoined`
-                  );
-
-                  // Only fully clean up if both participants left or if the waiting time exceeded
-                  const allParticipantsLeft = Object.values(
-                    currentCallData.participantStatus
-                  ).every(status => status === 'left_temporarily');
-
-                  const waitingTimeExceeded =
-                    Date.now() - (currentCallData.lastActivity || Date.now()) >
-                    3600000; // 1 hour
-
-                  if (allParticipantsLeft || waitingTimeExceeded) {
-                    // Clean up call resources
-                    activeCalls.delete(callId);
-                    pendingIceCandidates.delete(callId);
-                    callSetupStatus.delete(callId);
-
-                    // Notify any connected participants that the call expired
-                    Object.keys(currentCallData.participantStatus).forEach(
-                      participantId => {
-                        const participantSocketId =
-                          getSocketIdForUser(participantId);
-                        if (participantSocketId) {
-                          io.to(participantSocketId).emit('webrtc_signal', {
-                            type: 'call-expired',
-                            to: participantId,
-                            callId,
-                          });
-                        }
-                      }
-                    );
-                  }
+              try {
+                // Store more detailed participant status with proper structure
+                if (!callData.participantStatus) {
+                  callData.participantStatus = {};
                 }
-              }, 3600000); // 1 hour timeout
-            }
 
-            // Forward the temporary leave signal to the other participant
-            const recipientSocketId = getSocketIdForUser(to);
-            if (recipientSocketId) {
-              io.to(recipientSocketId).emit('webrtc_signal', data);
+                // Update participant status
+                callData.participantStatus[from] = {
+                  status: 'left_temporarily',
+                  timestamp: Date.now(),
+                  reason: data.reason || 'unknown',
+                };
+
+                // Keep the call active but mark it as waiting
+                callData.status = 'waiting';
+                callData.lastActivity = Date.now();
+
+                // Store the conversationId explicitly to ensure it's available for reconnection
+                if (data.conversationId) {
+                  callData.conversationId = data.conversationId;
+                }
+
+                // Update the call data in our map
+                activeCalls.set(callId, callData);
+
+                log.info(
+                  `Call ${callId} marked as 'waiting' with participant ${from} temporarily left`
+                );
+
+                // Set a timeout to clean up the call if it stays inactive too long
+                setTimeout(() => {
+                  // If the call still exists and the participant hasn't rejoined
+                  const currentCallData = activeCalls.get(callId) as
+                    | CallData
+                    | undefined;
+                  if (!currentCallData) {
+                    return; // Call no longer exists
+                  }
+
+                  // Check if this specific participant is still marked as temporarily left
+                  const participantStatus =
+                    currentCallData.participantStatus?.[from];
+                  if (
+                    participantStatus &&
+                    participantStatus.status === 'left_temporarily'
+                  ) {
+                    const timeSinceLeft =
+                      Date.now() - (participantStatus.timestamp || 0);
+                    const minutesLeft = Math.round(timeSinceLeft / 60000);
+
+                    log.info(
+                      `Call ${callId} checking inactive status - participant ${from} left for ${minutesLeft} minutes`
+                    );
+
+                    // Check if all participants are marked as left
+                    let allParticipantsLeft = true;
+                    let anyParticipantsLeft = false;
+
+                    // Safely check participant statuses
+                    if (currentCallData.participantStatus) {
+                      const statuses = Object.entries(
+                        currentCallData.participantStatus
+                      );
+                      if (statuses.length > 0) {
+                        anyParticipantsLeft = true;
+
+                        // Check if all participants have left temporarily
+                        allParticipantsLeft = statuses.every(([_, status]) => {
+                          return status && status.status === 'left_temporarily';
+                        });
+                      }
+                    }
+
+                    const waitingTimeExceeded = timeSinceLeft > 30 * 60 * 1000; // 30 minutes
+
+                    // Clean up if all participants left or waiting time exceeded
+                    if (
+                      (allParticipantsLeft && anyParticipantsLeft) ||
+                      waitingTimeExceeded
+                    ) {
+                      log.info(
+                        `Cleaning up inactive call ${callId} - ${
+                          allParticipantsLeft
+                            ? 'all participants left'
+                            : 'timeout exceeded after ' +
+                              minutesLeft +
+                              ' minutes'
+                        }`
+                      );
+
+                      // Clean up call resources
+                      activeCalls.delete(callId);
+                      pendingIceCandidates.delete(callId);
+                      callSetupStatus.delete(callId);
+
+                      // Notify any connected participants that the call expired
+                      if (currentCallData.participantStatus) {
+                        Object.keys(currentCallData.participantStatus).forEach(
+                          participantId => {
+                            const participantSocketId =
+                              getSocketIdForUser(participantId);
+                            if (participantSocketId) {
+                              io.to(participantSocketId).emit('webrtc_signal', {
+                                type: 'call-expired',
+                                to: participantId,
+                                from: 'system',
+                                callId,
+                                reason: waitingTimeExceeded
+                                  ? 'inactivity_timeout'
+                                  : 'all_participants_left',
+                                message: waitingTimeExceeded
+                                  ? 'Call ended due to inactivity'
+                                  : 'Call ended because all participants left',
+                              });
+                            }
+                          }
+                        );
+                      }
+                    }
+                  }
+                }, 30 * 60 * 1000); // 30 minute timeout
+
+                // Forward the temporary leave signal to the other participant
+                const recipientSocketId = getSocketIdForUser(to);
+                if (recipientSocketId) {
+                  io.to(recipientSocketId).emit('webrtc_signal', {
+                    type: 'participant-left',
+                    from,
+                    to,
+                    callId,
+                    reason: data.reason || 'unknown',
+                    message: `Participant ${from} has temporarily left the call and may rejoin.`,
+                    timestamp: Date.now(),
+                  });
+                }
+              } catch (error) {
+                log.error(
+                  `Error handling participant-left for call ${callId}:`,
+                  error
+                );
+              }
+            } else {
+              log.warn(`Received participant-left for unknown call ${callId}`);
             }
           } else if (type === 'rejoin-call') {
             log.info(`User ${from} is rejoining call ${callId}`);
@@ -639,7 +786,7 @@ app
               // Update participant status
               callData.participantStatus = {
                 ...(callData.participantStatus || {}),
-                [from]: 'active', // Mark this participant as active
+                [from]: 'rejoining', // Mark this participant as actively rejoining (transitional state)
               };
 
               // Track last activity for timeouts
@@ -647,10 +794,26 @@ app
 
               // Update other call properties as needed
               if (callData.status === 'waiting') {
-                callData.status = 'connecting';
+                callData.status = 'reconnecting';
               }
 
+              // Store the reconnection attempt
+              callData.reconnectAttempt = (callData.reconnectAttempt || 0) + 1;
+              callData.reconnectTimestamp = Date.now();
+
               activeCalls.set(callId, callData);
+
+              // Clear any buffered candidates that might be stale
+              if (pendingIceCandidates.has(callId)) {
+                log.info(
+                  `Clearing any stale ICE candidates for call ${callId} before rejoin`
+                );
+                pendingIceCandidates.delete(callId);
+              }
+
+              log.info(
+                `Call ${callId} status updated for rejoin, now: ${callData.status}`
+              );
             } else {
               // If call data doesn't exist anymore, let the client know
               log.warn(
@@ -679,6 +842,72 @@ app
           }
         } catch (error) {
           log.error('Error processing WebRTC signal:', error);
+        }
+      });
+      socket.on('join_call_session', async data => {
+        try {
+          const { appointmentId, userId, callId } = data;
+
+          if (!appointmentId || !userId || !callId) {
+            log.warn('Join call session event missing required data');
+            return;
+          }
+
+          log.info(
+            `User ${userId} joining call session for appointment ${appointmentId}`
+          );
+
+          // Add to active calls tracked on server
+          const callData = {
+            callId,
+            appointmentId,
+            participants: [userId],
+            startTime: new Date(),
+            status: 'joining',
+          };
+
+          // Add to tracked active calls
+          if (activeCalls.has(callId)) {
+            // Update existing call data
+            const existingCall = activeCalls.get(callId);
+            if (!existingCall.participants.includes(userId)) {
+              existingCall.participants.push(userId);
+            }
+            existingCall.status = 'active';
+            activeCalls.set(callId, existingCall);
+          } else {
+            // Create new call entry
+            activeCalls.set(callId, callData);
+          }
+
+          // Broadcast active calls update to relevant participants
+          io.to(userId).emit(
+            'active_calls_update',
+            Array.from(activeCalls.values())
+          );
+
+          // Notify other users about this participant's active call status
+          if (userSocketMap.has(userId)) {
+            // Create broadcast list of all users in active calls
+            const activeCallParticipants = Array.from(activeCalls.values())
+              .flatMap(call => call.participants)
+              .filter(id => id !== userId);
+
+            // Send updates to all active users
+            [...new Set(activeCallParticipants)].forEach(participantId => {
+              if (userSocketMap.has(participantId)) {
+                const socketId = userSocketMap.get(participantId);
+                io.to(socketId).emit(
+                  'active_calls_update',
+                  Array.from(activeCalls.values()).filter(call =>
+                    call.participants.includes(participantId)
+                  )
+                );
+              }
+            });
+          }
+        } catch (error) {
+          log.error('Error in join_call_session handler:', error);
         }
       });
 

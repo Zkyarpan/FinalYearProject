@@ -37,26 +37,12 @@ export default function LoginForm() {
   const [dialogTitle, setDialogTitle] = useState('Account Approval Required');
   const [dialogIcon, setDialogIcon] = useState('warning');
 
-  // Clear any static notifications in parent components
-  useEffect(() => {
-    // Remove any static notification elements that might be present
-    const notificationElement = document.querySelector('[role="alert"]');
-    if (notificationElement) {
-      notificationElement.remove();
-    }
-  }, []);
-
+  // Handle submit function with simplified approval detection
   const handleSubmit = async e => {
     e.preventDefault();
 
-    // Remove any static notification elements before processing
-    const notificationElement = document.querySelector('[role="alert"]');
-    if (notificationElement) {
-      notificationElement.remove();
-    }
-
+    // Validate form
     const result = loginSchema.safeParse({ email, password });
-
     if (!result.success) {
       toast.error(result.error.errors[0].message);
       return;
@@ -65,12 +51,6 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Clear console for debugging
-      if (process.env.NODE_ENV !== 'production') {
-        console.clear();
-        console.log('Submitting login with email:', email);
-      }
-
       const response = await fetch('/api/login', {
         method: 'POST',
         credentials: 'include',
@@ -79,20 +59,14 @@ export default function LoginForm() {
       });
 
       const data = await response.json();
-      setIsLoading(false);
+      console.log('Login response:', response.status, data);
 
-      // Log complete response for debugging
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Login response status:', response.status);
-        console.log('Login response data:', data);
-      }
-
-      // IMPORTANT: Check for 403 Forbidden status first - this is crucial for psychologist approvals
+      // Direct check for 403 status - approval required
       if (response.status === 403) {
-        // Extract message from API response
+        // Get the message from the response
         const message =
           data.ErrorMessage?.[0]?.message ||
-          'Your account requires approval before you can log in.';
+          'Your account is pending approval by an administrator. Please check your email for updates.';
 
         // Configure dialog based on message content
         if (message.includes('rejected')) {
@@ -108,17 +82,19 @@ export default function LoginForm() {
 
         setApprovalMessage(message);
         setShowApprovalDialog(true);
+        setIsLoading(false);
         return;
       }
 
-      // Handle other errors
+      // Handle other error responses
       if (!response.ok) {
         const errorMessage = data.ErrorMessage?.[0]?.message || 'Login failed';
         toast.error(errorMessage);
+        setIsLoading(false);
         return;
       }
 
-      // Handle successful login with token
+      // Handle successful login
       if (data.Result?.accessToken) {
         const userData = data.Result.user_data;
 
@@ -144,6 +120,7 @@ export default function LoginForm() {
           setDialogIcon(icon);
           setDialogTitle(title);
           setShowApprovalDialog(true);
+          setIsLoading(false);
           return;
         }
 
@@ -158,6 +135,7 @@ export default function LoginForm() {
           lastName: userData.lastName || null,
           profileImage: userData.profileImage || null,
           approvalStatus: userData.approvalStatus || 'approved',
+          isAuthenticated: true,
         };
 
         setUser(userObj);
@@ -176,19 +154,15 @@ export default function LoginForm() {
               router.push('/dashboard');
           }
         }, 500);
+      } else {
+        toast.error('Login failed. Please check your credentials.');
+        setIsLoading(false);
       }
     } catch (err) {
       console.error('Login error:', err);
       toast.error('Something went wrong. Please try again.');
       setIsLoading(false);
     }
-  };
-
-  const closeApprovalDialog = () => {
-    setShowApprovalDialog(false);
-    // Optional: clear credentials for security
-    setEmail('');
-    setPassword('');
   };
 
   // Get the appropriate icon component based on dialog type
@@ -317,7 +291,7 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {/* Approval Status Dialog - using portal to ensure it's at root level */}
+      {/* Improved Approval Status Dialog */}
       <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -399,7 +373,10 @@ export default function LoginForm() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={closeApprovalDialog} className="w-full">
+            <Button
+              onClick={() => setShowApprovalDialog(false)}
+              className="w-full"
+            >
               Close
             </Button>
           </DialogFooter>

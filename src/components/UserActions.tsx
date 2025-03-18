@@ -83,7 +83,7 @@ const UserActions = ({
 
   const navigateToProfile = () => {
     const profilePath =
-      role === 'psychologist' ? '/dashboard/psychologist' : '/account';
+      role === 'psychologist' ? '/account/psychologist' : '/account';
     router.push(profilePath);
   };
 
@@ -190,8 +190,6 @@ const UserActions = ({
                       Settings
                     </span>
                   </DropdownMenuItem>
-
-                 
 
                   <DropdownMenuSeparator />
 

@@ -54,11 +54,36 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useUserStore } from '@/store/userStore';
 
 const SESSION_DURATIONS = [
-  { value: 30, label: '30 minutes', description: 'Quick consultation' },
-  { value: 45, label: '45 minutes', description: 'Brief session' },
-  { value: 60, label: '1 hour', description: 'Standard session' },
-  { value: 90, label: '1.5 hours', description: 'Extended session' },
-  { value: 120, label: '2 hours', description: 'In-depth consultation' },
+  {
+    value: 30,
+    label: '30 minutes',
+    description: 'Quick consultation',
+    endTimeLabel: '(+30 min)',
+  },
+  {
+    value: 45,
+    label: '45 minutes',
+    description: 'Brief session',
+    endTimeLabel: '(+45 min)',
+  },
+  {
+    value: 60,
+    label: '1 hour',
+    description: 'Standard session',
+    endTimeLabel: '(+1 hour)',
+  },
+  {
+    value: 90,
+    label: '1.5 hours',
+    description: 'Extended session',
+    endTimeLabel: '(+1.5 hours)',
+  },
+  {
+    value: 120,
+    label: '2 hours',
+    description: 'In-depth consultation',
+    endTimeLabel: '(+2 hours)',
+  },
 ] as const;
 
 interface TimeSlot {
@@ -151,38 +176,71 @@ const TIME_PERIODS = {
 const generateTimeSlots = () => {
   const slots: TimeSlot[] = [];
 
-  // Generate slots for all 24 hours
+  // Generate slots for all 24 hours with half-hour increments
   for (let i = 0; i < 24; i++) {
+    // Full hour slot
     const hour = i;
-    const time = `${hour.toString().padStart(2, '0')}:00`;
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
+    const fullHourTime = `${hour.toString().padStart(2, '0')}:00`;
+    const periodFull = hour >= 12 ? 'PM' : 'AM';
+    const displayHourFull = hour % 12 || 12;
 
-    // Determine time period
-    let periodLabel = '';
+    // Determine time period for full hour
+    let periodLabelFull = '';
     if (
       hour >= TIME_PERIODS.MORNING.start &&
       hour <= TIME_PERIODS.MORNING.end
     ) {
-      periodLabel = TIME_PERIODS.MORNING.icon;
+      periodLabelFull = TIME_PERIODS.MORNING.icon;
     } else if (
       hour >= TIME_PERIODS.AFTERNOON.start &&
       hour <= TIME_PERIODS.AFTERNOON.end
     ) {
-      periodLabel = TIME_PERIODS.AFTERNOON.icon;
+      periodLabelFull = TIME_PERIODS.AFTERNOON.icon;
     } else if (
       hour >= TIME_PERIODS.EVENING.start &&
       hour <= TIME_PERIODS.EVENING.end
     ) {
-      periodLabel = TIME_PERIODS.EVENING.icon;
+      periodLabelFull = TIME_PERIODS.EVENING.icon;
     } else {
-      periodLabel = TIME_PERIODS.NIGHT.icon;
+      periodLabelFull = TIME_PERIODS.NIGHT.icon;
     }
 
     slots.push({
-      value: time,
-      label: `${displayHour}:00 ${period}`,
-      period: periodLabel,
+      value: fullHourTime,
+      label: `${displayHourFull}:00 ${periodFull}`,
+      period: periodLabelFull,
+    });
+
+    // Half hour slot
+    const halfHourTime = `${hour.toString().padStart(2, '0')}:30`;
+    const periodHalf = hour >= 12 ? 'PM' : 'AM';
+    const displayHourHalf = hour % 12 || 12;
+
+    // Determine time period for half hour
+    let periodLabelHalf = '';
+    if (
+      hour >= TIME_PERIODS.MORNING.start &&
+      hour <= TIME_PERIODS.MORNING.end
+    ) {
+      periodLabelHalf = TIME_PERIODS.MORNING.icon;
+    } else if (
+      hour >= TIME_PERIODS.AFTERNOON.start &&
+      hour <= TIME_PERIODS.AFTERNOON.end
+    ) {
+      periodLabelHalf = TIME_PERIODS.AFTERNOON.icon;
+    } else if (
+      hour >= TIME_PERIODS.EVENING.start &&
+      hour <= TIME_PERIODS.EVENING.end
+    ) {
+      periodLabelHalf = TIME_PERIODS.EVENING.icon;
+    } else {
+      periodLabelHalf = TIME_PERIODS.NIGHT.icon;
+    }
+
+    slots.push({
+      value: halfHourTime,
+      label: `${displayHourHalf}:30 ${periodHalf}`,
+      period: periodLabelHalf,
     });
   }
 
@@ -352,14 +410,17 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
       return false;
     }
 
+    // Allow setting availability for times at least 5 minutes in the future
     const hasInvalidDay = selectedDays.some(day => {
       if (day < currentDay) {
         return true;
       } else if (day === currentDay) {
-        if (
-          startHour < currentHour ||
-          (startHour === currentHour && startMinutes <= currentMinutes)
-        ) {
+        // Convert times to total minutes for easier comparison
+        const currentTotalMinutes = currentHour * 60 + currentMinutes;
+        const startTotalMinutes = startHour * 60 + startMinutes;
+
+        // Allow if the start time is at least 5 minutes in the future
+        if (startTotalMinutes < currentTotalMinutes + 5) {
           return true;
         }
       }
@@ -367,7 +428,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     });
 
     if (hasInvalidDay) {
-      toast.error('Cannot schedule availability in the past');
+      toast.error(
+        'Availability must be set for at least 5 minutes in the future'
+      );
       return false;
     }
 
@@ -492,6 +555,18 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
         newAvailability.duration
       );
 
+      // Check for overlapping slots before proceeding
+      const { hasOverlap, conflictDetails } = checkForOverlappingSlots(
+        newAvailability.startTime,
+        endTime,
+        newAvailability.daysOfWeek
+      );
+
+      if (hasOverlap) {
+        toast.error(`Overlapping slots already exist: ${conflictDetails}`);
+        return;
+      }
+
       // Create availability data with time period
       const availabilityWithEndTime = {
         ...newAvailability,
@@ -610,6 +685,54 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
     });
 
     return Array.from(daysMap.values()).sort((a, b) => a.day - b.day);
+  };
+
+  const checkForOverlappingSlots = (
+    newStart: string,
+    newEnd: string,
+    selectedDays: number[]
+  ): { hasOverlap: boolean; conflictDetails: string } => {
+    // Helper to convert time string to minutes since midnight
+    const timeToMinutes = (timeStr: string): number => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const newStartMinutes = timeToMinutes(newStart);
+    const newEndMinutes = timeToMinutes(newEnd);
+
+    let hasOverlap = false;
+    let conflictDetails = '';
+
+    // Check each availability slot for potential conflicts
+    for (const slot of availabilitySlots) {
+      // Check if the days overlap
+      const overlappingDays = slot.daysOfWeek.filter(day =>
+        selectedDays.includes(day)
+      );
+
+      if (overlappingDays.length > 0) {
+        const existingStartMinutes = timeToMinutes(slot.startTime);
+        const existingEndMinutes = timeToMinutes(slot.endTime);
+
+        // Check if the time ranges overlap
+        if (
+          newStartMinutes < existingEndMinutes &&
+          newEndMinutes > existingStartMinutes
+        ) {
+          hasOverlap = true;
+          const daysText = overlappingDays
+            .map(day => DAYS_OF_WEEK[day])
+            .join(', ');
+          conflictDetails = `Conflict on ${daysText} between ${formatTime(
+            slot.startTime
+          )} - ${formatTime(slot.endTime)}`;
+          break;
+        }
+      }
+    }
+
+    return { hasOverlap, conflictDetails };
   };
 
   const formatTime = (time: string): string => {
@@ -868,7 +991,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                                   );
                                   setDeleteDialog({
                                     isOpen: true,
-                                    slotId: slot.id, 
+                                    slotId: slot.id,
                                   });
                                 }}
                               >
@@ -1007,14 +1130,14 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                         key={duration.value}
                         htmlFor={`duration-${duration.value}`}
                         className={`
-          flex items-center space-x-2 rounded-lg border p-4 cursor-pointer
-          ${
-            newAvailability.duration === duration.value
-              ? 'border-primary bg-primary/5 shadow-md'
-              : 'hover:bg-muted/50 hover:border-primary/20'
-          }
-          transition-all
-        `}
+        flex items-center space-x-2 rounded-lg border p-4 cursor-pointer
+        ${
+          newAvailability.duration === duration.value
+            ? 'border-primary bg-primary/5 shadow-md'
+            : 'hover:bg-muted/50 hover:border-primary/20'
+        }
+        transition-all
+      `}
                       >
                         <RadioGroupItem
                           value={duration.value.toString()}
@@ -1022,10 +1145,35 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                           className="text-primary"
                         />
                         <div className="grid gap-1 ml-2 flex-1">
-                          <div className="font-medium">{duration.label}</div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">
+                              {duration.label}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono"
+                            >
+                              {duration.endTimeLabel}
+                            </Badge>
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {duration.description}
                           </p>
+
+                          {/* Preview time difference if a start time is selected */}
+                          {newAvailability.startTime &&
+                            newAvailability.duration === duration.value && (
+                              <div className="mt-1 text-xs text-primary font-medium bg-primary/5 rounded p-1 flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {formatTime(newAvailability.startTime)} →{' '}
+                                {formatTime(
+                                  calculateEndTime(
+                                    newAvailability.startTime,
+                                    duration.value
+                                  )
+                                )}
+                              </div>
+                            )}
                         </div>
                       </Label>
                     ))}
@@ -1063,10 +1211,29 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                   >
                     <SelectTrigger
                       className="w-full h-10 dark:bg-input border border-input rounded-md 
-      focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
-      data-[state=open]:border-input dark:border-foreground/30"
+  focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none
+  data-[state=open]:border-input dark:border-foreground/30"
                     >
-                      <SelectValue placeholder="Choose start time" />
+                      {newAvailability.startTime ? (
+                        <div className="flex items-center justify-between w-full">
+                          <span>{formatTime(newAvailability.startTime)}</span>
+                          {newAvailability.duration > 0 && (
+                            <div className="flex items-center text-muted-foreground text-sm">
+                              <ChevronRight className="h-4 w-4 mx-1" />
+                              <span>
+                                {formatTime(
+                                  calculateEndTime(
+                                    newAvailability.startTime,
+                                    newAvailability.duration
+                                  )
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <SelectValue placeholder="Choose start time" />
+                      )}
                     </SelectTrigger>
                     <SelectContent className="h-64 dark:bg-input">
                       <div className="grid grid-cols-1 divide-y">
@@ -1081,19 +1248,38 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                             <div className="py-0.5">
                               {timeSlots
                                 .filter(slot => {
-                                  const hour = parseInt(slot.value);
+                                  const hour = parseInt(
+                                    slot.value.split(':')[0]
+                                  );
+                                  const minutes = parseInt(
+                                    slot.value.split(':')[1]
+                                  );
                                   return (
                                     hour >= period.start && hour <= period.end
                                   );
                                 })
                                 .map(slot => {
-                                  const [hour] = slot.value
-                                    .split(':')
-                                    .map(Number);
+                                  const [hourStr, minutesStr] =
+                                    slot.value.split(':');
+                                  const hour = parseInt(hourStr);
+                                  const minutes = parseInt(minutesStr);
+
+                                  // Calculate if this time is in the past or too near future
+                                  const now = new Date();
+                                  const currentHour = now.getHours();
+                                  const currentMinutes = now.getMinutes();
+
+                                  // Convert to total minutes for comparison
+                                  const slotTotalMinutes = hour * 60 + minutes;
+                                  const currentTotalMinutes =
+                                    currentHour * 60 + currentMinutes;
+
+                                  // Consider a time slot as "past" if it's less than 5 minutes in the future
                                   const isPastTime =
                                     newAvailability.daysOfWeek.includes(
                                       currentTime.getDay()
-                                    ) && hour <= currentTime.getHours();
+                                    ) &&
+                                    slotTotalMinutes < currentTotalMinutes + 5;
 
                                   return (
                                     <SelectItem
@@ -1116,12 +1302,29 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                                         >
                                           {slot.label}
                                         </span>
+
+                                        {/* Show end time next to each option */}
+                                        {newAvailability.duration > 0 && (
+                                          <span className="ml-auto text-xs text-muted-foreground mr-2">
+                                            →{' '}
+                                            {formatTime(
+                                              calculateEndTime(
+                                                slot.value,
+                                                newAvailability.duration
+                                              )
+                                            )}
+                                          </span>
+                                        )}
+
                                         {isPastTime && (
                                           <Badge
                                             variant="outline"
                                             className="ml-auto text-xs"
                                           >
-                                            Past
+                                            {slotTotalMinutes <
+                                            currentTotalMinutes
+                                              ? 'Past'
+                                              : 'Too soon'}
                                           </Badge>
                                         )}
                                       </div>
@@ -1146,14 +1349,31 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({
                         </div>
                         <div>
                           <p className="text-sm font-medium">Session Details</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatTime(newAvailability.startTime)} -{' '}
-                            {formatTime(
-                              calculateEndTime(
-                                newAvailability.startTime,
-                                newAvailability.duration
-                              )
-                            )}
+                          <div className="flex items-center mt-1">
+                            <div className="flex items-center text-sm">
+                              <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                              <span>Start: </span>
+                              <span className="font-medium ml-1">
+                                {formatTime(newAvailability.startTime)}
+                              </span>
+                            </div>
+                            <ChevronRight className="h-3.5 w-3.5 mx-2 text-muted-foreground" />
+                            <div className="flex items-center text-sm">
+                              <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                              <span>End: </span>
+                              <span className="font-medium ml-1">
+                                {formatTime(
+                                  calculateEndTime(
+                                    newAvailability.startTime,
+                                    newAvailability.duration
+                                  )
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Total session time:{' '}
+                            {formatDuration(newAvailability.duration)}
                           </p>
                         </div>
                       </div>

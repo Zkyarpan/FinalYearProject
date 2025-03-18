@@ -6,13 +6,20 @@ import Heart from '@/icons/Heart';
 import Write from '@/icons/Write';
 import Readers from '@/icons/Readers';
 import { useState } from 'react';
+import Link from 'next/link';
 
 const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
   const [isWritingLoading, setIsWritingLoading] = useState(false);
-  const handleStartWriting = async () => {
-    setIsWritingLoading(true);
-    await handleNavigation('/blogs/create', true);
-    setIsWritingLoading(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const navigate = async path => {
+    setIsNavigating(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      handleNavigation(path);
+    } finally {
+      setIsNavigating(false);
+    }
   };
 
   return (
@@ -62,19 +69,27 @@ const BlogSection = ({ isAuthenticated, isLoading, handleNavigation }) => {
           </span>
         </div>
 
-        <button
-          onClick={handleStartWriting}
-          disabled={isWritingLoading}
-          className="bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full flex justify-center items-center gap-2 disabled:opacity-50"
+        <Link
+          href="/blogs/create"
+          onClick={e => {
+            if (isWritingLoading) {
+              e.preventDefault();
+              return;
+            }
+            navigate('/stories/create');
+          }}
+          className={`bg-primary text-primary-foreground rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors w-full flex justify-center items-center gap-2 disabled:opacity-50`}
         >
           {isWritingLoading ? (
-            <Loader className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-2 font-bold">
+              <Loader className="h-4 w-4 animate-spin" />
+            </div>
           ) : (
             <>
-              Start writing <RightIcon className="w-4 h-4" />
+              Share your story <RightIcon className="w-5 h-5" />
             </>
           )}
-        </button>
+        </Link>
 
         <p className="text-xs text-center  text-muted-foreground main-font">
           Join our community of mental health writers

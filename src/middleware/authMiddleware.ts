@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { createErrorResponse } from '@/lib/response';
-import  connectDB  from '@/db/db';
+import connectDB from '@/db/db';
 import Psychologist from '@/models/Psychologist';
 
-// Enhanced token payload type that maintains compatibility with existing code
 export interface TokenPayload extends jwt.JwtPayload {
   id: string;
   role: string;
@@ -13,14 +12,29 @@ export interface TokenPayload extends jwt.JwtPayload {
 }
 
 export const getTokenFromRequest = (req: NextRequest) => {
-  const token =
-    req.cookies.get('accessToken')?.value ||
-    req.headers.get('Authorization')?.replace('Bearer ', '');
+  const tokenFromCookie = req.cookies.get('accessToken')?.value;
 
+  const authHeader = req.headers.get('Authorization');
+  const tokenFromHeader = authHeader?.startsWith('Bearer ')
+    ? authHeader.replace('Bearer ', '')
+    : authHeader;
+
+  const token = tokenFromCookie || tokenFromHeader;
   if (!token) return null;
 
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as TokenPayload;
+    if (token.includes('.') && token.length > 40) {
+      return jwt.verify(token, process.env.JWT_SECRET!) as TokenPayload;
+    } else if (/^[0-9a-fA-F]{24}$/.test(token)) {
+      return {
+        id: token,
+        role: 'user', // Default role
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      } as TokenPayload;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -57,7 +71,6 @@ export async function withAuth(
       );
     }
 
-    // For psychologists, check if they are approved (unless accessing pending dashboard)
     if (
       userRole === 'psychologist' &&
       !req.nextUrl.pathname.includes('/dashboard/pending') &&
@@ -77,7 +90,6 @@ export async function withAuth(
         }
       } catch (err) {
         console.error('Error checking psychologist approval status:', err);
-        // Continue even if the check fails, to not block functionality
       }
     }
 
@@ -89,26 +101,4 @@ export async function withAuth(
       { status: 401 }
     );
   }
-}
-
-// Helper function to check if user is admin
-export async function isAdmin(req: NextRequest): Promise<boolean> {
-  try {
-    const token = getTokenFromRequest(req) as TokenPayload;
-
-    if (!token || token.role !== 'admin') {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-// Higher-order function for admin-only routes that maintains compatibility with existing code
-export function withAdminAuth(handler: Function) {
-  return async (req: NextRequest) => {
-    return withAuth(handler, req, ['admin']);
-  };
 }

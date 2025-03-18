@@ -5,10 +5,19 @@ import {
   PaymentElement,
   useStripe,
   useElements,
+  LinkAuthenticationElement,
+  AddressElement,
 } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Lock } from 'lucide-react';
+import {
+  Loader2,
+  Lock,
+  CreditCard,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 interface PaymentFormProps {
@@ -25,6 +34,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<
+    'idle' | 'processing' | 'success' | 'error'
+  >('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
@@ -33,7 +46,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
     if (elements) {
       elements.update({
         appearance: {
-          theme: 'night',
+          theme: isDarkMode ? 'night' : 'stripe',
           variables: {
             colorPrimary: '#0ea5e9',
             colorBackground: isDarkMode ? '#1e1e1e' : '#ffffff',
@@ -48,6 +61,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
               backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff',
               color: isDarkMode ? '#ffffff' : '#1a1a1a',
               border: isDarkMode ? '1px solid #404040' : '1px solid #e5e7eb',
+              boxShadow: 'none',
+              fontSize: '16px',
+              padding: '12px',
+              transition: 'all 0.2s ease',
             },
             '.Input:hover': {
               backgroundColor: isDarkMode ? '#363636' : '#f9fafb',
@@ -62,26 +79,37 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
             },
             '.Label': {
               color: isDarkMode ? '#d4d4d4' : '#6b7280',
+              fontSize: '14px',
+              fontWeight: '500',
+              marginBottom: '8px',
             },
             '.Tab': {
               backgroundColor: isDarkMode ? '#2d2d2d' : '#f9fafb',
               border: isDarkMode ? '1px solid #404040' : '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.15s ease',
             },
             '.Tab:hover': {
               backgroundColor: isDarkMode ? '#363636' : '#f3f4f6',
             },
             '.Tab--selected': {
-              backgroundColor: isDarkMode ? '#404040' : '#ffffff',
-              border: '1px solid #0ea5e9',
+              backgroundColor: isDarkMode ? '#0ea5e9' : '#0ea5e9',
+              borderColor: isDarkMode ? '#0ea5e9' : '#0ea5e9',
+              color: '#ffffff',
             },
             '.TabIcon': {
-              color: isDarkMode ? '#d4d4d4' : '#6b7280',
+              color: 'inherit',
             },
             '.TabLabel': {
-              color: isDarkMode ? '#ffffff' : '#1a1a1a',
+              color: 'inherit',
             },
             '.Error': {
               color: '#ef4444',
+              fontSize: '14px',
+              padding: '8px 0',
             },
           },
         },
@@ -124,6 +152,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
     }
 
     setIsProcessing(true);
+    setPaymentStatus('processing');
+    setErrorMessage(null);
 
     try {
       // First, submit the PaymentElement
@@ -161,10 +191,17 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       await updatePaymentStatus(paymentIntent.id);
 
       // If we get here, both the payment and status update were successful
+      setPaymentStatus('success');
       toast.success('Payment successful!');
-      onSuccess(paymentIntent.id);
+
+      // Short delay to show success state before proceeding
+      setTimeout(() => {
+        onSuccess(paymentIntent.id);
+      }, 1000);
     } catch (error: any) {
       console.error('Payment process error:', error);
+      setPaymentStatus('error');
+      setErrorMessage(error.message || 'An unexpected error occurred');
       toast.error(error.message || 'An unexpected error occurred');
 
       // If this was a payment success but status update failed, still proceed
@@ -183,90 +220,103 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className={`px-4 py-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+      {/* Payment Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-2xl font-semibold main-font">Payment Details</h3>
+        <div className="dark:bg-input font-semibold rounded-full px-3 py-1 text-sm main-font">
+          ${amount}
+        </div>
+      </div>
+
+      {/* Payment Status Messages */}
+      {paymentStatus === 'success' && (
+        <div className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm">
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          <span>Payment successful! Processing your booking...</span>
+        </div>
+      )}
+
+      {paymentStatus === 'error' && errorMessage && (
+        <div className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Secure Payment Badge */}
       <div
-        className={`p-6 rounded-lg space-y-3 ${
-          isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-100'
+        className={`flex items-center gap-2 mb-4 p-3 rounded-lg ${
+          isDarkMode ? 'bg-zinc-800' : 'bg-gray-50'
         }`}
       >
-        <div className="flex justify-between items-center">
-          <span
-            className={`text-2xl font-semibold main-font  ${
-              isDarkMode ? 'text-zinc-200' : 'text-black'
-            }`}
-          >
-            Amount to pay
-          </span>
-          <span
-            className={`text-2xl font-semibold main-font ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}
-          >
-            ${amount}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Lock className="w-4 h-4 text-green-500" />
-          <span className="main-font text-sky-500 font-medium">
-            Secure payment powered by Stripe
-          </span>
-        </div>
+        <Lock className="w-4 h-4 text-green-500" />
+        <span className="text-sm text-sky-500 font-medium">
+          Secure payment powered by Stripe
+        </span>
       </div>
 
-      <div
-        className={`rounded-lg ${
-          isDarkMode ? 'bg-zinc-800/30' : 'bg-white'
-        } p-6`}
-      >
-        <PaymentElement
-          options={{
-            layout: 'tabs',
-            defaultValues: {
-              billingDetails: {
-                name: '',
-                email: '',
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Payment Method Selection with Enhanced UI */}
+        <div
+          className={`rounded-lg ${
+            isDarkMode ? 'bg-zinc-800/70' : 'bg-white border border-gray-100'
+          } p-4`}
+        >
+          <PaymentElement
+            options={{
+              layout: {
+                type: 'tabs',
+                defaultCollapsed: false,
               },
-            },
-          }}
-        />
-      </div>
+              defaultValues: {
+                billingDetails: {
+                  name: '',
+                },
+              },
+            }}
+          />
+        </div>
 
-      <div className="flex justify-end gap-3 mt-6">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isProcessing}
-          className={`h-11 px-5 ${
-            isDarkMode
-              ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-200'
-              : 'hover:bg-gray-100'
-          }`}
-        >
-          Back
-        </Button>
-        <Button
-          type="submit"
-          disabled={isProcessing || !stripe || !elements}
-          className={`h-11 px-5 ${
-            isDarkMode
-              ? 'bg-blue-700 hover:bg-blue-600'
-              : 'bg-blue-700 hover:bg-blue-600'
-          }`}
-        >
-          {isProcessing ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              <span className="">Pay ${amount}</span>
-            </div>
-          )}
-        </Button>
-      </div>
-    </form>
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isProcessing}
+            className={`${
+              isDarkMode
+                ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-300'
+                : 'hover:bg-gray-100'
+            }`}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <Button
+            type="submit"
+            disabled={isProcessing || !stripe || !elements}
+            className={`${
+              isDarkMode
+                ? 'bg-blue-600 hover:bg-blue-500'
+                : 'bg-blue-600 hover:bg-blue-500'
+            }`}
+          >
+            {isProcessing ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                <span>Pay ${amount}</span>
+              </div>
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };

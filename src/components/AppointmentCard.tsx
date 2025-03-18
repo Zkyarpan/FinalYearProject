@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import {
   Video,
   Clock,
@@ -93,6 +93,39 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
     }
   };
 
+  // Helper function to safely format dates
+  const formatDate = (dateString, formatString) => {
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        return 'Invalid date';
+      }
+      return format(date, formatString);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  // Check if dates are valid before rendering
+  const isValidAppointmentDate = () => {
+    try {
+      const date = new Date(appointment.dateTime);
+      return isValid(date);
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const isValidEndTime = () => {
+    try {
+      const date = new Date(appointment.endTime);
+      return isValid(date);
+    } catch (error) {
+      return false;
+    }
+  };
+
   return (
     <div className="group relative transition-all hover:shadow-md dark:hover:shadow-zinc-800 hover:border-primary/20 bg-transparent border rounded-lg dark:border-zinc-800">
       <CardContent className="p-5">
@@ -125,31 +158,40 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                       appointment.status
                     )}`}
                   />
-                  <span className="capitalize bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 rounded-md text-xs font-medium;">{appointment.status}</span>
+                  <span className="capitalize bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 rounded-md text-xs font-medium;">
+                    {appointment.status}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CalendarDays className="h-4 w-4 text-primary/70" />
-                <span>
-                  {format(new Date(appointment.dateTime), 'EEEE, MMMM d')}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4 text-primary/70" />
-                <span>
-                  {format(new Date(appointment.dateTime), 'h:mm a')} -{' '}
-                  {format(new Date(appointment.endTime), 'h:mm a')}
-                </span>
-              </div>
+              {isValidAppointmentDate() && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4 text-primary/70" />
+                  <span>
+                    {formatDate(appointment.dateTime, 'EEEE, MMMM d')}
+                  </span>
+                </div>
+              )}
+
+              {isValidAppointmentDate() && isValidEndTime() && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4 text-primary/70" />
+                  <span>
+                    {formatDate(appointment.dateTime, 'h:mm a')} -{' '}
+                    {formatDate(appointment.endTime, 'h:mm a')}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Video className="h-4 w-4 text-primary/70" />
                 <span className="capitalize">
                   {appointment.sessionFormat} Session
                 </span>
               </div>
+
               {appointment.payment && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <DollarSign className="h-4 w-4 text-primary/70" />

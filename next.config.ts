@@ -3,7 +3,7 @@
 const nextConfig = {
   // Original settings from your working config
   poweredByHeader: false,
-  reactStrictMode: false,
+  reactStrictMode: true,
 
   // Keep your existing image configuration
   images: {

@@ -1245,7 +1245,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
 
       buttonProps = {
         disabled: true,
-        className: 'dark:bg-blue-600 text-primary-foreground cursor-not-allowed',
+        className:
+          'dark:bg-blue-600 text-primary-foreground cursor-not-allowed',
         children: (
           <>
             <Clock className="h-4 w-4 mr-2" />
@@ -1480,13 +1481,16 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ role }) => {
       {renderCancelDialog()}
       {renderDetailsDialog()}
       {selectedAppointment && renderSessionStatusIndicator(selectedAppointment)}
-      <VideoCallModal
-        open={isVideoCallModalOpen}
-        onClose={() => {
-          setIsVideoCallModalOpen(false);
-          setSelectedAppointment(null);
-        }}
-      />
+      {isVideoCallModalOpen && selectedAppointment && (
+        <VideoCallModal
+          open={isVideoCallModalOpen}
+          onClose={() => {
+            setIsVideoCallModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+          conversationId={selectedAppointment._id}
+        />
+      )}
     </div>
   );
 };

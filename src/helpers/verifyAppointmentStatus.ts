@@ -73,7 +73,9 @@ interface Appointment {
   canJoin: boolean;
 }
 
-export const verifyAppointmentStatus = (appointment: Appointment): Appointment => {
+export const verifyAppointmentStatus = (
+  appointment: Appointment
+): Appointment => {
   // Re-check isPast and canJoin in case the page has been open for a while
   const now = new Date();
   const appointmentDate = new Date(

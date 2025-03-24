@@ -243,6 +243,37 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         setConnectionState('reconnecting');
       });
 
+      registerEvent('webrtc_signal', data => {
+        // Ignore most signal events by default - these will be handled by the VideoCall context
+        if (data.type === 'call-ended') {
+          // Check if we're handling a stale event
+          try {
+            const endedCallsStr =
+              localStorage.getItem('mentality_ended_calls') || '[]';
+            const endedCalls = JSON.parse(endedCallsStr);
+
+            // If this is a new ended call, add it to our ended calls registry
+            if (data.callId && !endedCalls.includes(data.callId)) {
+              endedCalls.push(data.callId);
+              localStorage.setItem(
+                'mentality_ended_calls',
+                JSON.stringify(endedCalls)
+              );
+
+              // Note: We let the VideoCallContext handle showing the toast
+              console.log(
+                `Socket: registered ended call ${data.callId} in storage`
+              );
+            }
+          } catch (err) {
+            console.error(
+              'Error handling call-ended signal in socket context:',
+              err
+            );
+          }
+        }
+      });
+
       // Handle reconnect failed
       registerEvent('reconnect_failed', () => {
         console.error('Socket reconnection failed after all attempts');

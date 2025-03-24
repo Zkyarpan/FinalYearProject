@@ -69,6 +69,29 @@ const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
     }
   };
 
+  const formatDateTime = (
+    dateTimeStr,
+    formatPattern,
+    fallbackText = 'Not scheduled'
+  ) => {
+    try {
+      if (!dateTimeStr) return fallbackText;
+
+      // Try to parse the date
+      const date = new Date(dateTimeStr);
+
+      // Check if date is valid (will return NaN if invalid)
+      if (isNaN(date.getTime())) {
+        return fallbackText;
+      }
+
+      return format(date, formatPattern);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return fallbackText;
+    }
+  };
+
   const getPaymentStatusVariant = (
     status
   ): 'default' | 'destructive' | 'outline' | 'secondary' | null | undefined => {
@@ -207,7 +230,7 @@ const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
                         <div className="flex items-center gap-2 text-xs">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                           <span>
-                            {format(
+                            {formatDateTime(
                               new Date(appointment.dateTime),
                               'EEEE, MMMM d, yyyy'
                             )}
@@ -216,8 +239,15 @@ const AppointmentDialog = ({ appointment, isOpen, onClose, onJoinSession }) => {
                         <div className="flex items-center gap-2 text-xs">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                           <span>
-                            {format(new Date(appointment.dateTime), 'h:mm a')} -{' '}
-                            {format(new Date(appointment.endTime), 'h:mm a')}
+                            {formatDateTime(
+                              new Date(appointment.dateTime),
+                              'h:mm a'
+                            )}{' '}
+                            -{' '}
+                            {formatDateTime(
+                              new Date(appointment.endTime),
+                              'h:mm a'
+                            )}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs">

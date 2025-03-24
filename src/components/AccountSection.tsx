@@ -50,7 +50,7 @@ export default function AccountSection({
         </div>
         <div className="flex flex-col items-start justify-center">
           <span className="text-sm font-medium hover:translate-x-1 transition-transform duration-200">
-            {displayRole}
+            {firstName}
           </span>
           <span className="text-xs dark:text-gray-300">{getManageLabel()}</span>
         </div>

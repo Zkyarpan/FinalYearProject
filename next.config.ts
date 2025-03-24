@@ -1,40 +1,32 @@
-// next.config.js - Safe version with minimal changes
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Original settings from your working config
+  // Core settings
   poweredByHeader: false,
   reactStrictMode: false,
 
-  // Keep your existing image configuration
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'dqy38fnwh4fqs.cloudfront.net',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.ctfassets.net',
-      },
-      {
-        protocol: 'https',
-        hostname: 'i.postimg.cc',
-      },
-    ],
-    minimumCacheTTL: 60, // Keep your original value or set to 60 if unsure
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  // Enable server components as much as possible for better performance
+  experimental: {
+    serverComponentsExternalPackages: ['mongoose', 'bcryptjs'],
+    optimizeCss: true, // Optimize CSS
+    scrollRestoration: true,
+    optimisticClientCache: true,
   },
 
-  // Your original headers configuration
+  // Image optimizations
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'dqy38fnwh4fqs.cloudfront.net' },
+      { protocol: 'https', hostname: 'images.ctfassets.net' },
+      { protocol: 'https', hostname: 'i.postimg.cc' },
+    ],
+    minimumCacheTTL: 86400, // Increase cache time to 24 hours
+    deviceSizes: [640, 750, 1080, 1920], // Reduced sizes
+    imageSizes: [16, 64, 128], // Only necessary sizes
+  },
+
+  // CORS headers
   async headers() {
     return [
       {
@@ -46,24 +38,88 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
         ],
       },
+      // Enhanced cache headers
+      {
+        source: '/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/_next/image/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, immutable' },
+        ],
+      },
+      {
+        source: '/:all*(svg|jpg|png|webp)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
   },
 
-  // Your original webpack configuration - with minimal optimizations
+  // Enhanced webpack configuration
   webpack: (config, { dev, isServer }) => {
     // Only apply these optimizations in production
     if (!dev) {
       // Enable production mode optimizations
       config.mode = 'production';
+
+      // Optimize chunk splitting
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendors: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+              priority: 10,
+              reuseExistingChunk: true,
+            },
+            commons: {
+              name: 'commons',
+              minChunks: 2,
+              priority: 1,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+        runtimeChunk: {
+          name: 'runtime',
+        },
+      };
     }
+
+    // Add module resolvers
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // Add any needed aliases
+    };
+
     return config;
   },
 
-  // Basic performance optimizations that shouldn't break anything
+  // Production optimizations
   compress: true,
   generateEtags: true,
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  swcMinify: true,
+
+  // Only include necessary page extensions
+  pageExtensions: ['tsx', 'ts'],
   trailingSlash: false,
+
+  // Disable source maps in production for better performance
+  productionBrowserSourceMaps: false,
 };
 
 module.exports = nextConfig;

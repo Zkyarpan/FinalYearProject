@@ -47,6 +47,7 @@ export interface CallParticipant {
 export interface Call {
   callId: string;
   appointmentId?: string;
+  conversationId?: string;
   callType: 'video' | 'audio';
   status: CallStatus;
   initiator: CallParticipant;
@@ -198,6 +199,7 @@ export const VideoCallProvider = ({
   const [isVideoOff, setIsVideoOff] = useState<boolean>(false);
   const [callStats, setCallStats] = useState<CallStats>({});
   const [isCallMinimized, setIsCallMinimized] = useState<boolean>(false);
+  const [previousCall, setPreviousCall] = useState<Call | null>(null);
 
   // Debug function with timestamp
   const logDebug = useCallback((message: string, ...args: any[]) => {
@@ -386,8 +388,51 @@ export const VideoCallProvider = ({
   }, [socket, isConnected, currentCall, user?._id, logDebug]);
 
   // End call
+  // const endCall = useCallback(
+  //   async (reason?: string): Promise<void> => {
+  //     if (!currentCall || !user?._id) {
+  //       logDebug('Cannot end call - prerequisites not met');
+  //       cleanupCall();
+  //       setCurrentCall(null);
+  //       setCallStatus(CallStatus.IDLE);
+  //       return;
+  //     }
+
+  //     logDebug('Ending call', reason);
+
+  //     // Send call-ended signal
+  //     if (socket && isConnected) {
+  //       socket.emit('webrtc_signal', {
+  //         type: 'call-ended',
+  //         from: user._id,
+  //         to:
+  //           currentCall.initiator.userId === user._id
+  //             ? currentCall.receiver.userId
+  //             : currentCall.initiator.userId,
+  //         callId: currentCall.callId,
+  //         reason: reason || 'ended',
+  //         appointmentId: currentCall.appointmentId,
+  //       });
+  //     }
+
+  //     // Clean up
+  //     cleanupCall();
+
+  //     // Reset call state with a slight delay to allow animations
+  //     setTimeout(() => {
+  //       setCurrentCall(null);
+  //       setCallStatus(CallStatus.IDLE);
+  //     }, 500);
+
+  //     logDebug('Call ended');
+  //   },
+  //   [socket, isConnected, currentCall, user?._id, cleanupCall, logDebug]
+  // );
+
+  // This update focuses on the endCall function in your VideoCallContext.tsx file
+
   const endCall = useCallback(
-    async (reason?: string): Promise<void> => {
+    async (reason?: string, conversationId?: string): Promise<void> => {
       if (!currentCall || !user?._id) {
         logDebug('Cannot end call - prerequisites not met');
         cleanupCall();
@@ -396,9 +441,32 @@ export const VideoCallProvider = ({
         return;
       }
 
+      // Prevent ending a call that's already ended
+      if (callStatus === CallStatus.ENDED) {
+        logDebug('Call already ended, ignoring duplicate end request');
+        return;
+      }
+
       logDebug('Ending call', reason);
 
-      // Send call-ended signal
+      // Update call status immediately to prevent multiple end events
+      setCallStatus(CallStatus.ENDED);
+
+      // Create a copy of current call before we lose it in cleanup
+      const callToEnd = { ...currentCall };
+
+      // Include conversationId in the call to ensure call history is saved properly
+      const callConversationId = conversationId || currentCall.conversationId;
+
+      // Track call end time for duration calculation
+      const endTime = new Date();
+      const callDuration = currentCall.startTime
+        ? Math.floor(
+            (endTime.getTime() - currentCall.startTime.getTime()) / 1000
+          )
+        : 0;
+
+      // Send call-ended signal with conversationId always included
       if (socket && isConnected) {
         socket.emit('webrtc_signal', {
           type: 'call-ended',
@@ -410,7 +478,38 @@ export const VideoCallProvider = ({
           callId: currentCall.callId,
           reason: reason || 'ended',
           appointmentId: currentCall.appointmentId,
+          conversationId: callConversationId, // Ensure this is always included
+          duration: callDuration, // Include duration for call history
+          endedAt: endTime.toISOString(), // Include end time for call history
         });
+
+        // Also send call summary for reliable call history saving
+        socket.emit('call_summary', {
+          callId: currentCall.callId,
+          from: user._id,
+          to:
+            currentCall.initiator.userId === user._id
+              ? currentCall.receiver.userId
+              : currentCall.initiator.userId,
+          callType: currentCall.callType || 'video',
+          duration: callDuration,
+          startedAt: currentCall.startTime?.toISOString(),
+          endedAt: endTime.toISOString(),
+          status: 'ended',
+          conversationId: callConversationId,
+          appointmentId: currentCall.appointmentId,
+        });
+      }
+
+      // Store previous call data if leaving temporarily
+      if (reason === 'left_temporarily') {
+        setPreviousCall({
+          ...currentCall,
+          endTime,
+          duration: callDuration,
+        });
+      } else {
+        setPreviousCall(null);
       }
 
       // Clean up
@@ -424,7 +523,15 @@ export const VideoCallProvider = ({
 
       logDebug('Call ended');
     },
-    [socket, isConnected, currentCall, user?._id, cleanupCall, logDebug]
+    [
+      socket,
+      isConnected,
+      currentCall,
+      callStatus,
+      user?._id,
+      cleanupCall,
+      logDebug,
+    ]
   );
 
   // Initialize WebRTC
@@ -894,75 +1001,6 @@ export const VideoCallProvider = ({
       }, 3000); // 3 second timeout
     });
   };
-
-  // Leave call temporarily
-  const leaveCallTemporarily = useCallback(async (): Promise<void> => {
-    if (!socket || !isConnected || !currentCall || !user?._id) {
-      logDebug('Cannot leave call temporarily - prerequisites not met');
-      return;
-    }
-
-    logDebug('Leaving call temporarily');
-
-    // Send participant-left signal instead of call-ended
-    socket.emit('webrtc_signal', {
-      type: 'participant-left',
-      from: user._id,
-      to:
-        currentCall.initiator.userId === user._id
-          ? currentCall.receiver.userId
-          : currentCall.initiator.userId,
-      callId: currentCall.callId,
-      reason: 'left_temporarily',
-      appointmentId: currentCall.appointmentId,
-    });
-
-    // Clean up local resources but don't reset call state completely
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        track.stop();
-      });
-      localStreamRef.current = null;
-      setLocalStream(null);
-    }
-
-    // Close data channel
-    if (dataChannelRef.current) {
-      dataChannelRef.current.close();
-      dataChannelRef.current = null;
-    }
-
-    // Close peer connection but keep call state
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-
-    // Clear timeouts and intervals
-    if (callTimeoutRef.current) {
-      clearTimeout(callTimeoutRef.current);
-      callTimeoutRef.current = null;
-    }
-
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-
-    if (statsIntervalRef.current) {
-      clearInterval(statsIntervalRef.current);
-      statsIntervalRef.current = null;
-    }
-
-    // Reset pending ICE candidates
-    pendingIceCandidatesRef.current = [];
-
-    // Update call status but don't nullify the call object
-    setCallStatus(CallStatus.IDLE);
-    setMediaStatus(MediaStatus.LOADING);
-
-    logDebug('Call left temporarily, can rejoin later');
-  }, [socket, isConnected, currentCall, user?._id, logDebug]);
 
   // Create and send offer
   const createAndSendOffer = useCallback(async () => {
@@ -1450,63 +1488,342 @@ export const VideoCallProvider = ({
     ]
   );
 
-  // Rejoin a call after leaving temporarily
   const rejoinCall = useCallback(
     async (appointmentId: string): Promise<void> => {
       try {
         logDebug(`Rejoining call for appointment ${appointmentId}`);
 
-        // Check if we still have call state
-        if (!currentCall) {
-          logDebug('No active call to rejoin, starting fresh');
-          // Fall back to regular join logic
+        // Check if we have previous call data
+        const callToRejoin = currentCall || previousCall;
+
+        if (!callToRejoin) {
+          logDebug('No previous call to rejoin, starting fresh');
+          toast.error('Cannot rejoin - no previous call found');
           return;
         }
 
-        // If we have current call state, use it to rejoin
+        // Update UI state first to show progress
         setCallStatus(CallStatus.CONNECTING);
+        setMediaStatus(MediaStatus.LOADING);
 
-        // Initialize WebRTC
+        // Reset flags
+        hasReducedQuality.current = false;
+        lastQualityAlertTime.current = null;
+
+        // Store previous call data in localStorage to handle page refreshes
+        try {
+          localStorage.setItem(
+            'rejoining_call_data',
+            JSON.stringify({
+              callId: callToRejoin.callId,
+              appointmentId,
+              timestamp: Date.now(),
+            })
+          );
+        } catch (err) {
+          logDebug('Error storing rejoin data:', err);
+        }
+
+        // Initialize WebRTC with completely fresh connection
+        // First, ensure old connection is fully closed
+        if (peerConnection.current) {
+          peerConnection.current.close();
+          peerConnection.current = null;
+        }
+
+        // Give a small delay for cleanup
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         const initialized = await initializeWebRTC();
 
         if (!initialized) {
           toast.error('Failed to initialize video call');
+          setCallStatus(CallStatus.ERROR);
           return;
         }
 
         // Get the other participant
         const otherParticipantId =
-          currentCall.initiator.userId === user?._id
-            ? currentCall.receiver.userId
-            : currentCall.initiator.userId;
+          callToRejoin.initiator.userId === user?._id
+            ? callToRejoin.receiver.userId
+            : callToRejoin.initiator.userId;
 
-        // Send rejoin signal
-        socket?.emit('webrtc_signal', {
-          type: 'rejoin-call',
-          from: user?._id,
-          to: otherParticipantId,
-          callId: currentCall.callId,
-          appointmentId: appointmentId,
+        // Use the existing callId
+        const callId = callToRejoin.callId;
+
+        // Update current call state to use the previous call info
+        setCurrentCall({
+          ...callToRejoin,
+          status: CallStatus.CONNECTING,
+          reconnectionAttempts: (callToRejoin.reconnectionAttempts || 0) + 1,
         });
 
-        // Create and send offer
-        await createAndSendOffer();
+        // Send rejoin signal
+        if (socket && isConnected) {
+          socket.emit('webrtc_signal', {
+            type: 'rejoin-call',
+            from: user?._id,
+            to: otherParticipantId,
+            callId: callId,
+            appointmentId: appointmentId,
+            reconnecting: true,
+            originalCallStatus: callToRejoin.status,
+            conversationId: callToRejoin.conversationId,
+            timestamp: Date.now(),
+          });
 
-        logDebug('Rejoining call - sent new offer');
+          toast.info('Attempting to rejoin call...', { id: 'rejoin-toast' });
+
+          // Wait a short moment
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Create and send a new offer with the same callId
+          const pc = peerConnection.current;
+          if (!pc) {
+            throw new Error('Peer connection not initialized');
+          }
+
+          try {
+            // Use type assertion to help TypeScript understand the type
+            const rtcPeerConnection = pc as RTCPeerConnection;
+
+            const offer = await rtcPeerConnection.createOffer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true,
+              iceRestart: true, // Important for reconnection!
+            });
+
+            await rtcPeerConnection.setLocalDescription(offer);
+
+            socket.emit('webrtc_signal', {
+              type: 'offer',
+              from: user?._id,
+              to: otherParticipantId,
+              callId: callId,
+              signal: offer,
+              appointmentId: appointmentId,
+              isRejoin: true,
+              conversationId: callToRejoin.conversationId,
+            });
+
+            logDebug('Rejoining call - sent new offer with existing callId');
+            toast.success('Reconnecting to call...', { id: 'rejoin-toast' });
+          } catch (error) {
+            logDebug('Error creating rejoin offer:', error);
+            toast.error('Failed to create connection offer');
+            throw error;
+          }
+        } else {
+          throw new Error('Socket not connected');
+        }
+
+        // Setup timeout for reconnection attempt
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (callStatus === CallStatus.CONNECTING) {
+            logDebug('Rejoin timed out');
+            toast.error('Failed to rejoin call. Please try again.');
+            setCallStatus(CallStatus.ERROR);
+          }
+        }, 15000);
       } catch (error) {
         logDebug('Error rejoining call:', error);
         toast.error('Failed to rejoin call');
+        setCallStatus(CallStatus.ERROR);
       }
     },
     [
       currentCall,
+      previousCall,
       user?._id,
       socket,
+      isConnected,
       initializeWebRTC,
-      createAndSendOffer,
+      callStatus,
       logDebug,
     ]
   );
+
+  // Also update leaveCallTemporarily to better preserve call state
+  const leaveCallTemporarily = useCallback(async (): Promise<void> => {
+    if (!socket || !isConnected || !currentCall || !user?._id) {
+      logDebug('Cannot leave call temporarily - prerequisites not met');
+      return;
+    }
+
+    logDebug('Leaving call temporarily');
+
+    // Store call state more completely for rejoin
+    const callToRestore = {
+      ...currentCall,
+      leftAt: new Date(),
+      videoState: isVideoOff,
+      audioState: isMuted,
+    };
+
+    // Store this in localStorage to make it available even after refresh
+    try {
+      localStorage.setItem(
+        'temporarily_left_call',
+        JSON.stringify({
+          callId: currentCall.callId,
+          appointmentId: currentCall.appointmentId,
+          participantId:
+            currentCall.initiator.userId === user._id
+              ? currentCall.receiver.userId
+              : currentCall.initiator.userId,
+          timestamp: Date.now(),
+          callData: callToRestore,
+        })
+      );
+    } catch (err) {
+      logDebug('Error storing call state:', err);
+    }
+
+    // Set previous call for rejoin
+    setPreviousCall(callToRestore);
+
+    // Send participant-left signal instead of call-ended
+    socket.emit('webrtc_signal', {
+      type: 'participant-left',
+      from: user._id,
+      to:
+        currentCall.initiator.userId === user._id
+          ? currentCall.receiver.userId
+          : currentCall.initiator.userId,
+      callId: currentCall.callId,
+      reason: 'left_temporarily',
+      appointmentId: currentCall.appointmentId,
+      conversationId: currentCall.conversationId, // Include conversationId
+      // Add timestamp to help with timeouts
+      timestamp: Date.now(),
+    });
+
+    // Clean up local resources but don't reset call state completely
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+      localStreamRef.current = null;
+      setLocalStream(null);
+    }
+
+    // Clean up remote stream
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current = null;
+      setRemoteStream(null);
+    }
+
+    // Close data channel
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close();
+      dataChannelRef.current = null;
+    }
+
+    // Close peer connection but keep call state
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+
+    // Clear all timeouts
+    if (callTimeoutRef.current) {
+      clearTimeout(callTimeoutRef.current);
+      callTimeoutRef.current = null;
+    }
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (statsIntervalRef.current) {
+      clearInterval(statsIntervalRef.current);
+      statsIntervalRef.current = null;
+    }
+
+    if (connectionHealthIntervalRef.current) {
+      clearInterval(connectionHealthIntervalRef.current);
+      connectionHealthIntervalRef.current = null;
+    }
+
+    // Reset pending ICE candidates
+    pendingIceCandidatesRef.current = [];
+
+    // Update call status but don't nullify the call object
+    setCallStatus(CallStatus.IDLE);
+    setMediaStatus(MediaStatus.LOADING);
+
+    // Keep the current call state, just update its status
+    setCurrentCall(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        status: CallStatus.WAITING,
+        leftAt: new Date(), // Add timestamp when user left
+      };
+    });
+
+    toast.info('You left the call temporarily. You can rejoin later.');
+
+    logDebug('Call left temporarily, can rejoin later');
+  }, [
+    socket,
+    isConnected,
+    currentCall,
+    user?._id,
+    isMuted,
+    isVideoOff,
+    logDebug,
+  ]);
+
+  // Add this useEffect to check for temporarily left calls on page load
+  useEffect(() => {
+    // Check for temporarily left call on component mount (handles page refreshes)
+    const checkForTemporarilyLeftCall = () => {
+      try {
+        const tempCallStr = localStorage.getItem('temporarily_left_call');
+        if (!tempCallStr) return;
+
+        const tempCallData = JSON.parse(tempCallStr);
+
+        // Check if this is recent (within 30 minutes)
+        const isRecent = Date.now() - tempCallData.timestamp < 30 * 60 * 1000;
+
+        if (isRecent && tempCallData.callData && tempCallData.appointmentId) {
+          logDebug('Found temporarily left call data:', tempCallData);
+
+          // Restore the previous call state
+          setPreviousCall(tempCallData.callData);
+
+          // Notify user they can rejoin
+          toast.info(
+            'You were in a call that was interrupted. Would you like to rejoin?',
+            {
+              duration: 10000,
+              action: {
+                label: 'Rejoin',
+                onClick: () => {
+                  rejoinCall(tempCallData.appointmentId);
+                },
+              },
+            }
+          );
+        } else {
+          // Clean up old data
+          localStorage.removeItem('temporarily_left_call');
+        }
+      } catch (err) {
+        logDebug('Error checking for temporarily left call:', err);
+      }
+    };
+
+    // Small delay to ensure context is fully initialized
+    setTimeout(checkForTemporarilyLeftCall, 1000);
+  }, [rejoinCall, logDebug]);
 
   // Join an incoming call (receiver)
   const joinCall = useCallback(

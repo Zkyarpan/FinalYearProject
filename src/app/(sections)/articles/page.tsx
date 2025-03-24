@@ -1,450 +1,368 @@
 'use client';
 
-import React from 'react';
-import {
-  Search,
-  BookOpen,
-  Clock,
-  Calendar,
-  Tag,
-  TrendingUp,
-  Heart,
-  Share2,
-  Bookmark,
-  Filter,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Skeleton from '@/components/common/Skeleton';
+import { generateSlug } from '@/helpers/generateSlug';
+import { useUserStore } from '@/store/userStore';
+import { useRouter } from 'next/navigation';
+
+interface Author {
+  _id: string;
+  name: string;
+  avatar: string;
+  isOwner?: boolean;
+}
+
+interface Article {
+  _id: string;
+  title: string;
+  content: string;
+  articleImage: string;
+  category: string;
+  tags: string[];
+  readTime: number | string;
+  author: Author;
+  publishDate: string;
+  isOwner?: boolean;
+}
+
+interface ApiResponse {
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    articles: Article[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    };
+  };
+}
+
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
+
+const ArticleOwnershipTag = ({
+  isOwner,
+  size = 'default',
+}: {
+  isOwner: boolean;
+  size?: 'small' | 'default';
+}) => {
+  if (!isOwner) return null;
+
+  // Base classes for all sizes
+  const baseClasses =
+    'inline-flex items-center font-medium shadow rounded-full';
+
+  // Dynamic classes based on size prop
+  const styles = {
+    small: 'px-2 py-0.5 text-xs bg-blue-600 text-white',
+    default: 'px-3 py-1 text-sm bg-blue-600 text-white',
+  };
+
+  // Choose style based on size
+  const style = styles[size];
+
+  return <span className={`${baseClasses} ${style}`}>Your Article</span>;
+};
 
 const ArticlesPage = () => {
-  const categories = [
-    {
-      name: 'Depression & Anxiety',
-      count: 42,
-      color: 'bg-blue-100 text-blue-800',
-    },
-    {
-      name: 'Trauma & PTSD',
-      count: 38,
-      color: 'bg-purple-100 text-purple-800',
-    },
-    { name: 'Relationships', count: 35, color: 'bg-pink-100 text-pink-800' },
-    {
-      name: 'Self-Development',
-      count: 31,
-      color: 'bg-green-100 text-green-800',
-    },
-    { name: 'Mindfulness', count: 29, color: 'bg-yellow-100 text-yellow-800' },
-    {
-      name: 'Work & Stress',
-      count: 25,
-      color: 'bg-orange-100 text-orange-800',
-    },
-  ];
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const userId = useUserStore(state => state._id);
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const router = useRouter();
 
-  const featuredArticles = [
-    {
-      title: 'Understanding and Managing Depression in the Modern World',
-      excerpt:
-        'A comprehensive guide to recognizing depression symptoms, understanding their impact, and developing effective coping strategies.',
-      image:
-        'https://images.unsplash.com/photo-1536148935331-408321065b18?auto=format&fit=crop&w=1200',
-      author: {
-        name: 'Dr. Sarah Johnson',
-        credentials: 'Ph.D. Clinical Psychology',
-        image:
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200',
-      },
-      readTime: '12 min read',
-      date: 'Feb 15, 2024',
-      category: 'Depression & Anxiety',
-      engagement: {
-        likes: 1.2,
-        shares: 342,
-        saves: 567,
-      },
-    },
-    {
-      title: 'The Science of Trauma Recovery: Latest Research and Approaches',
-      excerpt:
-        'Explore evidence-based approaches to trauma healing and discover how the brain can recover from traumatic experiences.',
-      image:
-        'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=1200',
-      author: {
-        name: 'Dr. Michael Chen',
-        credentials: 'M.D., Psychiatrist',
-        image:
-          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200',
-      },
-      readTime: '15 min read',
-      date: 'Feb 14, 2024',
-      category: 'Trauma & PTSD',
-      engagement: {
-        likes: 956,
-        shares: 289,
-        saves: 432,
-      },
-    },
-  ];
+  const defaultImage = '/default-image.jpg';
+  const defaultAvatar = '/default-avatar.jpg';
+  const defaultAlt = 'Article Image';
 
-  const latestArticles = [
-    {
-      title: 'Building Emotional Resilience in Challenging Times',
-      excerpt:
-        'Learn practical strategies to strengthen your emotional resilience and navigate lifes uncertainties with confidence.',
-      author: {
-        name: 'Dr. Emma Wilson',
-        credentials: 'Psy.D., Clinical Psychologist',
-        image:
-          'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200',
-      },
-      readTime: '10 min read',
-      date: 'Feb 13, 2024',
-      category: 'Self-Development',
-    },
-    {
-      title: 'Mindfulness-Based Approaches to Anxiety Management',
-      excerpt:
-        'Discover how mindfulness practices can help reduce anxiety and promote mental well-being in daily life.',
-      author: {
-        name: 'Dr. James Miller',
-        credentials: 'Ph.D., Clinical Psychology',
-        image:
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200',
-      },
-      readTime: '8 min read',
-      date: 'Feb 12, 2024',
-      category: 'Mindfulness',
-    },
-  ];
+  const fetchArticles = async (page = 1) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/articles/index?page=${page}&limit=10`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch articles');
+      }
+      const data: ApiResponse = await res.json();
 
-  return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                Mental Health Resources
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Evidence-based articles by mental health professionals
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Search articles..."
-                  className="pl-10"
-                />
-              </div>
-              <Select>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">Most Recent</SelectItem>
-                  <SelectItem value="popular">Most Popular</SelectItem>
-                  <SelectItem value="trending">Trending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </header>
+      if (data.Result && data.Result.articles.length > 0) {
+        const articlesWithOwnership = data.Result.articles.map(article => ({
+          ...article,
+          isOwner: isAuthenticated && userId === article.author?._id,
+        }));
+        setArticles(articlesWithOwnership);
+        setTotalPages(data.Result.pagination.pages);
+        setCurrentPage(data.Result.pagination.page);
+      } else {
+        setArticles([]);
+      }
+    } catch (error) {
+      setError('Failed to load articles');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-2 w-full">
-          {categories.map(category => (
-            <Button
-              key={category.name}
-              variant="outline"
-              className={`${category.color} border-none whitespace-nowrap text-sm w-full`}
+  useEffect(() => {
+    fetchArticles();
+  }, [userId, isAuthenticated]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchArticles(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex justify-center mt-8">
+        <div className="flex space-x-2">
+          {currentPage > 1 && (
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              className="px-4 py-2 rounded-lg border bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]"
             >
-              {category.name}
-              <Badge variant="secondary" className="ml-2">
-                {category.count}
-              </Badge>
-            </Button>
+              Previous
+            </button>
+          )}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-4 py-2 rounded-lg border ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]'
+              }`}
+            >
+              {page}
+            </button>
           ))}
+          {currentPage < totalPages && (
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              className="px-4 py-2 rounded-lg border bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]"
+            >
+              Next
+            </button>
+          )}
         </div>
+      </div>
+    );
+  };
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Featured Articles */}
-          <div className="lg:col-span-2 space-y-6">
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                  Featured Articles
-                </h2>
-                <Button variant="ghost" size="sm">
-                  View all
-                </Button>
-              </div>
-              <div className="space-y-4">
-                {featuredArticles.map((article, index) => (
-                  <Card
-                    key={index}
-                    className="overflow-hidden hover:shadow-lg transition-shadow"
-                  >
-                    <div className="md:flex">
-                      <div className="md:w-1/3">
-                        <img
-                          src={article.image}
-                          alt={article.title}
-                          className="h-48 md:h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="md:w-2/3 p-4">
-                        <Badge
-                          className={`mb-2 ${
-                            article.category === 'Depression & Anxiety'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
-                          }`}
-                        >
-                          {article.category}
-                        </Badge>
-                        <h3 className="text-lg font-semibold mb-2 hover:text-blue-600 cursor-pointer">
-                          {article.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                          {article.excerpt}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={article.author.image} />
-                              <AvatarFallback>
-                                {article.author.name
-                                  .split(' ')
-                                  .map(n => n[0])
-                                  .join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {article.author.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {article.author.credentials}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <Heart className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <Share2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <Bookmark className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </section>
-
-            {/* Latest Articles */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Latest Articles</h2>
-                <Button variant="ghost" size="sm">
-                  View all
-                </Button>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                {latestArticles.map((article, index) => (
-                  <Card
-                    key={index}
-                    className="hover:shadow-lg transition-shadow"
-                  >
-                    <CardHeader className="space-y-2 p-4">
-                      <Badge
-                        className={
-                          article.category === 'Self-Development'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }
-                      >
-                        {article.category}
-                      </Badge>
-                      <CardTitle className="text-base hover:text-blue-600 cursor-pointer">
-                        {article.title}
-                      </CardTitle>
-                      <CardDescription className="text-sm">
-                        {article.excerpt}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardFooter className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage src={article.author.image} />
-                          <AvatarFallback>
-                            {article.author.name
-                              .split(' ')
-                              .map(n => n[0])
-                              .join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {article.author.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {article.author.credentials}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Clock className="w-3 h-3" />
-                        {article.readTime}
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </section>
+  if (isLoading) return <Skeleton />;
+  if (error) {
+    return (
+      <main className="min-h-screen">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{error}</h1>
+            <p className="text-gray-600">Please try again later.</p>
           </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-4">
-            <Card>
-              <CardHeader className="p-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Filter className="w-4 h-4" />
-                  Filter Articles
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 p-4">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">
-                    Reading Time
-                  </label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select duration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="short">Under 5 minutes</SelectItem>
-                      <SelectItem value="medium">5-15 minutes</SelectItem>
-                      <SelectItem value="long">Over 15 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">
-                    Author Type
-                  </label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select author type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="psychologist">
-                        Psychologists
-                      </SelectItem>
-                      <SelectItem value="psychiatrist">
-                        Psychiatrists
-                      </SelectItem>
-                      <SelectItem value="counselor">Counselors</SelectItem>
-                      <SelectItem value="researcher">Researchers</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">
-                    Publication Date
-                  </label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select time period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">Last week</SelectItem>
-                      <SelectItem value="month">Last month</SelectItem>
-                      <SelectItem value="year">Last year</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="p-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Popular Topics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Anxiety',
-                    'Depression',
-                    'Stress',
-                    'Self-Care',
-                    'Therapy',
-                    'Mental Health',
-                    'Wellness',
-                    'Meditation',
-                    'Relationships',
-                    'Work-Life Balance',
-                  ].map((topic, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs"
-                    >
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
         </div>
       </main>
-    </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Mental Health Articles</h1>
+          {isAuthenticated && (
+            <button
+              onClick={() => {
+                router.push('/articles/create');
+              }}
+              className="mb-2 group flex items-center justify-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 px-4 bg-blue-600 text-white border-blue-500 hover:bg-blue-700 disabled:bg-blue-400 disabled:border-blue-400 shadow-sm"
+            >
+              Write an Article
+              <span className="-mr-1">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M5 12H19.5833M19.5833 12L12.5833 5M19.5833 12L12.5833 19"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  ></path>
+                </svg>
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          {articles.length > 0 ? (
+            <>
+              <div className="mb-8">
+                <Link
+                  href={`/articles/${generateSlug(articles[0].title)}`}
+                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
+                >
+                  <article className="h-full relative">
+                    <div className="relative h-[400px] w-full">
+                      <Image
+                        src={articles[0].articleImage || defaultImage}
+                        alt={
+                          `Featured image for ${articles[0].title}` ||
+                          defaultAlt
+                        }
+                        fill
+                        className="object-cover transition-opacity group-hover:opacity-75"
+                        sizes="(max-width: 1024px) 100vw, 1024px"
+                        priority
+                      />
+                    </div>
+                    <div className="p-6">
+                      <div className="flex items-center gap-2 text-xs mb-3">
+                        <span>{articles[0].category}</span>
+                        <span>•</span>
+                        <span>{articles[0].readTime} min read</span>
+                        <ArticleOwnershipTag
+                          isOwner={articles[0].isOwner ?? false}
+                        />
+                      </div>
+
+                      <h2 className="text-xl font-bold mb-3">
+                        {articles[0].title}
+                      </h2>
+                      <p className="text-sm mb-4 line-clamp-3">
+                        {truncateText(articles[0].content, 200)}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-8 w-8">
+                            <Image
+                              src={articles[0].author.avatar || defaultAvatar}
+                              alt={`Profile picture of ${articles[0].author.name}`}
+                              fill
+                              className="rounded-full object-cover"
+                              sizes="32px"
+                            />
+                          </div>
+                          <span className="text-sm font-semibold">
+                            {articles[0].author.name}
+                          </span>
+                        </div>
+                        <span className="text-xs">
+                          {articles[0].publishDate}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                </Link>
+              </div>
+
+              {articles.length > 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {articles.slice(1).map(article => (
+                    <Link
+                      key={article._id}
+                      href={`/articles/${generateSlug(article.title)}`}
+                      className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
+                    >
+                      <article className="h-full relative">
+                        <div className="relative h-[200px] w-full">
+                          <Image
+                            src={article.articleImage || defaultImage}
+                            alt={
+                              `Featured image for ${article.title}` ||
+                              defaultAlt
+                            }
+                            fill
+                            className="object-cover transition-opacity group-hover:opacity-75"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span>{article.category}</span>
+                              <span>•</span>
+                              <span>{article.readTime} min read</span>
+                            </div>
+                            <ArticleOwnershipTag
+                              isOwner={article.isOwner ?? false}
+                              size="small"
+                            />
+                          </div>
+
+                          <h2 className="font-semibold text-lg mb-2">
+                            {article.title}
+                          </h2>
+                          <p className="text-sm line-clamp-2 mb-4">
+                            {truncateText(article.content, 120)}
+                          </p>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="relative h-6 w-6">
+                                <Image
+                                  src={article.author.avatar || defaultAvatar}
+                                  alt={`Profile picture of ${article.author.name}`}
+                                  fill
+                                  className="rounded-full object-cover"
+                                  sizes="24px"
+                                />
+                              </div>
+                              <span className="text-xs font-semibold">
+                                {article.author.name}
+                              </span>
+                            </div>
+                            <span className="text-xs">
+                              {article.publishDate}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {renderPagination()}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <h2 className="text-xl font-semibold">No articles found</h2>
+              <p className="mt-2">
+                Be the first to share your mental health insights
+              </p>
+              {isAuthenticated && (
+                <button
+                  onClick={() => router.push('/articles/create')}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Create an Article
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
   );
 };
 

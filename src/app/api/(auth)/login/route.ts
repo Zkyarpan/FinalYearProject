@@ -12,13 +12,10 @@ import { encrypt } from '@/lib/token';
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
-    console.log('🔍 Login API: Connected to database');
 
     const { email, password } = await req.json();
-    console.log(`🔍 Login attempt for email: ${email}`);
 
     if (!email || !password) {
-      console.log('❌ Missing email or password');
       return NextResponse.json(
         createErrorResponse(400, 'All fields are required'),
         { status: 400 }
@@ -26,26 +23,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Check for regular user first
-    console.log('🔍 Checking for regular user account');
     let user = await Account.findOne({ email }).select('+password');
     let userType = 'user';
     let profile;
 
     if (user) {
-      console.log(`✅ Found regular user with id: ${user._id}`);
       userType = user.role || 'user';
       profile = await Profile.findOne({ user: user._id });
     } else {
       // If not found, try finding a psychologist
-      console.log('🔍 Checking for psychologist account');
       user = await Psychologist.findOne({ email }).select('+password');
 
       if (user) {
-        console.log(`✅ Found psychologist with id: ${user._id}`);
-        console.log(`👀 Psychologist approval status: ${user.approvalStatus}`);
         userType = 'psychologist';
       } else {
-        console.log('❌ No user found with this email');
         return NextResponse.json(
           createErrorResponse(400, 'Invalid email or password'),
           { status: 400 }
@@ -54,12 +45,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Now check the password
-    console.log('🔍 Validating password');
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log(`🔐 Password valid: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
-      console.log('❌ Password validation failed');
       return NextResponse.json(
         createErrorResponse(400, 'Invalid email or password'),
         { status: 400 }
@@ -68,13 +56,7 @@ export async function POST(req: NextRequest) {
 
     // Now check approval status for psychologists
     if (userType === 'psychologist') {
-      console.log(
-        `🔍 Checking psychologist approval status: ${user.approvalStatus}`
-      );
-
       if (user.approvalStatus !== 'approved') {
-        console.log(`🚫 Psychologist not approved: ${user.approvalStatus}`);
-
         // IMPORTANT: Return 403 status for pending/rejected accounts
         return NextResponse.json(
           createErrorResponse(
@@ -86,11 +68,9 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-      console.log('✅ Psychologist is approved');
     }
 
     // If we get here, authentication is successful
-    console.log('✅ Authentication successful, creating session token');
     const isAdminOrPsychologist = ['admin', 'psychologist'].includes(userType);
 
     const accessToken = await encrypt({
@@ -118,7 +98,6 @@ export async function POST(req: NextRequest) {
         lastName: user.lastName,
         profileImage: user.profilePhotoUrl,
         approvalStatus: user.approvalStatus,
-        // Other fields omitted for brevity
       };
     } else {
       userData = {

@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { fetchWithAuth, isResourceOwner } from '@/services/authService';
 
 interface BlogActionsProps {
   slug: string;
@@ -36,29 +37,33 @@ const BlogActions = ({
   className = '',
 }: BlogActionsProps) => {
   const router = useRouter();
-  const userId = useUserStore(state => state._id);
-  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const { _id: userId, isAuthenticated } = useUserStore();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const userIdStr = String(userId);
-    const authorIdStr = String(authorId);
-    setIsOwner(isAuthenticated && userIdStr === authorIdStr);
-  }, [isAuthenticated, userId, authorId]);
+    // Check ownership whenever relevant props change
+    setIsOwner(isResourceOwner(authorId));
 
+    // Debug information
+    console.log('BlogActions - Ownership check:', {
+      authorId,
+      userId,
+      isAuthenticated,
+      isOwner: isResourceOwner(authorId),
+    });
+  }, [authorId, userId, isAuthenticated]);
+
+  // Don't render the component if user isn't the owner
   if (!isAuthenticated || !isOwner) return null;
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/blogs/delete/${slug}`, {
+      // Use the auth service to ensure proper authorization headers
+      const response = await fetchWithAuth(`/api/blogs/${slug}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${userId}`,
-        },
       });
 
       if (!response.ok) {
@@ -69,6 +74,7 @@ const BlogActions = ({
       toast.success('Blog deleted successfully');
       setShowDeleteDialog(false);
       router.push('/blogs');
+      router.refresh();
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(

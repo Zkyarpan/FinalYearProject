@@ -241,7 +241,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({
             formDataObj.append(key, value.join(','));
           } else if (key === 'image') {
             if (value instanceof File) {
-              formDataObj.append(key, value);
+              formDataObj.append(key, value);   
             }
           } else if (value !== null && value !== undefined) {
             formDataObj.append(key, value.toString());

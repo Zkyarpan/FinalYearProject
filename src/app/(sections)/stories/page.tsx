@@ -1,309 +1,295 @@
 'use client';
 
-import {
-  Heart,
-  MessageCircle,
-  Share2,
-  Bookmark,
-  TrendingUp,
-  Search,
-  Filter,
-  PenSquare,
-  ThumbsUp,
-  Clock,
-  Tag,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Skeleton from '@/components/common/Skeleton';
+import { generateSlug } from '@/helpers/generateSlug';
+import { useUserStore } from '@/store/userStore';
+import { useRouter } from 'next/navigation';
+
+interface Author {
+  _id: string;
+  name: string;
+  avatar: string;
+  isOwner?: boolean;
+}
+
+interface Story {
+  _id: string;
+  title: string;
+  content: string;
+  storyImage: string;
+  category: string;
+  tags: string[];
+  readTime: number | string;
+  author: Author;
+  publishDate: string;
+  isOwner?: boolean;
+}
+
+interface ApiResponse {
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    stories: Story[];
+  };
+}
+
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
+
+const StoryOwnershipTag = ({
+  isOwner,
+  size = 'default',
+}: {
+  isOwner: boolean;
+  size?: 'small' | 'default';
+}) => {
+  if (!isOwner) return null;
+
+  // Base classes for all sizes
+  const baseClasses =
+    'inline-flex items-center font-medium shadow rounded-full';
+
+  // Dynamic classes based on size prop
+  const styles = {
+    small: 'px-2 py-0.5 text-xs bg-blue-600 text-white',
+    default: 'px-3 py-1 text-sm bg-blue-600 text-white',
+  };
+
+  // Choose style based on size
+  const style = styles[size];
+
+  return <span className={`${baseClasses} ${style}`}>Your Story</span>;
+};
 
 const StoriesPage = () => {
-  const categories = [
-    { name: 'Recovery', count: 128 },
-    { name: 'Anxiety', count: 85 },
-    { name: 'Depression', count: 92 },
-    { name: 'Self-Care', count: 156 },
-    { name: 'Mindfulness', count: 73 },
-  ];
+  const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const userId = useUserStore(state => state._id);
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const router = useRouter();
 
-  const stories = [
-    {
-      id: 1,
-      title: 'Finding Light in the Darkness: My Journey Through Depression',
-      excerpt:
-        'After years of struggling with depression, I finally found the courage to seek help. This is my story of recovery and hope...',
-      author: {
-        name: 'Sarah Mitchell',
-        image:
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
-        badge: 'Verified Story',
-      },
-      coverImage:
-        'https://images.unsplash.com/photo-1520333789090-1afc82db536a?auto=format&fit=crop&w=800',
-      category: 'Recovery',
-      readTime: '8 min read',
-      likes: 342,
-      comments: 56,
-      tags: ['Depression', 'Recovery', 'Hope'],
-      publishedAt: '2 days ago',
-    },
-    {
-      id: 2,
-      title: 'Breaking the Anxiety Cycle: A Path to Peace',
-      excerpt:
-        "Living with anxiety felt like being trapped in a never-ending cycle. Here's how I learned to break free and find peace...",
-      author: {
-        name: 'Michael Chen',
-        image:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150',
-        badge: 'Community Leader',
-      },
-      coverImage:
-        'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&w=800',
-      category: 'Anxiety',
-      readTime: '6 min read',
-      likes: 289,
-      comments: 43,
-      tags: ['Anxiety', 'Mental Health', 'Self-Help'],
-      publishedAt: '1 week ago',
-    },
-    {
-      id: 3,
-      title: 'The Power of Self-Care in Mental Health Recovery',
-      excerpt:
-        "I discovered that self-care isn't selfish—it's essential. This is my journey of learning to prioritize mental wellness...",
-      author: {
-        name: 'Emma Thompson',
-        image:
-          'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
-        badge: 'Featured Writer',
-      },
-      coverImage:
-        'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800',
-      category: 'Self-Care',
-      readTime: '5 min read',
-      likes: 421,
-      comments: 67,
-      tags: ['Self-Care', 'Wellness', 'Growth'],
-      publishedAt: '2 weeks ago',
-    },
-  ];
+  const defaultImage = '/default-image.jpg';
+  const defaultAvatar = '/default-avatar.jpg';
+  const defaultAlt = 'Alternative Image';
+
+  useEffect(() => {
+    const fetchStories = async () => {
+      try {
+        const res = await fetch('/api/stories/index');
+        if (!res.ok) {
+          throw new Error('Failed to fetch stories');
+        }
+        const data: ApiResponse = await res.json();
+
+        if (data.Result && data.Result.stories.length > 0) {
+          const storiesWithOwnership = data.Result.stories.map(story => ({
+            ...story,
+            isOwner: isAuthenticated && userId === story.author?._id,
+          }));
+          setStories(storiesWithOwnership);
+        } else {
+          setStories([]);
+        }
+      } catch (error) {
+        setError('Failed to load stories');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStories();
+  }, [userId, isAuthenticated]);
+
+  if (isLoading) return <Skeleton />;
+  if (error) {
+    return (
+      <main className="min-h-screen">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{error}</h1>
+            <p className="text-gray-600">Please try again later.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 rounded-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight">
+    <main className="min-h-screen">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          {isAuthenticated && (
+            <button
+              onClick={() => {
+                router.push('/stories/create');
+              }}
+              className="mb-2 group flex items-center justify-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 px-4 bg-blue-600 text-white border-blue-500 hover:bg-blue-700 disabled:bg-blue-400 disabled:border-blue-400 shadow-sm"
+            >
               Share Your Story
-            </h1>
-            <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-              Every story matters. Share your mental health journey and connect
-              with others who understand.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3 mb-8">
-              {categories.map((cat, index) => (
-                <Button
-                  key={index}
-                  variant="ghost"
-                  className="bg-white/10 hover:bg-white/20 text-white"
+              <span className="-mr-1">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  {cat.name}
-                  <Badge variant="secondary" className="ml-2 bg-white/20">
-                    {cat.count}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-            <div className="flex gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-white text-indigo-600 hover:bg-white/90"
-              >
-                <PenSquare className="mr-2 h-5 w-5" />
-                Share Your Story
-              </Button>
-              <Button
-                size="lg"
-                variant="ghost"
-                className="bg-white/10 hover:bg-white/20"
-              >
-                Read Stories
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Search and Filter */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input placeholder="Search stories..." className="pl-10" />
-          </div>
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem>Most Recent</DropdownMenuItem>
-                <DropdownMenuItem>Most Popular</DropdownMenuItem>
-                <DropdownMenuItem>Most Discussed</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Trending
-            </Button>
-          </div>
+                  <path
+                    d="M5 12H19.5833M19.5833 12L12.5833 5M19.5833 12L12.5833 19"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  ></path>
+                </svg>
+              </span>
+            </button>
+          )}
         </div>
 
-        {/* Stories Grid */}
-        <Tabs defaultValue="featured" className="mb-16">
-          <TabsList className="mb-8">
-            <TabsTrigger value="featured">Featured</TabsTrigger>
-            <TabsTrigger value="recent">Recent</TabsTrigger>
-            <TabsTrigger value="trending">Trending</TabsTrigger>
-            <TabsTrigger value="following">Following</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="featured">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">
-              {stories.map(story => (
-                <Card
-                  key={story.id}
-                  className="group hover:shadow-lg transition-shadow"
+        <div className="space-y-6">
+          {stories.length > 0 ? (
+            <>
+              <div className="mb-8">
+                <Link
+                  href={`/stories/${generateSlug(stories[0].title)}`}
+                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
                 >
-                  <CardHeader className="p-0">
-                    <div className="relative">
-                      <img
-                        src={story.coverImage}
-                        alt={story.title}
-                        className="w-full h-48 object-cover rounded-t-lg"
+                  <article className="h-full relative">
+                    <div className="relative h-[400px] w-full">
+                      <Image
+                        src={stories[0].storyImage || defaultImage}
+                        alt={
+                          `Featured image for ${stories[0].title}` || defaultAlt
+                        }
+                        fill
+                        className="object-cover transition-opacity group-hover:opacity-75"
+                        sizes="(max-width: 1024px) 100vw, 1024px"
+                        priority
                       />
-                      <Badge className="absolute top-4 left-4 bg-blue-600">
-                        {story.category}
-                      </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Avatar>
-                        <AvatarImage src={story.author.image} />
-                        <AvatarFallback>{story.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {story.author.name}
-                        </p>
-                        <Badge variant="secondary" className="text-xs">
-                          {story.author.badge}
-                        </Badge>
+                    <div className="p-6">
+                      <div className="flex items-center gap-2 text-xs mb-3">
+                        <span>{stories[0].category}</span>
+                        <span>•</span>
+                        <span>{stories[0].readTime} min read</span>
+                        <StoryOwnershipTag
+                          isOwner={stories[0].isOwner ?? false}
+                        />
+                      </div>
+
+                      <h2 className="text-xl font-bold mb-3">
+                        {stories[0].title}
+                      </h2>
+                      <p className="text-sm mb-4 line-clamp-3">
+                        {truncateText(stories[0].content, 200)}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-8 w-8">
+                            <Image
+                              src={stories[0].author.avatar || defaultAvatar}
+                              alt={`Profile picture of ${stories[0].author.name}`}
+                              fill
+                              className="rounded-full object-cover"
+                              sizes="32px"
+                            />
+                          </div>
+                          <span className="text-sm font-semibold">
+                            {stories[0].author.name}
+                          </span>
+                        </div>
+                        <span className="text-xs">
+                          {stories[0].publishDate}
+                        </span>
                       </div>
                     </div>
-                    <CardTitle className="mb-2 group-hover:text-primary transition-colors">
-                      {story.title}
-                    </CardTitle>
-                    <CardDescription className="line-clamp-2 mb-4">
-                      {story.excerpt}
-                    </CardDescription>
-                    <div className="flex gap-2 mb-4">
-                      {story.tags.map((tag, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-6 py-4  flex items-center justify-between ">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {story.readTime}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <ThumbsUp className="h-4 w-4" />
-                        {story.likes}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="h-4 w-4" />
-                        {story.comments}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Bookmark className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+                  </article>
+                </Link>
+              </div>
 
-        {/* Featured Categories */}
-        <section>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
-            <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0">
-              <CardHeader>
-                <CardTitle className="text-2xl">Recovery Stories</CardTitle>
-                <CardDescription className="text-white/90">
-                  Stories of hope, healing, and transformation from our
-                  community.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter>
-                <Button variant="secondary" className="">
-                  Read Stories
-                  <Heart className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-            <Card className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-0">
-              <CardHeader>
-                <CardTitle className="text-2xl">Community Voices</CardTitle>
-                <CardDescription className="text-white/90">
-                  Authentic experiences shared by people just like you.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter>
-                <Button variant="secondary" className="">
-                  Join the Conversation
-                  <MessageCircle className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        </section>
+              {stories.length > 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {stories.slice(1).map(story => (
+                    <Link
+                      key={story._id}
+                      href={`/stories/${generateSlug(story.title)}`}
+                      className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
+                    >
+                      <article className="h-full relative">
+                        <div className="relative h-[200px] w-full">
+                          <Image
+                            src={story.storyImage || defaultImage}
+                            alt={
+                              `Featured image for ${story.title}` || defaultAlt
+                            }
+                            fill
+                            className="object-cover transition-opacity group-hover:opacity-75"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span>{story.category}</span>
+                              <span>•</span>
+                              <span>{story.readTime} min read</span>
+                            </div>
+                            <StoryOwnershipTag
+                              isOwner={story.isOwner ?? false}
+                              size="small"
+                            />
+                          </div>
+
+                          <h2 className="font-semibold text-lg mb-2">
+                            {story.title}
+                          </h2>
+                          <p className="text-sm line-clamp-2 mb-4">
+                            {truncateText(story.content, 120)}
+                          </p>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="relative h-6 w-6">
+                                <Image
+                                  src={story.author.avatar || defaultAvatar}
+                                  alt={`Profile picture of ${story.author.name}`}
+                                  fill
+                                  className="rounded-full object-cover"
+                                  sizes="24px"
+                                />
+                              </div>
+                              <span className="text-xs font-semibold">
+                                {story.author.name}
+                              </span>
+                            </div>
+                            <span className="text-xs">{story.publishDate}</span>
+                          </div>
+                        </div>
+                      </article>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <h2 className="text-xl font-semibold">No stories found</h2>
+              <p className="mt-2">
+                Be the first to share your mental health journey
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   );
 };
 

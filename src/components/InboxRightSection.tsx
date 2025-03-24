@@ -180,6 +180,10 @@ export default function InboxRightSection({
 
     const otherPerson =
       convo.user._id === user._id ? convo.psychologist : convo.user;
+
+    // Add null check for otherPerson
+    if (!otherPerson) return false;
+
     const fullName = `${otherPerson.firstName || ''} ${
       otherPerson.lastName || ''
     }`.toLowerCase();

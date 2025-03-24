@@ -111,6 +111,22 @@ const RootLayout = ({ children }) => {
 
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
+
+  // Check for detail or edit pages
+  const isNestedArticleRoute =
+    pathname.startsWith('/articles/') &&
+    pathname !== '/articles' &&
+    !pathname.includes('/articles/create');
+
+  const isNestedStoryRoute =
+    pathname.startsWith('/stories/') &&
+    pathname !== '/stories' &&
+    !pathname.includes('/stories/create');
+
+  // Check specifically for edit pages
+  const isArticleEditPage = pathname.startsWith('/articles/edit/');
+  const isStoryEditPage = pathname.startsWith('/stories/edit/');
+
   const isPsychologistProfileRoute = pathname => {
     const pathParts = pathname.split('/');
     return (
@@ -124,6 +140,8 @@ const RootLayout = ({ children }) => {
 
   const showBackButton =
     isNestedBlogRoute ||
+    isNestedArticleRoute ||
+    isNestedStoryRoute ||
     (pathname.startsWith('/psychologist/') &&
       pathname !== '/psychologist' &&
       !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route)));
@@ -133,11 +151,13 @@ const RootLayout = ({ children }) => {
     pathname !== '/psychologist' &&
     isPsychologistProfileRoute(pathname);
 
+  // Updated showRightSidebar condition to include /articles path
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
       (isAuthenticated && !isDashboardPage && role === 'user')) &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
+      pathname === '/articles' || // Added articles path
       pathname === '/psychologist' ||
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
@@ -174,6 +194,13 @@ const RootLayout = ({ children }) => {
       router.push('/blogs');
     } else if (isNestedPsychologistRoute) {
       router.push('/psychologist');
+    } else if (
+      isArticleEditPage ||
+      (isNestedArticleRoute && !isArticleEditPage)
+    ) {
+      router.push('/articles');
+    } else if (isStoryEditPage || (isNestedStoryRoute && !isStoryEditPage)) {
+      router.push('/stories');
     }
   };
 
@@ -223,57 +250,70 @@ const RootLayout = ({ children }) => {
     <>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[60]">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-[10]">
           <div className="container mx-auto px-4 h-full">
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center">
-                <Sheet
-                  open={isMobileMenuOpen}
-                  onOpenChange={setIsMobileMenuOpen}
-                >
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="lg:hidden">
-                      <Menu className="h-5 w-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-[280px] sm:w-[350px]">
-                    <SheetHeader>
-                      <SheetTitle>
-                        <div className="flex items-center gap-2">
-                          <Image
-                            alt="Mentality"
-                            width={32}
-                            height={32}
-                            className="object-contain dark:bg-white rounded-full"
-                            src="/Logo1.png?v=1"
-                          />
-                          <span className="text-xl logo-font">Mentality</span>
-                        </div>
-                      </SheetTitle>
-                    </SheetHeader>
-                    <nav className="mt-5 overflow-auto scroll-smooth">
-                      {NAV_ITEMS.map(item => (
-                        <button
-                          key={item.text}
-                          onClick={() => handleNavigation(item.href)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                            pathname === item.href
-                              ? 'dark:text-white font-medium'
-                              : 'hover:transition-all lg:group-hover:translate-x-1'
-                          }`}
-                        >
-                          {item.icon}
-                          <span>{item.text}</span>
-                        </button>
-                      ))}
-                      <AccountSection
-                        firstName={firstName || 'Anonymous'}
-                        profileImage={profileImage || '/default-avatar.jpg'}
-                        role={role ?? undefined}
-                      />
-                    </nav>
-                  </SheetContent>
-                </Sheet>
+                {showBackButton ? (
+                  <button
+                    type="button"
+                    onClick={handleBackNavigation}
+                    className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-full p-2 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
+                  >
+                    <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
+                  </button>
+                ) : (
+                  <Sheet
+                    open={isMobileMenuOpen}
+                    onOpenChange={setIsMobileMenuOpen}
+                  >
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" className="lg:hidden">
+                        <Menu className="h-5 w-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                      side="left"
+                      className="w-[280px] sm:w-[350px]"
+                    >
+                      <SheetHeader>
+                        <SheetTitle>
+                          <div className="flex items-center gap-2">
+                            <Image
+                              alt="Mentality"
+                              width={32}
+                              height={32}
+                              className="object-contain dark:bg-white rounded-full"
+                              src="/Logo1.png?v=1"
+                            />
+                            <span className="text-xl logo-font">Mentality</span>
+                          </div>
+                        </SheetTitle>
+                      </SheetHeader>
+                      <nav className="mt-5 overflow-auto scroll-smooth">
+                        {NAV_ITEMS.map(item => (
+                          <button
+                            key={item.text}
+                            onClick={() => handleNavigation(item.href)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                              pathname === item.href
+                                ? 'dark:text-white font-medium'
+                                : 'hover:transition-all lg:group-hover:translate-x-1'
+                            }`}
+                          >
+                            {item.icon}
+                            <span>{item.text}</span>
+                          </button>
+                        ))}
+                        <AccountSection
+                          firstName={firstName || 'Anonymous'}
+                          profileImage={profileImage || '/default-avatar.jpg'}
+                          role={role ?? undefined}
+                        />
+                      </nav>
+                    </SheetContent>
+                  </Sheet>
+                )}
                 <Link
                   href={isAuthenticated ? `/dashboard/${role!}` : '/'}
                   onClick={handleLogoClick}
@@ -368,7 +408,7 @@ const RootLayout = ({ children }) => {
                       <button
                         type="button"
                         onClick={handleBackNavigation}
-                        className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 w-8 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
+                        className="mr-2 justify-center shrink-0 flex items-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-full p-2 text-gray-900 bg-gray-100 border-gray-200 dark:bg-input dark:border-[hsl(var(--border))] hover:dark:bg-[#505050] dark:disabled:bg-gray-800 dark:disabled:hover:bg-gray-800 shadow-sm hover:shadow-md"
                       >
                         <ArrowRightIcon className="h-4 w-4 rotate-180 dark:text-white" />
                       </button>

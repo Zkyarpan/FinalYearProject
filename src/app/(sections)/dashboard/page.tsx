@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Bell,
   Calendar,
@@ -23,9 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useUserStore } from '@/store/userStore';
+import { useRouter } from 'next/navigation';
 
 function App() {
+  const router = useRouter();
   const [selectedTimeRange, setSelectedTimeRange] = useState('week');
+
+
 
   const moodData = [
     { date: 'Mon', value: 85 },

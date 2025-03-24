@@ -18,12 +18,30 @@ interface Availability {
 // Define approval status type
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
+// Profile completion form data interface
+interface ProfileFormData {
+  currentStep: number;
+  firstName: string;
+  lastName: string;
+  age: string;
+  gender: string;
+  phone: string;
+  address: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  therapyHistory: string;
+  preferredCommunication: string;
+  briefBio: string;
+  struggles: string[];
+  imagePreviewUrl: string | null;
+}
+
 interface UserProfile {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
   profileImage: string | null;
-  image?: string | null; // Added image property for compatibility
+  image?: string | null;
   country?: string | null;
   streetAddress?: string | null;
   city?: string | null;
@@ -48,8 +66,8 @@ interface UserProfile {
   availability?: Availability;
   acceptingNewClients?: boolean;
   ageGroups?: ('children' | 'teenagers' | 'adults' | 'seniors')[];
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface User extends UserProfile {
@@ -58,35 +76,72 @@ interface User extends UserProfile {
   isAuthenticated: boolean;
   isVerified: boolean;
   profileComplete: boolean;
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface SetUser extends UserProfile {
-  _id: string;
+  _id?: string;
+  id?: string; // Add id property from API
   role: string;
   isVerified: boolean;
   profileComplete: boolean;
   isAuthenticated?: boolean;
   image?: string; // Allow image property from API
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface UserStore extends User {
   user: User | null;
+
+  // Profile completion form data
+  profileFormData: ProfileFormData | null;
+
+  // Form state methods
+  saveProfileFormData: (formData: Partial<ProfileFormData>) => void;
+  clearProfileFormData: () => void;
+
+  // User management methods
   setUser: (user: SetUser) => void;
   setProfileComplete: (complete: boolean) => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
   logout: () => Promise<void>;
-  // Add a helper method to get display role
+
+  // Role helper methods
   getDisplayRole: () => string;
-  // Add helper methods for approval status
+
+  // Approval status helper methods
   isApproved: () => boolean;
   isPending: () => boolean;
   isRejected: () => boolean;
   getApprovalStatus: () => ApprovalStatus | null;
+
+  // Authentication helper methods
+  getUserId: () => string | null;
+  getAuthHeaders: () => HeadersInit;
+  isResourceOwner: (resourceAuthorId: string | undefined) => boolean;
+  ensureAuthentication: () => boolean;
+  debugAuth: () => boolean;
 }
+
+// Default profile form data
+const defaultProfileFormData: ProfileFormData = {
+  currentStep: 1,
+  firstName: '',
+  lastName: '',
+  age: '',
+  gender: '',
+  phone: '',
+  address: '',
+  emergencyContact: '',
+  emergencyPhone: '',
+  therapyHistory: 'no',
+  preferredCommunication: '',
+  briefBio: '',
+  struggles: [],
+  imagePreviewUrl: null,
+};
 
 export const useUserStore = create(
   persist<UserStore>(
@@ -100,7 +155,7 @@ export const useUserStore = create(
       firstName: null,
       lastName: null,
       profileImage: null,
-      image: null, // Added image property with default value
+      image: null,
       country: null,
       streetAddress: null,
       city: null,
@@ -120,36 +175,143 @@ export const useUserStore = create(
       availability: {},
       acceptingNewClients: false,
       ageGroups: [],
-      approvalStatus: undefined, // Initialize approval status
-      adminFeedback: null, // Initialize admin feedback
+      approvalStatus: undefined,
+      adminFeedback: null,
       user: null,
 
-      // Add helper method to get formatted display role
+      // Profile completion form data
+      profileFormData: null,
+
+      // Form state methods
+      saveProfileFormData: formData => {
+        const currentFormData = get().profileFormData || defaultProfileFormData;
+        set({
+          profileFormData: {
+            ...currentFormData,
+            ...formData,
+          },
+        });
+      },
+
+      clearProfileFormData: () => {
+        set({ profileFormData: null });
+      },
+
+      // Display role helper
       getDisplayRole: () => {
         const role = get().role;
         if (!role) return 'User';
         return role.charAt(0).toUpperCase() + role.slice(1);
       },
 
-      // Add helper methods for approval status
+      // Approval status helpers
       isApproved: () => get().approvalStatus === 'approved',
       isPending: () => get().approvalStatus === 'pending',
       isRejected: () => get().approvalStatus === 'rejected',
       getApprovalStatus: () =>
         get().role === 'psychologist' ? get().approvalStatus || null : null,
 
-      setUser: user =>
-        set({
+      // Authentication helpers
+      getUserId: () => {
+        return get()._id;
+      },
+
+      getAuthHeaders: () => {
+        const userId = get()._id;
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+
+        if (userId) {
+          headers['Authorization'] = `Bearer ${userId}`;
+          console.log('Adding auth header with user ID:', userId);
+        } else {
+          console.log('No user ID available for auth header');
+        }
+
+        return headers;
+      },
+
+      isResourceOwner: resourceAuthorId => {
+        if (!resourceAuthorId) return false;
+
+        const userId = get()._id;
+        if (!userId) return false;
+
+        // Convert both IDs to strings to ensure consistent comparison
+        const userIdStr = String(userId).trim();
+        const authorIdStr = String(resourceAuthorId).trim();
+
+        const isOwner = userIdStr === authorIdStr;
+
+        console.log('Ownership check:', {
+          userId: userIdStr,
+          resourceAuthorId: authorIdStr,
+          isOwner,
+          compareResult: userIdStr === authorIdStr,
+        });
+
+        return isOwner;
+      },
+
+      ensureAuthentication: () => {
+        const state = get();
+        if (state.isAuthenticated && !state._id) {
+          console.warn('⚠️ Authentication state inconsistency detected');
+          set({ isAuthenticated: false });
+          return false;
+        }
+        return state.isAuthenticated;
+      },
+
+      debugAuth: () => {
+        const state = get();
+        console.log('Current auth state:', {
+          _id: state._id,
+          isAuthenticated: state.isAuthenticated,
+          role: state.role,
+        });
+
+        if (state._id && !state.isAuthenticated) {
+          console.log('Fixing inconsistent auth state');
+          set(state => ({ ...state, isAuthenticated: true }));
+          return true;
+        }
+        return false;
+      },
+
+      // FIXED: Modified setUser to handle both id and _id properties
+      setUser: user => {
+        // Handle both id and _id from API response
+        const userId = user._id || user.id;
+
+        // Log what we're receiving for debugging
+        console.log('Setting user with:', {
+          id: user.id,
           _id: user._id,
+          userId,
+        });
+
+        if (!userId) {
+          console.error(
+            'Cannot set user without user ID (neither id nor _id provided)'
+          );
+          return;
+        }
+
+        const isAuthenticated = true;
+
+        set({
+          _id: userId, // Use the extracted userId
           email: user.email,
-          role: user.role, // Ensure role is properly set
-          isAuthenticated: user.isAuthenticated ?? true,
+          role: user.role,
+          isAuthenticated: isAuthenticated,
           isVerified: user.isVerified,
           profileComplete: user.profileComplete,
           firstName: user.firstName,
           lastName: user.lastName,
-          profileImage: user.profileImage || user.image || null, // Use image as fallback
-          image: user.image || user.profileImage || null, // Set both properties
+          profileImage: user.profileImage || user.image || null,
+          image: user.image || user.profileImage || null,
           country: user.country,
           streetAddress: user.streetAddress,
           city: user.city,
@@ -175,17 +337,23 @@ export const useUserStore = create(
           adminFeedback: user.adminFeedback || null,
           user: {
             ...user,
-            isAuthenticated: user.isAuthenticated ?? true,
-            // Ensure user object also has both image properties
+            _id: userId, // Ensure user object also has _id
+            isAuthenticated: isAuthenticated,
             profileImage: user.profileImage || user.image || null,
             image: user.image || user.profileImage || null,
-            // Ensure approval status is set in the user object
             approvalStatus:
               user.approvalStatus ||
               (user.role === 'psychologist' ? 'pending' : undefined),
             adminFeedback: user.adminFeedback || null,
           },
-        }),
+        });
+
+        console.log('User state updated:', {
+          id: userId,
+          isAuthenticated: isAuthenticated,
+          role: user.role,
+        });
+      },
 
       setProfileComplete: complete =>
         set(state => ({
@@ -195,21 +363,22 @@ export const useUserStore = create(
 
       updateProfile: profile =>
         set(state => {
-          // If profile update includes either image property, update both
           const updatedImage =
             profile.image ||
             profile.profileImage ||
             state.image ||
             state.profileImage;
 
+          // Clear profile form data after successful update
+          get().clearProfileFormData();
+
           return {
             ...state,
             ...profile,
-            // Keep both properties in sync
             profileImage: updatedImage,
             image: updatedImage,
             profileComplete: true,
-            isAuthenticated: true,
+            isAuthenticated: state._id ? true : false,
           };
         }),
 
@@ -224,7 +393,7 @@ export const useUserStore = create(
           firstName: null,
           lastName: null,
           profileImage: null,
-          image: null, // Clear image property too
+          image: null,
           country: null,
           streetAddress: null,
           city: null,
@@ -244,10 +413,13 @@ export const useUserStore = create(
           availability: {},
           acceptingNewClients: false,
           ageGroups: [],
-          approvalStatus: undefined, // Clear approval status
-          adminFeedback: null, // Clear admin feedback
+          approvalStatus: undefined,
+          adminFeedback: null,
           user: null,
+          profileFormData: null,
         });
+
+        console.log('User logged out, state cleared');
       },
     }),
     {
@@ -255,3 +427,11 @@ export const useUserStore = create(
     }
   )
 );
+
+// Convenience exports
+export const getUserId = () => useUserStore.getState().getUserId();
+export const getAuthHeaders = () => useUserStore.getState().getAuthHeaders();
+export const isResourceOwner = (resourceAuthorId: string | undefined) =>
+  useUserStore.getState().isResourceOwner(resourceAuthorId);
+export const ensureAuthentication = () =>
+  useUserStore.getState().ensureAuthentication();

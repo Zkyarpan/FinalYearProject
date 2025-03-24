@@ -1,425 +1,596 @@
 'use client';
 
-import {
-  Moon,
-  Brain,
-  Heart,
-  Users,
-  BookOpen,
-  Sparkles,
-  Search,
-  BookMarked,
-  Clock,
-  TrendingUp,
-  Star,
-  Play,
-  ChevronRight,
-  Bookmark,
-  ArrowRight,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Skeleton from '@/components/common/Skeleton';
+import { generateSlug } from '@/helpers/generateSlug';
+import { useUserStore } from '@/store/userStore';
+import { useRouter } from 'next/navigation';
+
+interface Author {
+  _id: string;
+  name: string;
+  avatar: string;
+}
+
+interface Resource {
+  _id: string;
+  title: string;
+  description: string;
+  content: string;
+  category: string;
+  resourceImage: string;
+  mediaUrls: {
+    type: 'audio' | 'video';
+    url: string;
+    title?: string;
+  }[];
+  duration: number;
+  difficultyLevel: 'beginner' | 'intermediate' | 'advanced';
+  steps: string[];
+  tags: string[];
+  author: Author;
+  publishDate: string;
+  viewCount: number;
+  isOwner?: boolean;
+}
+
+interface ApiResponse {
+  StatusCode: number;
+  IsSuccess: boolean;
+  ErrorMessage: string[];
+  Result: {
+    resources: Resource[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    };
+  };
+}
+
+const getDifficultyBadgeColor = (level: string) => {
+  switch (level) {
+    case 'beginner':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    case 'intermediate':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+    case 'advanced':
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+  }
+};
+
+const formatDuration = (minutes: number): string => {
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0
+    ? `${hours} hr ${remainingMinutes} min`
+    : `${hours} hr`;
+};
+
+const truncateText = (text: string, maxLength: number) => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
+
+const OwnershipTag = ({
+  isOwner,
+  size = 'default',
+}: {
+  isOwner: boolean;
+  size?: 'small' | 'default';
+}) => {
+  if (!isOwner) return null;
+
+  // Base classes for all sizes
+  const baseClasses =
+    'inline-flex items-center font-medium shadow rounded-full';
+
+  // Dynamic classes based on size prop
+  const styles = {
+    small: 'px-2 py-0.5 text-xs bg-blue-600 text-white',
+    default: 'px-3 py-1 text-sm bg-blue-600 text-white',
+  };
+
+  // Choose style based on size
+  const style = styles[size];
+
+  return <span className={`${baseClasses} ${style}`}>Your Resource</span>;
+};
 
 const ResourcesPage = () => {
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(
+    null
+  );
+
+  const userId = useUserStore(state => state._id);
+  const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const getAuthHeaders = useUserStore(state => state.getAuthHeaders);
+  const router = useRouter();
+
+  const defaultImage = '/default-image.jpg';
+  const defaultAvatar = '/default-avatar.jpg';
+  const defaultAlt = 'Resource Image';
+
   const categories = [
-    {
-      name: 'Mental Health',
-      icon: '🧠',
-      color: 'from-blue-500 to-blue-600',
-      count: '51',
-    },
-    {
-      name: 'Focus',
-      icon: '🎯',
-      color: 'from-purple-500 to-purple-600',
-      count: '32',
-    },
-    {
-      name: 'Sleep',
-      icon: '🌙',
-      color: 'from-indigo-500 to-indigo-600',
-      count: '28',
-    },
-    {
-      name: 'Stress',
-      icon: '🌿',
-      color: 'from-green-500 to-green-600',
-      count: '45',
-    },
+    'All',
+    'Breathing',
+    'Meditation',
+    'Yoga',
+    'Exercise',
+    'Sleep',
+    'Anxiety',
+    'Depression',
+    'Stress',
+    'Mindfulness',
+    'Self-care',
+    'Other',
   ];
 
-  const featuredContent = [
-    {
-      title: 'Anxiety Management',
-      category: 'Mental Health',
-      type: 'Course',
-      duration: '10 min',
-      image:
-        'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&w=800',
-      author: 'Dr. Sarah Johnson',
-      rating: 4.8,
-      tags: ['Beginner', 'Self-paced'],
-      progress: 65,
-    },
-    {
-      title: 'Mindfulness Basics',
-      category: 'Focus',
-      type: 'Guided Practice',
-      duration: '15 min',
-      image:
-        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800',
-      author: 'Mark Williams',
-      rating: 4.9,
-      tags: ['Popular', 'Audio'],
-      progress: 30,
-    },
-    {
-      title: 'Sleep Meditation',
-      category: 'Sleep',
-      type: 'Audio Guide',
-      duration: '20 min',
-      image:
-        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800',
-      author: 'Emma Thompson',
-      rating: 4.7,
-      tags: ['Nighttime', 'Relaxation'],
-      progress: 80,
-    },
-  ];
+  const difficultyLevels = ['All', 'beginner', 'intermediate', 'advanced'];
 
-  const resourceCategories = [
-    {
-      title: 'Ready, Set, Reset',
-      description:
-        'Decrease your stress and increase your happiness in just 10 days.',
-      icon: <Sparkles className="w-6 h-6" />,
-      color: 'from-orange-400 to-pink-600',
-      count: '10 activities',
-      tag: 'Popular',
-    },
-    {
-      title: 'New and Popular',
-      description:
-        'The latest mental health resources and top picks from our team.',
-      icon: <Brain className="w-6 h-6" />,
-      color: 'from-blue-400 to-indigo-600',
-      count: '8 new items',
-      tag: 'New',
-    },
-    {
-      title: 'Beginning Mental Health',
-      description:
-        'Learn the fundamental techniques of maintaining good mental health.',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'from-yellow-400 to-orange-600',
-      count: '12 lessons',
-      tag: 'Beginner',
-    },
-    {
-      title: 'Quick Relief',
-      description: 'Give yourself a moment to breathe and reset.',
-      icon: <Moon className="w-6 h-6" />,
-      color: 'from-purple-400 to-pink-600',
-      count: '5 min exercises',
-      tag: 'Quick',
-    },
-    {
-      title: 'Support Groups',
-      description:
-        'Connect with others in moderated group sessions for mutual support.',
-      icon: <Users className="w-6 h-6" />,
-      color: 'from-green-400 to-teal-600',
-      count: '6 active groups',
-      tag: 'Community',
-    },
-    {
-      title: 'Life Skills',
-      description:
-        'Essential tools and techniques for managing daily challenges.',
-      icon: <BookOpen className="w-6 h-6" />,
-      color: 'from-pink-400 to-rose-600',
-      count: '15 skills',
-      tag: 'Essential',
-    },
-  ];
+  const fetchResources = async (page = 1) => {
+    setIsLoading(true);
+    try {
+      let url = `/api/resources/index?page=${page}&limit=10`;
 
-  return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-2xl" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-          <div className="text-center">
-            <div className="flex flex-wrap justify-center gap-4 mb-10">
-              {categories.map((cat, index) => (
-                <button
-                  key={index}
-                  className={`category-pill flex items-center px-6 py-3 rounded-full bg-gradient-to-r ${cat.color} text-white shadow-lg hover:shadow-xl transition-all`}
-                >
-                  <span className="text-xl mr-2">{cat.icon}</span>
-                  <span className="font-medium mr-2">{cat.name}</span>
-                  <Badge variant="secondary" className="bg-white/20">
-                    {cat.count}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-8 text-white tracking-tight">
-              Discover Mental Wellness
-              <br className="hidden sm:block" /> Resources
-            </h1>
-            <div className="max-w-2xl mx-auto">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <Input
-                  placeholder="Search for resources, topics, or experts..."
-                  className="pl-12 h-14 text-lg rounded-full bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:ring-2 focus:ring-white/30"
-                />
-              </div>
-            </div>
-          </div>
+      if (selectedCategory && selectedCategory !== 'All') {
+        url += `&category=${selectedCategory}`;
+      }
+
+      if (selectedDifficulty && selectedDifficulty !== 'All') {
+        url += `&difficulty=${selectedDifficulty}`;
+      }
+
+      // Get auth headers for ownership check
+      const headers = getAuthHeaders ? getAuthHeaders() : {};
+
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        throw new Error('Failed to fetch resources');
+      }
+      const data: ApiResponse = await res.json();
+
+      if (data.Result && data.Result.resources.length > 0) {
+        setResources(data.Result.resources);
+        setTotalPages(data.Result.pagination.pages);
+        setCurrentPage(data.Result.pagination.page);
+      } else {
+        setResources([]);
+      }
+    } catch (error) {
+      setError('Failed to load resources');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchResources();
+  }, [userId, isAuthenticated, selectedCategory, selectedDifficulty]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchResources(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category === 'All' ? null : category);
+    setCurrentPage(1);
+  };
+
+  const handleDifficultyChange = (difficulty: string) => {
+    setSelectedDifficulty(difficulty === 'All' ? null : difficulty);
+    setCurrentPage(1);
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex justify-center mt-8">
+        <div className="flex space-x-2">
+          {currentPage > 1 && (
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              className="px-4 py-2 rounded-lg border bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]"
+            >
+              Previous
+            </button>
+          )}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-4 py-2 rounded-lg border ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          {currentPage < totalPages && (
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              className="px-4 py-2 rounded-lg border bg-white dark:bg-[#171717] hover:bg-gray-50 dark:hover:bg-[#222222]"
+            >
+              Next
+            </button>
+          )}
         </div>
       </div>
+    );
+  };
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Featured Content */}
-        <Tabs defaultValue="featured" className="mb-20">
-          <div className="flex items-center justify-between mb-8">
-            <TabsList className="p-1 bg-gray-100/80 backdrop-blur-sm">
-              <TabsTrigger value="featured" className="text-sm">
-                Featured
-              </TabsTrigger>
-              <TabsTrigger value="recent" className="text-sm">
-                Recent
-              </TabsTrigger>
-              <TabsTrigger value="popular" className="text-sm">
-                Popular
-              </TabsTrigger>
-              <TabsTrigger value="collections" className="text-sm">
-                Collections
-              </TabsTrigger>
-            </TabsList>
-            <Button variant="outline" className="gap-2">
-              View Library <ChevronRight className="h-4 w-4" />
-            </Button>
+  if (isLoading) return <Skeleton />;
+  if (error) {
+    return (
+      <main className="min-h-screen">
+        <div className="px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+              {error}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please try again later.
+            </p>
           </div>
+        </div>
+      </main>
+    );
+  }
 
-          <TabsContent value="featured">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredContent.map((content, index) => (
-                <Card
-                  key={index}
-                  className="featured-card border-0 shadow-lg overflow-hidden"
+  return (
+    <main className="min-h-screen">
+      <div className="mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 md:mb-0">
+            Mental Health Resources
+          </h1>
+          {isAuthenticated && (
+            <button
+              onClick={() => {
+                router.push('/resources/create');
+              }}
+              className="mb-2 group flex items-center justify-center font-semibold border transition-all ease-in duration-75 whitespace-nowrap text-center select-none disabled:shadow-none disabled:opacity-50 disabled:cursor-not-allowed gap-x-1 active:shadow-none text-sm leading-5 rounded-xl py-1.5 h-8 px-4 bg-blue-600 text-white border-blue-500 hover:bg-blue-700 disabled:bg-blue-400 disabled:border-blue-400 shadow-sm"
+            >
+              Create Resource
+              <span className="-mr-1">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <div className="relative overflow-hidden">
-                    <img
-                      src={content.image}
-                      alt={content.title}
-                      className="featured-image w-full h-48 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <Badge className="absolute top-4 left-4 bg-white/90 text-blue-600 font-medium">
-                      {content.type}
-                    </Badge>
-                    <Button
-                      size="icon"
-                      className="absolute bottom-4 right-4 rounded-full bg-white/90 hover:bg-white text-blue-600"
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-50 text-blue-600 font-medium"
-                      >
-                        {content.category}
-                      </Badge>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                        <span className="font-medium">{content.rating}</span>
-                      </div>
-                    </div>
-                    <CardTitle className="mb-2 line-clamp-2">
-                      {content.title}
-                    </CardTitle>
-                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                      <span className="font-medium">{content.author}</span>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {content.duration}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex gap-2">
-                        {content.tags.map((tag, i) => (
-                          <Badge
-                            key={i}
-                            variant="outline"
-                            className="bg-gray-50 border-gray-200"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
-                          style={{ width: `${content.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+                  <path
+                    d="M5 12H19.5833M19.5833 12L12.5833 5M19.5833 12L12.5833 19"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  ></path>
+                </svg>
+              </span>
+            </button>
+          )}
+        </div>
 
-        {/* Resource Categories */}
-        <section className="mb-20">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <Badge className="mb-4 px-4 py-1 text-sm bg-blue-100 text-blue-700">
-                Resources
-              </Badge>
-              <h2 className="text-3xl font-bold gradient-text">
-                Explore by Category
-              </h2>
-            </div>
-            <Button variant="outline" className="gap-2">
-              View All <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {resourceCategories.map((category, index) => (
-              <Card
-                key={index}
-                className="resource-card border-0 shadow-lg hover:shadow-xl overflow-hidden group cursor-pointer"
+        {/* Filter Section */}
+        <div className="mb-8 flex flex-col md:flex-row gap-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="font-medium text-gray-700 dark:text-gray-300 self-center">
+              Category:
+            </span>
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => handleCategoryChange(category)}
+                className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  (category === 'All' && !selectedCategory) ||
+                  selectedCategory === category
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-800 dark:bg-[#333333] dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#444444]'
+                }`}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div
-                      className={`p-3 rounded-2xl bg-gradient-to-br ${category.color} text-white`}
-                    >
-                      {category.icon}
-                    </div>
-                    <Badge
-                      variant="secondary"
-                      className="bg-gray-100 text-gray-600 font-medium"
-                    >
-                      {category.tag}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-xl mb-2 group-hover:text-blue-600 transition-colors">
-                    {category.title}
-                  </CardTitle>
-                  <CardDescription className="text-gray-600">
-                    {category.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter className="pt-4 border-t">
-                  <div className="flex items-center justify-between w-full">
-                    <Badge
-                      variant="outline"
-                      className="bg-gray-50 border-gray-200"
-                    >
-                      {category.count}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      className="text-blue-600 group-hover:translate-x-1 transition-transform"
-                    >
-                      Explore <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
+                {category}
+              </button>
             ))}
           </div>
-        </section>
 
-        {/* Special Collections */}
-        <section>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="border-0 overflow-hidden relative group cursor-pointer">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-indigo-600 opacity-90 transition-opacity group-hover:opacity-100" />
-              <CardHeader className="relative z-10 text-white">
-                <div className="flex items-center justify-between mb-4">
-                  <Badge className="bg-white/20 text-white border-0">
-                    Featured Collection
-                  </Badge>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-white hover:text-white hover:bg-white/20"
-                  >
-                    <Bookmark className="h-5 w-5" />
-                  </Button>
-                </div>
-                <CardTitle className="text-2xl mb-2">
-                  LGBTQIA+ Support
-                </CardTitle>
-                <CardDescription className="text-white/90">
-                  Specialized resources and support for the LGBTQIA+ community.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="relative z-10 pt-4">
-                <Button className="bg-white/20 text-white hover:bg-white/30 group-hover:translate-x-1 transition-all">
-                  Explore Resources
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card className="border-0 overflow-hidden relative group cursor-pointer">
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-500 to-rose-600 opacity-90 transition-opacity group-hover:opacity-100" />
-              <CardHeader className="relative z-10 text-white">
-                <div className="flex items-center justify-between mb-4">
-                  <Badge className="bg-white/20 text-white border-0">
-                    Featured Collection
-                  </Badge>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-white hover:text-white hover:bg-white/20"
-                  >
-                    <Bookmark className="h-5 w-5" />
-                  </Button>
-                </div>
-                <CardTitle className="text-2xl mb-2">
-                  Women's Collection
-                </CardTitle>
-                <CardDescription className="text-white/90">
-                  Curated resources celebrating and supporting women's mental
-                  health.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="relative z-10 pt-4">
-                <Button className="bg-white/20 text-white hover:bg-white/30 group-hover:translate-x-1 transition-all">
-                  Explore Resources
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
+          <div className="flex flex-wrap gap-2">
+            <span className="font-medium text-gray-700 dark:text-gray-300 self-center">
+              Difficulty:
+            </span>
+            {difficultyLevels.map(level => (
+              <button
+                key={level}
+                onClick={() => handleDifficultyChange(level)}
+                className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  (level === 'All' && !selectedDifficulty) ||
+                  selectedDifficulty === level
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-800 dark:bg-[#333333] dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#444444]'
+                }`}
+              >
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </button>
+            ))}
           </div>
-        </section>
+        </div>
+
+        <div className="space-y-6">
+          {resources.length > 0 ? (
+            <>
+              <div className="mb-8">
+                <Link
+                  href={`/resources/${generateSlug(resources[0].title)}`}
+                  className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
+                >
+                  <article className="h-full relative">
+                    <div className="relative h-[400px] w-full">
+                      <Image
+                        src={resources[0].resourceImage || defaultImage}
+                        alt={
+                          `Featured image for ${resources[0].title}` ||
+                          defaultAlt
+                        }
+                        fill
+                        className="object-cover transition-opacity group-hover:opacity-75"
+                        sizes="(max-width: 1024px) 100vw, 1024px"
+                        priority
+                      />
+                    </div>
+                    <div className="p-6">
+                      <div className="flex flex-wrap items-center gap-2 text-xs mb-3">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                          {resources[0].category}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-full ${getDifficultyBadgeColor(
+                            resources[0].difficultyLevel
+                          )}`}
+                        >
+                          {resources[0].difficultyLevel
+                            .charAt(0)
+                            .toUpperCase() +
+                            resources[0].difficultyLevel.slice(1)}
+                        </span>
+                        <span>•</span>
+                        <span>{formatDuration(resources[0].duration)}</span>
+                        <OwnershipTag isOwner={resources[0].isOwner ?? false} />
+                      </div>
+
+                      <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
+                        {resources[0].title}
+                      </h2>
+                      <p className="text-sm mb-4 line-clamp-3 text-gray-700 dark:text-gray-300">
+                        {truncateText(resources[0].description, 200)}
+                      </p>
+
+                      {resources[0].tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {resources[0].tags.slice(0, 3).map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-0.5 bg-gray-100 dark:bg-[#333333] text-gray-800 dark:text-gray-200 rounded-full text-xs"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                          {resources[0].tags.length > 3 && (
+                            <span className="px-2 py-0.5 bg-gray-100 dark:bg-[#333333] text-gray-800 dark:text-gray-200 rounded-full text-xs">
+                              +{resources[0].tags.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-8 w-8">
+                            <Image
+                              src={resources[0].author.avatar || defaultAvatar}
+                              alt={`Profile picture of ${resources[0].author.name}`}
+                              fill
+                              className="rounded-full object-cover"
+                              sizes="32px"
+                            />
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {resources[0].author.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                          <span>{resources[0].publishDate}</span>
+                          <span>•</span>
+                          <span>{resources[0].viewCount} views</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </Link>
+              </div>
+
+              {resources.length > 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {resources.slice(1).map(resource => (
+                    <Link
+                      key={resource._id}
+                      href={`/resources/${generateSlug(resource.title)}`}
+                      className="group block h-full overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
+                    >
+                      <article className="h-full relative">
+                        <div className="relative h-[200px] w-full">
+                          <Image
+                            src={resource.resourceImage || defaultImage}
+                            alt={
+                              `Featured image for ${resource.title}` ||
+                              defaultAlt
+                            }
+                            fill
+                            className="object-cover transition-opacity group-hover:opacity-75"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                          />
+
+                          {/* Media type indicator */}
+                          {resource.mediaUrls &&
+                            resource.mediaUrls.length > 0 && (
+                              <div className="absolute top-2 right-2 bg-black bg-opacity-60 rounded-full p-1">
+                                {resource.mediaUrls[0].type === 'video' ? (
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="text-white"
+                                  >
+                                    <path
+                                      d="M8 6.82001V17.18C8 17.97 8.87 18.45 9.54 18.02L17.68 12.84C18.3 12.45 18.3 11.55 17.68 11.15L9.54 5.98001C8.87 5.55001 8 6.03001 8 6.82001Z"
+                                      fill="currentColor"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="text-white"
+                                  >
+                                    <path
+                                      d="M12 3V21M3 12H21"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                        </div>
+                        <div className="p-4">
+                          <div className="flex flex-wrap items-center justify-between mb-2 text-xs">
+                            <div className="flex flex-wrap items-center gap-1 mb-1">
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                                {resource.category}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full ${getDifficultyBadgeColor(
+                                  resource.difficultyLevel
+                                )}`}
+                              >
+                                {resource.difficultyLevel
+                                  .charAt(0)
+                                  .toUpperCase() +
+                                  resource.difficultyLevel.slice(1)}
+                              </span>
+                            </div>
+                            <OwnershipTag
+                              isOwner={resource.isOwner ?? false}
+                              size="small"
+                            />
+                          </div>
+
+                          <h2 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">
+                            {resource.title}
+                          </h2>
+                          <p className="text-sm line-clamp-2 mb-3 text-gray-700 dark:text-gray-300">
+                            {truncateText(resource.description, 100)}
+                          </p>
+
+                          {resource.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {resource.tags.slice(0, 2).map((tag, index) => (
+                                <span
+                                  key={index}
+                                  className="px-2 py-0.5 bg-gray-100 dark:bg-[#333333] text-gray-800 dark:text-gray-200 rounded-full text-xs"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                              {resource.tags.length > 2 && (
+                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-[#333333] text-gray-800 dark:text-gray-200 rounded-full text-xs">
+                                  +{resource.tags.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between mt-auto">
+                            <div className="flex items-center gap-2">
+                              <div className="relative h-6 w-6">
+                                <Image
+                                  src={resource.author.avatar || defaultAvatar}
+                                  alt={`Profile picture of ${resource.author.name}`}
+                                  fill
+                                  className="rounded-full object-cover"
+                                  sizes="24px"
+                                />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                {resource.author.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span>{formatDuration(resource.duration)}</span>
+                              <span>•</span>
+                              <span>{resource.viewCount} views</span>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {renderPagination()}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                No resources found
+              </h2>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                {selectedCategory || selectedDifficulty
+                  ? 'No resources match your current filters. Try adjusting your selections.'
+                  : 'Be the first to share your mental health resources.'}
+              </p>
+              {isAuthenticated && (
+                <button
+                  onClick={() => router.push('/resources/create')}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Create a Resource
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   );
 };
 

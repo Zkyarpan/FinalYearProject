@@ -3,7 +3,9 @@
   "scripts": {
     "dev": "nodemon",
     "build": "next build && tsc --project tsconfig.server.json",
-    "start": "cross-env NODE_ENV=production node dist/server.js"
+    "start": "cross-env NODE_ENV=production node dist/server.js",
+    "analyze": "ANALYZE=true next build",
+    "lint": "next lint"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.15",
@@ -42,6 +44,7 @@
     "@tiptap/extension-image": "^2.11.2",
     "@tiptap/react": "^2.11.2",
     "@tiptap/starter-kit": "^2.11.2",
+    "@types/compression": "^1.7.5",
     "@types/formidable": "^3.4.5",
     "@types/mongoose": "^5.11.97",
     "@types/validator": "^13.12.2",
@@ -53,6 +56,7 @@
     "cloudinary": "^2.5.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
+    "compression": "^1.8.0",
     "cross-env": "^7.0.3",
     "crypto-js": "^4.2.0",
     "date-fns": "^3.6.0",
@@ -102,6 +106,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@lhci/cli": "0.14.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/busboy": "^1.5.4",
     "@types/crypto-js": "^4.2.2",

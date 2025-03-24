@@ -18,12 +18,30 @@ interface Availability {
 // Define approval status type
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
+// Profile completion form data interface
+interface ProfileFormData {
+  currentStep: number;
+  firstName: string;
+  lastName: string;
+  age: string;
+  gender: string;
+  phone: string;
+  address: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  therapyHistory: string;
+  preferredCommunication: string;
+  briefBio: string;
+  struggles: string[];
+  imagePreviewUrl: string | null;
+}
+
 interface UserProfile {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
   profileImage: string | null;
-  image?: string | null; // Added image property for compatibility
+  image?: string | null;
   country?: string | null;
   streetAddress?: string | null;
   city?: string | null;
@@ -48,8 +66,8 @@ interface UserProfile {
   availability?: Availability;
   acceptingNewClients?: boolean;
   ageGroups?: ('children' | 'teenagers' | 'adults' | 'seniors')[];
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface User extends UserProfile {
@@ -58,8 +76,8 @@ interface User extends UserProfile {
   isAuthenticated: boolean;
   isVerified: boolean;
   profileComplete: boolean;
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface SetUser extends UserProfile {
@@ -70,12 +88,19 @@ interface SetUser extends UserProfile {
   profileComplete: boolean;
   isAuthenticated?: boolean;
   image?: string; // Allow image property from API
-  approvalStatus?: ApprovalStatus; // Add approval status
-  adminFeedback?: string | null; // Add admin feedback for rejections
+  approvalStatus?: ApprovalStatus;
+  adminFeedback?: string | null;
 }
 
 interface UserStore extends User {
   user: User | null;
+
+  // Profile completion form data
+  profileFormData: ProfileFormData | null;
+
+  // Form state methods
+  saveProfileFormData: (formData: Partial<ProfileFormData>) => void;
+  clearProfileFormData: () => void;
 
   // User management methods
   setUser: (user: SetUser) => void;
@@ -99,6 +124,24 @@ interface UserStore extends User {
   ensureAuthentication: () => boolean;
   debugAuth: () => boolean;
 }
+
+// Default profile form data
+const defaultProfileFormData: ProfileFormData = {
+  currentStep: 1,
+  firstName: '',
+  lastName: '',
+  age: '',
+  gender: '',
+  phone: '',
+  address: '',
+  emergencyContact: '',
+  emergencyPhone: '',
+  therapyHistory: 'no',
+  preferredCommunication: '',
+  briefBio: '',
+  struggles: [],
+  imagePreviewUrl: null,
+};
 
 export const useUserStore = create(
   persist<UserStore>(
@@ -135,6 +178,24 @@ export const useUserStore = create(
       approvalStatus: undefined,
       adminFeedback: null,
       user: null,
+
+      // Profile completion form data
+      profileFormData: null,
+
+      // Form state methods
+      saveProfileFormData: formData => {
+        const currentFormData = get().profileFormData || defaultProfileFormData;
+        set({
+          profileFormData: {
+            ...currentFormData,
+            ...formData,
+          },
+        });
+      },
+
+      clearProfileFormData: () => {
+        set({ profileFormData: null });
+      },
 
       // Display role helper
       getDisplayRole: () => {
@@ -308,6 +369,9 @@ export const useUserStore = create(
             state.image ||
             state.profileImage;
 
+          // Clear profile form data after successful update
+          get().clearProfileFormData();
+
           return {
             ...state,
             ...profile,
@@ -352,6 +416,7 @@ export const useUserStore = create(
           approvalStatus: undefined,
           adminFeedback: null,
           user: null,
+          profileFormData: null,
         });
 
         console.log('User logged out, state cleared');

@@ -1,27 +1,29 @@
 import type { Metadata } from 'next';
 import { Inter, Instrument_Serif } from 'next/font/google';
 import './globals.css';
-import NavbarWrapper from '@/components/NavbarWrapper';
-import FooterWrapper from '@/components/FooterWrapper';
-import { Toaster } from 'sonner';
+import { Suspense, lazy } from 'react';
 import { ThemeProviders } from '@/providers/ThemeProviders';
+import { Toaster } from 'sonner';
 import NextTopLoader from 'nextjs-toploader';
-import { StripeProvider } from '@/providers/stripe-provider';
-import { SocketProvider } from '@/contexts/SocketContext';
-import { ChatProvider } from '../contexts/ChatContext';
-import { VideoCallProvider } from '@/contexts/VideoCallContext';
-import { NotificationProvider } from '@/contexts/NotificationContext';
 
+// Lazy load client components
+const ClientProviders = lazy(() => import('@/components/core/ClientOnly'));
+
+// Further optimize fonts - only load weights you actually use
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
-  weight: ['100', '400', '500', '600', '700', '900'],
+  weight: ['400', '700'],
+  display: 'swap',
+  preload: true,
 });
 
 const instrumentSerif = Instrument_Serif({
   subsets: ['latin'],
   variable: '--font-instrument-serif',
   weight: '400',
+  display: 'swap',
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -38,39 +40,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning={true}>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${instrumentSerif.variable} antialiased`}
-        suppressHydrationWarning={true}
+        suppressHydrationWarning
       >
         <ThemeProviders>
-          <NextTopLoader
-            color="#0466C8"
-            initialPosition={0.08}
-            crawlSpeed={200}
-            height={3}
-            crawl={true}
-            showSpinner={true}
-            easing="ease"
-            speed={200}
-            shadow="0 0 10px #2299DD,0 0 5px #2299DD"
-            template='<div class="bar" role="bar"><div class="peg"></div></div> 
-  <div class="spinner" role="spinner"><div class="spinner-icon"></div></div>'
-            zIndex={9999}
-            showAtBottom={false}
-          />
+          <NextTopLoader color="#0466C8" showSpinner={false} height={2} />
           <Toaster position="bottom-right" richColors />
-          <NavbarWrapper />
-          <StripeProvider>
-            <SocketProvider>
-              <NotificationProvider>
-                <VideoCallProvider>
-                  <ChatProvider>{children}</ChatProvider>
-                </VideoCallProvider>
-              </NotificationProvider>
-            </SocketProvider>
-          </StripeProvider>
-          <FooterWrapper />
+
+          <Suspense fallback={<div className="min-h-screen"></div>}>
+            <ClientProviders>{children}</ClientProviders>
+          </Suspense>
         </ThemeProviders>
       </body>
     </html>

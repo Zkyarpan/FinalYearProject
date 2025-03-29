@@ -32,12 +32,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   showConversationList,
 }) => {
   const { socket, isConnected } = useSocket();
-  const {
-    callStatus,
-    callDuration,
-    callType,
-    conversationId: activeCallConversationId,
-  } = useVideoCall();
+  const { callStatus } = useVideoCall();
   const { user } = useUserStore();
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -196,71 +191,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       setLoadingMessages(false);
     }
   };
-
-  // Add handling for call summary messages when a call ends
-  useEffect(() => {
-    // When a call status changes to 'idle' (ended) from 'connected', add a call summary
-    if (
-      callStatus === 'idle' &&
-      callDuration > 0 &&
-      activeCallConversationId &&
-      currentConversation &&
-      activeCallConversationId === currentConversation._id
-    ) {
-      // Generate a unique ID for this call summary to prevent duplicates
-      const callSummaryId = `call-summary-${Date.now()}`;
-
-      // Check if we've already added this summary
-      if (lastAddedCallSummary !== callSummaryId) {
-        const callSymbol = callType === 'video' ? '🎥' : '📞';
-        const formattedDuration = formatDuration(callDuration);
-        const content = `${callSymbol} ${callType} call (${formattedDuration})`;
-
-        // Create a temporary message - the server will send the official one
-        const tempCallMessage = {
-          _id: `temp-${callSummaryId}`,
-          senderId: user?._id || '',
-          receiverId: selectedPsychologist?._id || '',
-          content,
-          conversation: currentConversation._id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          isRead: true,
-          messageType: 'call_summary',
-          metadata: {
-            callType,
-            duration: callDuration,
-            status: 'ended',
-          },
-          sender: {
-            _id: user?._id || '',
-            firstName: user?.firstName || '',
-            lastName: user?.lastName || '',
-            email: user?.email || '',
-            image: user?.image || '',
-            role: user?.role || 'user',
-          },
-        } as Message;
-
-        setMessages(prev => [...prev, tempCallMessage]);
-        setLastAddedCallSummary(callSummaryId);
-
-        // Scroll to bottom
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 50);
-      }
-    }
-  }, [
-    callStatus,
-    callDuration,
-    activeCallConversationId,
-    currentConversation,
-    callType,
-    lastAddedCallSummary,
-    user,
-    selectedPsychologist,
-  ]);
 
   // Set up socket listeners for real-time messaging with better error handling
   useEffect(() => {

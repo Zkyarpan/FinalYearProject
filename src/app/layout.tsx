@@ -5,6 +5,7 @@ import { Suspense, lazy } from 'react';
 import { ThemeProviders } from '@/providers/ThemeProviders';
 import { Toaster } from 'sonner';
 import NextTopLoader from 'nextjs-toploader';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 // Lazy load client components
 const ClientProviders = lazy(() => import('@/components/core/ClientOnly'));
@@ -50,7 +51,9 @@ export default function RootLayout({
           <Toaster position="bottom-right" richColors />
 
           <Suspense fallback={<div className="min-h-screen"></div>}>
-            <ClientProviders>{children}</ClientProviders>
+            <ClientProviders>
+              <NotificationProvider>{children}</NotificationProvider>
+            </ClientProviders>
           </Suspense>
         </ThemeProviders>
       </body>

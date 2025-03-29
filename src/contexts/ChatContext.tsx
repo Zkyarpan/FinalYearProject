@@ -606,8 +606,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
               currentConversation && currentConversation._id === convo._id
                 ? 0
                 : isReceiver
-                ? 1
-                : 0;
+                  ? 1
+                  : 0;
 
             return {
               ...convo,

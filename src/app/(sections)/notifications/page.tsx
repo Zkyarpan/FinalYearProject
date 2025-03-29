@@ -784,12 +784,12 @@ const NotificationsPage = () => {
               searchQuery
                 ? 'No results found. Try adjusting your search.'
                 : activeTab === 'all'
-                ? "You're all caught up! New notifications will appear here."
-                : activeTab === 'unread'
-                ? 'You have no unread notifications.'
-                : activeTab === 'appointments'
-                ? 'You have no appointment notifications.'
-                : 'You have no availability notifications.'
+                  ? "You're all caught up! New notifications will appear here."
+                  : activeTab === 'unread'
+                    ? 'You have no unread notifications.'
+                    : activeTab === 'appointments'
+                      ? 'You have no appointment notifications.'
+                      : 'You have no availability notifications.'
             }
           />
         ) : (

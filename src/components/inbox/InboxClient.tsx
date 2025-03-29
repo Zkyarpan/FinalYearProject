@@ -12,12 +12,7 @@ import { Conversation, Psychologist } from '@/app/(sections)/inbox/types';
 const InboxClient = () => {
   const { user } = useUserStore();
   const { socket, isConnected } = useSocket();
-  const {
-    callStatus,
-    callId,
-    incomingCall,
-    conversationId: activeCallConversationId,
-  } = useVideoCall();
+  const { callStatus } = useVideoCall();
   const [selectedPsychologist, setSelectedPsychologist] =
     useState<Psychologist | null>(null);
   const [currentConversation, setCurrentConversation] =
@@ -95,97 +90,6 @@ const InboxClient = () => {
       }
     }
   };
-
-  // Auto-select conversation when receiving a call
-  useEffect(() => {
-    if (incomingCall && incomingCall.conversationId) {
-      // Find the conversation that matches the incoming call
-      const fetchConversationDetails = async () => {
-        try {
-          // Only fetch if we don't already have the conversation selected
-          if (
-            !currentConversation ||
-            currentConversation._id !== incomingCall.conversationId
-          ) {
-            const response = await fetch(
-              `/api/conversations/${incomingCall.conversationId}`
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              if (data.IsSuccess && data.Result) {
-                // Set the current conversation
-                setCurrentConversation(data.Result);
-
-                // Set the selected psychologist based on the remote user ID
-                const psychologist = isPsychologist
-                  ? data.Result.user // If we're the psychologist, the remote user is the patient
-                  : data.Result.psychologist; // Otherwise, the remote user is the psychologist
-
-                setSelectedPsychologist(psychologist);
-
-                // Show the chat on mobile
-                setIsMobileListVisible(false);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching conversation for incoming call', error);
-        }
-      };
-
-      fetchConversationDetails();
-    }
-  }, [incomingCall, currentConversation, isPsychologist]);
-
-  // Auto-select conversation when a call is active
-  useEffect(() => {
-    if (
-      (callStatus === 'connected' || callStatus === 'calling') &&
-      activeCallConversationId
-    ) {
-      // Only fetch if we don't already have the conversation selected
-      if (
-        !currentConversation ||
-        currentConversation._id !== activeCallConversationId
-      ) {
-        const fetchConversationDetails = async () => {
-          try {
-            const response = await fetch(
-              `/api/conversations/${activeCallConversationId}`
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              if (data.IsSuccess && data.Result) {
-                // Set the current conversation
-                setCurrentConversation(data.Result);
-
-                // Set the selected psychologist based on the remote user ID
-                const psychologist = isPsychologist
-                  ? data.Result.user
-                  : data.Result.psychologist;
-
-                setSelectedPsychologist(psychologist);
-
-                // Show the chat on mobile
-                setIsMobileListVisible(false);
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching conversation for active call', error);
-          }
-        };
-
-        fetchConversationDetails();
-      }
-    }
-  }, [
-    callStatus,
-    activeCallConversationId,
-    currentConversation,
-    isPsychologist,
-  ]);
 
   // Show back button on mobile
   const showConversationList = () => {

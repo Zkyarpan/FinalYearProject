@@ -17,6 +17,7 @@ export interface Psychologist {
 
 export interface Message {
   _id: string;
+  tempId?: string;
   content: string;
   conversation: string;
   createdAt: string;
@@ -32,9 +33,24 @@ export interface Message {
     image?: string;
     role?: string;
   };
+  receiver?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    image?: string;
+    role?: string;
+  };
   updatedAt: string;
-  messageType?: string; // Add this property
-  metadata?: any; // Consider adding this for call data
+  messageType?: string;
+  metadata?: any;
+
+  // Message status properties
+  pending?: boolean;
+  failed?: boolean;
+  delivered?: boolean;
+  deliveredAt?: string;
+  error?: string;
 }
 
 export interface Conversation {

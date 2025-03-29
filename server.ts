@@ -9,40 +9,18 @@ import CallHistory from './src/models/CallHistory';
 import mongoose from 'mongoose';
 import Notification from './src/models/Notification';
 import User from './src/models/User';
-import compression from 'compression'; // Add compression
-import express from 'express'; // Add express
+import compression from 'compression';
+import express from 'express';
 
 const port = parseInt(process.env.PORT || '3000', 10);
+const isTurbopackRunning = process.env.NEXT_TURBOPACK === 'true';
+const serverPort = isTurbopackRunning
+  ? parseInt(process.env.SERVER_PORT || '3001', 10)
+  : port;
+
 const dev = process.env.NODE_ENV !== 'production';
-const app = next({ dev });
-const handle = app.getRequestHandler();
-
-interface ParticipantStatus {
-  status: string;
-  timestamp: number;
-  reason?: string;
-}
-
-interface CallData {
-  callId: string;
-  from: string;
-  to: string;
-  status: string;
-  startTime: Date;
-  acceptTime?: Date;
-  participantStatus?: Record<string, ParticipantStatus>;
-  lastActivity?: number;
-  conversationId?: string;
-  appointmentId?: string;
-  reconnectAttempt?: number;
-  reconnectTimestamp?: number;
-  callType?: string;
-  isRejoinRecovery?: boolean;
-}
-
-// Performance optimization: Add size limits to prevent memory leaks
-const MAX_CACHE_SIZE = 1000;
-const MAX_SIGNAL_CACHE_SIZE = 5000;
+const app = isTurbopackRunning ? null : next({ dev });
+const handle = isTurbopackRunning ? null : app?.getRequestHandler();
 
 // Store for connected users
 const connectedUsers = new Map();
@@ -75,12 +53,10 @@ const connectionQualityMetrics = new Map(); // userId -> quality metrics
 // Track call setup progress to handle race conditions
 const callSetupStatus = new Map(); // callId -> {offerSent, answerReceived, iceCandidatesComplete}
 
-// Performance optimization: Reduce production logging
+// Enhanced logging with timestamps
 const log = {
   info: (message, ...args) => {
-    if (dev || process.env.LOG_LEVEL === 'info') {
-      console.log(`[INFO] [${new Date().toISOString()}] ${message}`, ...args);
-    }
+    console.log(`[INFO] [${new Date().toISOString()}] ${message}`, ...args);
   },
   warn: (message, ...args) => {
     console.warn(`[WARN] [${new Date().toISOString()}] ${message}`, ...args);
@@ -94,57 +70,6 @@ const log = {
     }
   },
 };
-
-// Performance optimization: Database operation batching
-const pendingDbOperations = {
-  messages: new Map(),
-  notifications: new Map(),
-  callHistory: new Map(),
-};
-
-let dbBatchTimeout: NodeJS.Timeout | null = null;
-
-// Schedule database operations to run in batches
-function scheduleBatchDbOperations() {
-  if (dbBatchTimeout) return;
-
-  dbBatchTimeout = setTimeout(async () => {
-    try {
-      // Process message saves
-      if (pendingDbOperations.messages.size > 0) {
-        const messages = Array.from(pendingDbOperations.messages.values());
-        if (messages.length > 0) {
-          await Message.insertMany(messages);
-        }
-        pendingDbOperations.messages.clear();
-      }
-
-      // Process notification saves
-      if (pendingDbOperations.notifications.size > 0) {
-        const notifications = Array.from(
-          pendingDbOperations.notifications.values()
-        );
-        if (notifications.length > 0) {
-          await Notification.insertMany(notifications);
-        }
-        pendingDbOperations.notifications.clear();
-      }
-
-      // Process call history saves
-      if (pendingDbOperations.callHistory.size > 0) {
-        const calls = Array.from(pendingDbOperations.callHistory.values());
-        if (calls.length > 0) {
-          await CallHistory.insertMany(calls);
-        }
-        pendingDbOperations.callHistory.clear();
-      }
-    } catch (error) {
-      log.error('Error in batch database operations:', error);
-    } finally {
-      dbBatchTimeout = null;
-    }
-  }, 1000); // Batch every 1 second
-}
 
 // Utility function to check if a date is valid
 function isValidDate(date) {
@@ -178,46 +103,39 @@ function getSocketIdForUser(userId) {
 
   const socketId = userSocketMap.get(userId);
   if (!socketId) {
-    // Performance optimization: Reduce logging in production
-    if (dev) {
-      log.warn(`No socket found for user ${userId}`);
-    }
+    log.warn(`No socket found for user ${userId}`);
     return null;
   }
   return socketId;
 }
 
-// Performance optimization: Improve ICE candidate handling
+// Improved version to buffer ICE candidates if connection not ready
 function bufferIceCandidates(callId, from, to, candidate) {
   if (!pendingIceCandidates.has(callId)) {
     pendingIceCandidates.set(callId, []);
   }
 
-  // Limit the number of buffered candidates to prevent memory issues
-  const candidates = pendingIceCandidates.get(callId);
-  if (candidates.length < 100) {
-    // Set reasonable limit
-    candidates.push({
-      from,
-      to,
-      candidate,
-      timestamp: Date.now(),
-    });
-  }
+  pendingIceCandidates.get(callId).push({
+    from,
+    to,
+    candidate,
+    timestamp: Date.now(),
+  });
 
-  // Performance optimization: Reduce logging in production
-  if (dev) {
-    log.info(
-      `Buffered ICE candidate for call ${callId}, now have ${candidates.length} candidates`
-    );
-  }
+  log.info(
+    `Buffered ICE candidate for call ${callId}, now have ${
+      pendingIceCandidates.get(callId).length
+    } candidates`
+  );
 }
 
-// Performance optimization: Better flushing of ICE candidates
-function flushCandidates(callId: string, to: string): void {
+let io; // Make io variable accessible outside for functions that need it
+
+// Flush buffered candidates when appropriate
+function flushCandidates(callId, to) {
   if (!pendingIceCandidates.has(callId)) return;
 
-  const candidates = pendingIceCandidates.get(callId) || [];
+  const candidates = pendingIceCandidates.get(callId);
   const recipientSocketId = getSocketIdForUser(to);
 
   if (!recipientSocketId) {
@@ -227,920 +145,660 @@ function flushCandidates(callId: string, to: string): void {
     return;
   }
 
-  if (dev) {
-    log.info(
-      `Flushing ${candidates.length} buffered ICE candidates for call ${callId} to ${to}`
-    );
-  }
+  log.info(
+    `Flushing ${candidates.length} buffered ICE candidates for call ${callId} to ${to}`
+  );
 
-  // Performance optimization: Send candidates in batches instead of one by one
-  // Group candidates into batches of 10
-  const batchSize = 10;
-  const candidateBatches: Array<any[]> = [];
-
-  for (let i = 0; i < candidates.length; i += batchSize) {
-    candidateBatches.push(candidates.slice(i, i + batchSize));
-  }
-
-  // Send batches with a small delay between them
-  candidateBatches.forEach((batch, batchIndex) => {
+  candidates.forEach((candidateData, index) => {
+    // Add a small delay between candidates to avoid overwhelming
     setTimeout(() => {
-      // Extract from property safely
-      let fromValue = '';
-      if (batch && batch.length > 0 && batch[0]) {
-        fromValue = batch[0].from || '';
-      }
-
-      io.to(recipientSocketId).emit('ice_candidates_batch', {
-        from: fromValue,
-        to,
+      io.to(recipientSocketId).emit('webrtc_signal', {
+        type: 'ice-candidate',
+        from: candidateData.from,
+        to: candidateData.to,
         callId,
-        candidates: Array.isArray(batch)
-          ? batch.map(item => item && (item.candidate || item))
-          : [],
-        batchIndex,
-        totalBatches: candidateBatches.length,
+        signal: candidateData.candidate,
+        buffered: true,
+        batchIndex: index,
+        batchSize: candidates.length,
       });
-    }, batchIndex * 100); // Stagger batches by 100ms
+    }, index * 50); // Small staggered delay
   });
 
   // Clear the buffer after flushing
   pendingIceCandidates.delete(callId);
 }
-// Fixed graceful shutdown handler
-process.on('SIGTERM', () => {
-  log.info('SIGTERM signal received, shutting down gracefully');
 
-  // Close the Socket.IO server
-  io.close(() => {
-    log.info('Socket.IO server closed');
-
-    // Close MongoDB connection - fixed to use correct signature
-    mongoose.connection
-      .close()
-      .then(() => {
-        log.info('MongoDB connection closed');
-        process.exit(0);
-      })
-      .catch(err => {
-        log.error('Error closing MongoDB connection:', err);
-        process.exit(1);
-      });
-  });
-
-  // Force exit after 10 seconds if graceful shutdown fails
-  setTimeout(() => {
-    log.error('Forced shutdown after timeout');
-    process.exit(1);
-  }, 10000);
+// Connect to MongoDB at server start
+connectDB().catch(err => {
+  log.error('Failed to connect to MongoDB:', err);
+  process.exit(1);
 });
 
-// Performance optimization: Improve MongoDB connection
-connectDB()
-  .then(() => {
-    log.info('MongoDB connected successfully');
-  })
-  .catch(err => {
-    log.error('Failed to connect to MongoDB:', err);
-    process.exit(1);
+// Function to set up Socket.IO server
+function setupSocketServer(server) {
+  // Initialize Socket.IO with improved connection settings for WebRTC
+  io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+    pingTimeout: 60000, // 1 minute ping timeout
+    pingInterval: 25000, // Send ping every 25 seconds
+    connectTimeout: 45000, // 45 second connection timeout
+    maxHttpBufferSize: 5e8, // 500 MB max buffer size for large media transfers
+    transports: ['websocket', 'polling'], // Prefer websocket but allow polling as fallback
   });
 
-let io; // Make io variable accessible outside for functions that need it
+  // Socket.IO connection handling
+  io.on('connection', socket => {
+    // Extract user info from socket connection
+    const userId =
+      socket.handshake.auth.userId || socket.handshake.query.userId;
+    const userRole =
+      socket.handshake.auth.userRole || socket.handshake.query.userRole;
 
-app
-  .prepare()
-  .then(() => {
-    // Performance optimization: Use Express for middleware support
-    const expressApp = express();
+    if (!userId) {
+      log.warn('Connection without userId detected, disconnecting:', socket.id);
+      socket.disconnect(true);
+      return;
+    }
 
-    // Performance optimization: Add compression middleware
-    expressApp.use(compression());
-
-    // Add static file caching
-    expressApp.use(
-      '/static',
-      express.static('public', {
-        maxAge: '7d', // Cache static assets for 7 days
-        immutable: true,
-      })
+    log.info(
+      `User connected: ${userId}, role: ${userRole}, socket: ${socket.id}`
     );
 
-    // Handle all requests through Next.js
-    expressApp.all('*', (req, res) => {
-      const parsedUrl = parse(req.url!, true);
-      handle(req, res, parsedUrl);
-    });
+    // Track multiple connections for the same user
+    if (!userConnections.has(userId)) {
+      userConnections.set(userId, new Set());
+    }
+    userConnections.get(userId).add(socket.id);
 
-    // Use Express app with createServer
-    const server = createServer(expressApp);
-
-    // Performance optimization: Improved Socket.IO configuration
-    io = new Server(server, {
-      cors: {
-        origin: '*',
-        methods: ['GET', 'POST'],
-      },
-      // Reduced timeouts
-      pingTimeout: 30000, // Reduced from 60s to 30s
-      pingInterval: 15000, // Reduced from 25s to 15s
-      connectTimeout: 20000, // Reduced from 45s to 20s
-      maxHttpBufferSize: 1e6, // Reduced from 500MB to 1MB for better memory usage
-      transports: ['websocket'], // Prefer websocket only for better performance
-      // Add compression
-      perMessageDeflate: true,
-    });
-
-    // Socket.IO connection handling
-    io.on('connection', socket => {
-      // Extract user info from socket connection
-      const userId =
-        socket.handshake.auth.userId || socket.handshake.query.userId;
-      const userRole =
-        socket.handshake.auth.userRole || socket.handshake.query.userRole;
+    // Handle user login
+    socket.on('user_login', userData => {
+      const userId = userData._id || userData.id;
 
       if (!userId) {
-        log.warn(
-          'Connection without userId detected, disconnecting:',
-          socket.id
-        );
-        socket.disconnect(true);
+        log.warn('User login event received without a user ID');
         return;
       }
 
-      // Performance optimization: Reduce logging detail in production
-      if (dev) {
+      // Store user data with socket ID
+      connectedUsers.set(socket.id, {
+        userId,
+        socketId: socket.id,
+        userData,
+        userRole,
+        connectedAt: new Date().toISOString(),
+      });
+
+      // Map user ID to socket ID for direct messaging
+      userSocketMap.set(userId, socket.id);
+
+      // Join a personal room based on user ID for direct messages
+      socket.join(userId);
+
+      // If user is a psychologist, add to psychologist room
+      if (userRole === 'psychologist') {
+        log.info(`Psychologist ${userId} joined the psychologist room`);
+        socket.join(psychologistRoom);
+      }
+
+      log.info(`User logged in: ${userId} with socket: ${socket.id}`);
+
+      // Broadcast to all clients
+      io.emit(
+        'users_update',
+        Array.from(connectedUsers.values()).map(user => ({
+          userId: user.userId,
+          socketId: user.socketId,
+          userRole: user.userRole,
+          firstName: user.userData?.firstName,
+          lastName: user.userData?.lastName,
+        }))
+      );
+    });
+
+    // ======= ENHANCED WEBRTC SIGNALING HANDLERS =======
+
+    socket.on('webrtc_signal', async data => {
+      try {
+        const { type, from, to, signal, callId, callType, conversationId } =
+          data;
+
+        // Enhanced logging for debugging
         log.info(
-          `User connected: ${userId}, role: ${userRole}, socket: ${socket.id}`
+          `WebRTC Signal: ${type} from ${from} to ${to}, callId: ${
+            callId || 'none'
+          }`
         );
-      }
 
-      // Track multiple connections for the same user
-      if (!userConnections.has(userId)) {
-        userConnections.set(userId, new Set());
-      }
-      userConnections.get(userId).add(socket.id);
-
-      // Handle user login
-      socket.on('user_login', userData => {
-        const userId = userData._id || userData.id;
-
-        if (!userId) {
-          log.warn('User login event received without a user ID');
+        // Validate basic required data
+        if (!type || !from || !to) {
+          log.error('Invalid WebRTC signal data - missing required fields');
           return;
         }
 
-        // Performance optimization: Store minimal user data
-        connectedUsers.set(socket.id, {
-          userId,
-          socketId: socket.id,
-          userData: {
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-          },
-          userRole,
-          connectedAt: Date.now(),
-        });
+        // Find recipient's socket ID
+        const recipientSocketId = getSocketIdForUser(to);
+        if (!recipientSocketId) {
+          log.warn(`Recipient socket not found for user ${to}`);
 
-        // Map user ID to socket ID for direct messaging
-        userSocketMap.set(userId, socket.id);
-
-        // Join a personal room based on user ID for direct messages
-        socket.join(userId);
-
-        // If user is a psychologist, add to psychologist room
-        if (userRole === 'psychologist') {
-          if (dev) {
-            log.info(`Psychologist ${userId} joined the psychologist room`);
-          }
-          socket.join(psychologistRoom);
-        }
-
-        if (dev) {
-          log.info(`User logged in: ${userId} with socket: ${socket.id}`);
-        }
-
-        // Broadcast to all clients with minimal data
-        io.emit(
-          'users_update',
-          Array.from(connectedUsers.values()).map(user => ({
-            userId: user.userId,
-            socketId: user.socketId,
-            userRole: user.userRole,
-            firstName: user.userData?.firstName,
-            lastName: user.userData?.lastName,
-          }))
-        );
-      });
-
-      // ======= WEBRTC SIGNALING HANDLERS =======
-
-      socket.on('webrtc_signal', async data => {
-        try {
-          const { type, from, to, signal, callId, callType, conversationId } =
-            data;
-
-          // Enhanced logging for debugging in development only
-          if (dev) {
-            log.info(
-              `WebRTC Signal: ${type} from ${from} to ${to}, callId: ${
-                callId || 'none'
-              }`
-            );
-          }
-
-          // Validate basic required data
-          if (!type || !from || !to) {
-            log.error('Invalid WebRTC signal data - missing required fields');
-            return;
-          }
-
-          // Find recipient's socket ID
-          const recipientSocketId = getSocketIdForUser(to);
-          if (!recipientSocketId) {
-            if (dev) {
-              log.warn(`Recipient socket not found for user ${to}`);
-            }
-
-            // If recipient is offline and this is an offer, notify caller immediately
-            if (type === 'offer') {
-              socket.emit('webrtc_signal', {
-                type: 'user-unavailable',
-                from: to,
-                to: from,
-                callId: callId || '',
-              });
-            }
-            return;
-          }
-
-          // Special handling for different signal types
+          // If recipient is offline and this is an offer, notify caller immediately
           if (type === 'offer') {
-            if (dev) {
-              log.info(
-                `New call offer: ${callId} from ${from} to ${to}, type: ${
-                  callType || 'video'
-                }`
-              );
-            }
-
-            // Initialize call setup status
-            callSetupStatus.set(callId, {
-              offerSent: true,
-              answerReceived: false,
-              iceCandidatesComplete: false,
-              connectionChecked: false,
+            socket.emit('webrtc_signal', {
+              type: 'user-unavailable',
+              from: to,
+              to: from,
+              callId: callId || '',
             });
+          }
+          return;
+        }
 
-            // Track this call with enhanced metadata
-            activeCalls.set(callId, {
-              callId,
-              from,
-              to,
-              status: 'ringing',
-              startTime: new Date(),
-              offerTimestamp: Date.now(),
-              callType: callType || 'video',
-              conversationId,
-              connectionState: 'new',
-              mediaTracksAdded: false,
-              participantStatus: {},
-              lastActivity: Date.now(),
-            });
+        // Special handling for different signal types
+        if (type === 'offer') {
+          log.info(
+            `New call offer: ${callId} from ${from} to ${to}, type: ${
+              callType || 'video'
+            }`
+          );
 
-            // Forward the offer immediately
-            io.to(recipientSocketId).emit('webrtc_signal', data);
+          // Initialize call setup status
+          callSetupStatus.set(callId, {
+            offerSent: true,
+            answerReceived: false,
+            iceCandidatesComplete: false,
+            connectionChecked: false,
+          });
 
-            // Performance optimization: Reduce timeout for unanswered calls
-            setTimeout(() => {
-              const callData = activeCalls.get(callId);
-              if (callData && callData.status === 'ringing') {
-                if (dev) {
-                  log.warn(`Call ${callId} timed out without answer`);
-                }
+          // Track this call with enhanced metadata
+          activeCalls.set(callId, {
+            callId,
+            from,
+            to,
+            status: 'ringing',
+            startTime: new Date(),
+            offerTimestamp: Date.now(),
+            callType: callType || 'video',
+            conversationId,
+            connectionState: 'new',
+            mediaTracksAdded: false,
+            participantStatus: {},
+            lastActivity: Date.now(),
+          });
 
-                // Send missed call signal to caller
-                const callerSocketId = getSocketIdForUser(from);
-                if (callerSocketId) {
-                  io.to(callerSocketId).emit('webrtc_signal', {
-                    type: 'call-missed',
-                    from: to,
-                    to: from,
-                    callId,
-                  });
-                }
+          // Forward the offer immediately
+          io.to(recipientSocketId).emit('webrtc_signal', data);
 
-                // Performance optimization: Use batch database operations
-                pendingDbOperations.callHistory.set(callId, {
-                  from,
-                  to,
-                  fromModel: 'User',
-                  toModel: 'User',
-                  callType: callType || 'video',
-                  duration: 0,
-                  status: 'missed',
-                  conversationId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+          // Set auto-timeout for unanswered calls - shorter timeout for better UX
+          setTimeout(() => {
+            const callData = activeCalls.get(callId);
+            if (callData && callData.status === 'ringing') {
+              log.warn(`Call ${callId} timed out without answer`);
+
+              // Send missed call signal to caller
+              const callerSocketId = getSocketIdForUser(from);
+              if (callerSocketId) {
+                io.to(callerSocketId).emit('webrtc_signal', {
+                  type: 'call-missed',
+                  from: to,
+                  to: from,
+                  callId,
                 });
-                scheduleBatchDbOperations();
-
-                // Clean up
-                activeCalls.delete(callId);
-                pendingIceCandidates.delete(callId);
-                callSetupStatus.delete(callId);
               }
-            }, 30000); // Performance optimization: Reduced from 45s to 30s
-          } else if (type === 'pre-offer') {
-            // Special handling for pre-offer to check availability before starting call
-            if (dev) {
-              log.info(`Pre-offer check from ${from} to ${to}`);
-            }
 
-            // Forward to recipient to check if they can accept calls
-            io.to(recipientSocketId).emit('webrtc_signal', {
-              type: 'pre-offer',
-              from,
-              to,
-              callId: callId || `pre-${Date.now()}`,
-              callType: callType || 'video',
-            });
-          } else if (type === 'pre-offer-answer') {
-            // Handle pre-offer response
-            if (dev) {
-              log.info(
-                `Pre-offer answer from ${from} to ${to}: ${data.response}`
-              );
-            }
-
-            // Forward response to caller
-            const callerSocketId = getSocketIdForUser(to);
-            if (callerSocketId) {
-              io.to(callerSocketId).emit('webrtc_signal', {
-                type: 'pre-offer-answer',
+              // Log a missed call in history
+              saveCallHistory({
                 from,
                 to,
-                callId,
-                response: data.response, // can be 'accepted', 'busy', 'rejected'
+                fromModel: 'User', // Using default model
+                toModel: 'User', // Using default model
+                callType: callType || 'video',
+                duration: 0,
+                status: 'missed',
+                conversationId,
               });
-            }
-          } else if (type === 'answer') {
-            if (dev) {
-              log.info(`Call ${callId} was answered by ${to}`);
-            }
 
-            // Update call status
-            const callData = activeCalls.get(callId);
-            if (callData) {
-              callData.status = 'connected';
-              callData.acceptTime = new Date();
-              callData.connectionState = 'connecting';
-              activeCalls.set(callId, callData);
-
-              // Update call setup tracking
-              if (callSetupStatus.has(callId)) {
-                const status = callSetupStatus.get(callId);
-                status.answerReceived = true;
-                callSetupStatus.set(callId, status);
-              }
-            }
-
-            // Forward the answer immediately
-            io.to(recipientSocketId).emit('webrtc_signal', data);
-
-            // Flush any buffered ICE candidates after a short delay
-            setTimeout(() => {
-              flushCandidates(callId, from); // Flush to caller
-            }, 300); // Performance optimization: Reduced from 500ms to 300ms
-          } else if (type === 'ice-candidate') {
-            // Handle and forward ICE candidates with smarter buffering
-            const callData = activeCalls.get(callId);
-
-            // Performance optimization: Better ICE candidate handling
-            // If call setup is not complete, buffer candidates
-            if (callData && callData.status === 'ringing') {
-              bufferIceCandidates(callId, from, to, signal);
-            } else {
-              // Forward ICE candidates immediately
-              io.to(recipientSocketId).emit('webrtc_signal', data);
-            }
-          } else if (type === 'call-state-update') {
-            // Handle call state updates
-            const { connectionState, mediaState } = data;
-
-            if (dev) {
-              log.info(
-                `Call ${callId} state update: ${connectionState}, media: ${mediaState}`
-              );
-            }
-
-            // Update call tracking
-            const callData = activeCalls.get(callId);
-            if (callData) {
-              callData.connectionState =
-                connectionState || callData.connectionState;
-              if (mediaState === 'tracks-added') {
-                callData.mediaTracksAdded = true;
-              }
-              activeCalls.set(callId, callData);
-            }
-
-            // Forward state update to the other party
-            io.to(recipientSocketId).emit('webrtc_signal', data);
-          } else if (type === 'connection-check') {
-            // Verify ICE connectivity
-            if (dev) {
-              log.info(`Connection check for call ${callId}`);
-            }
-
-            // Update call setup status
-            if (callSetupStatus.has(callId)) {
-              const status = callSetupStatus.get(callId);
-              status.connectionChecked = true;
-              callSetupStatus.set(callId, status);
-            }
-
-            // Forward to other party
-            io.to(recipientSocketId).emit('webrtc_signal', data);
-          } else if (type === 'call-ended' || type === 'call-rejected') {
-            if (dev) {
-              log.info(`Call ${callId} was ${type} by ${from}`);
-            }
-
-            // Get call data before cleanup
-            const callData = activeCalls.get(callId);
-
-            // Handle call history based on status
-            if (callData) {
-              if (
-                type === 'call-ended' &&
-                callData.status === 'connected' &&
-                callData.acceptTime
-              ) {
-                // Calculate call duration
-                const duration = Math.floor(
-                  (new Date().getTime() - callData.acceptTime.getTime()) / 1000
-                );
-
-                // Get conversationId with fallback options
-                const callConversationId =
-                  callData.conversationId || data.conversationId;
-
-                try {
-                  // If we still don't have a conversationId, try to find one from previous appointments
-                  let finalConversationId = callConversationId;
-
-                  if (!finalConversationId) {
-                    if (dev) {
-                      log.warn(
-                        `Missing conversationId for call ${callId} - attempting to find from appointments`
-                      );
-                    }
-
-                    // Try to find a conversation between these users
-                    try {
-                      const existingConversation = await mongoose.connection
-                        .collection('conversations')
-                        .findOne({
-                          $or: [
-                            {
-                              user: new mongoose.Types.ObjectId(callData.from),
-                              psychologist: new mongoose.Types.ObjectId(
-                                callData.to
-                              ),
-                            },
-                            {
-                              user: new mongoose.Types.ObjectId(callData.to),
-                              psychologist: new mongoose.Types.ObjectId(
-                                callData.from
-                              ),
-                            },
-                          ],
-                        });
-
-                      if (existingConversation) {
-                        finalConversationId =
-                          existingConversation._id.toString();
-                        if (dev) {
-                          log.info(
-                            `Found existing conversation: ${finalConversationId}`
-                          );
-                        }
-                      } else {
-                        // Create a new conversation as fallback
-                        const newConversation = {
-                          user: callData.from,
-                          psychologist: callData.to,
-                          createdAt: new Date(),
-                          updatedAt: new Date(),
-                        };
-
-                        const result = await mongoose.connection
-                          .collection('conversations')
-                          .insertOne(newConversation);
-
-                        finalConversationId = result.insertedId.toString();
-                        if (dev) {
-                          log.info(
-                            `Created new conversation: ${finalConversationId}`
-                          );
-                        }
-                      }
-                    } catch (err) {
-                      log.error('Error finding/creating conversation:', err);
-                    }
-                  }
-
-                  if (finalConversationId) {
-                    // Performance optimization: Use batch database operations
-                    pendingDbOperations.callHistory.set(callId, {
-                      from: callData.from,
-                      to: callData.to,
-                      fromModel: 'User',
-                      toModel: 'User',
-                      callType: callData.callType || 'video',
-                      duration,
-                      status: 'ended',
-                      endedAt: new Date(),
-                      conversationId: finalConversationId,
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    });
-                    scheduleBatchDbOperations();
-                  } else {
-                    log.error(
-                      `Could not save call history - no conversationId available for call ${callId}`
-                    );
-                  }
-                } catch (error) {
-                  log.error('Error saving call history:', error);
-                }
-              }
-              // Clean up call tracking
+              // Clean up
               activeCalls.delete(callId);
               pendingIceCandidates.delete(callId);
               callSetupStatus.delete(callId);
             }
+          }, 45000); // 45 second timeout (reduced from 60s)
+        } else if (type === 'pre-offer') {
+          // Special handling for pre-offer to check availability before starting call
+          log.info(`Pre-offer check from ${from} to ${to}`);
 
-            // Forward the signal to the recipient
+          // Forward to recipient to check if they can accept calls
+          io.to(recipientSocketId).emit('webrtc_signal', {
+            type: 'pre-offer',
+            from,
+            to,
+            callId: callId || `pre-${Date.now()}`,
+            callType: callType || 'video',
+          });
+        } else if (type === 'pre-offer-answer') {
+          // Handle pre-offer response
+          log.info(`Pre-offer answer from ${from} to ${to}: ${data.response}`);
+
+          // Forward response to caller
+          const callerSocketId = getSocketIdForUser(to);
+          if (callerSocketId) {
+            io.to(callerSocketId).emit('webrtc_signal', {
+              type: 'pre-offer-answer',
+              from,
+              to,
+              callId,
+              response: data.response, // can be 'accepted', 'busy', 'rejected'
+            });
+          }
+        } else if (type === 'answer') {
+          log.info(`Call ${callId} was answered by ${to}`);
+
+          // Update call status
+          const callData = activeCalls.get(callId);
+          if (callData) {
+            callData.status = 'connected';
+            callData.acceptTime = new Date();
+            callData.connectionState = 'connecting';
+            activeCalls.set(callId, callData);
+
+            // Update call setup tracking
+            if (callSetupStatus.has(callId)) {
+              const status = callSetupStatus.get(callId);
+              status.answerReceived = true;
+              callSetupStatus.set(callId, status);
+            }
+          }
+
+          // Forward the answer immediately
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+
+          // Flush any buffered ICE candidates after a short delay
+          setTimeout(() => {
+            flushCandidates(callId, from); // Flush to caller
+          }, 500);
+        } else if (type === 'ice-candidate') {
+          // Handle and forward ICE candidates with smarter buffering
+          const callData = activeCalls.get(callId);
+
+          // If call setup is not complete, buffer candidates
+          if (callData && callData.status === 'ringing') {
+            bufferIceCandidates(callId, from, to, signal);
+          } else {
+            // Forward ICE candidates immediately
             io.to(recipientSocketId).emit('webrtc_signal', data);
-          } else if (type === 'media-toggle') {
-            // Handle media toggles (mute/unmute, camera on/off)
-            if (dev) {
-              log.info(
-                `Media toggle for call ${callId}: ${data.mediaType} - ${
-                  data.enabled ? 'enabled' : 'disabled'
-                }`
+          }
+        } else if (type === 'call-state-update') {
+          // Handle call state updates (new in this implementation)
+          const { connectionState, mediaState } = data;
+
+          log.info(
+            `Call ${callId} state update: ${connectionState}, media: ${mediaState}`
+          );
+
+          // Update call tracking
+          const callData = activeCalls.get(callId);
+          if (callData) {
+            callData.connectionState =
+              connectionState || callData.connectionState;
+            if (mediaState === 'tracks-added') {
+              callData.mediaTracksAdded = true;
+            }
+            activeCalls.set(callId, callData);
+          }
+
+          // Forward state update to the other party
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+        } else if (type === 'connection-check') {
+          // New event type to verify ICE connectivity
+          log.info(`Connection check for call ${callId}`);
+
+          // Update call setup status
+          if (callSetupStatus.has(callId)) {
+            const status = callSetupStatus.get(callId);
+            status.connectionChecked = true;
+            callSetupStatus.set(callId, status);
+          }
+
+          // Forward to other party
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+        } else if (type === 'call-ended' || type === 'call-rejected') {
+          log.info(`Call ${callId} was ${type} by ${from}`);
+
+          // Get call data before cleanup
+          const callData = activeCalls.get(callId);
+
+          // Handle call history based on status
+          if (callData) {
+            if (
+              type === 'call-ended' &&
+              callData.status === 'connected' &&
+              callData.acceptTime
+            ) {
+              // Calculate call duration
+              const duration = Math.floor(
+                (new Date().getTime() - callData.acceptTime.getTime()) / 1000
               );
-            }
+              const callConversationId =
+                callData.conversationId || data.conversationId;
 
-            // Forward media toggle to the other party
-            io.to(recipientSocketId).emit('webrtc_signal', data);
-          } else if (type === 'call-reconnect') {
-            // Handle reconnection attempt
-            if (dev) {
-              log.info(`Call reconnection attempt for ${callId}`);
-            }
+              if (!callConversationId) {
+                log.warn(
+                  `Missing conversationId for call ${callId} - call history may be incomplete`
+                );
+              }
 
-            const callData = activeCalls.get(callId);
-            if (callData) {
-              callData.reconnecting = true;
-              activeCalls.set(callId, callData);
-            }
-
-            // Forward to other party
-            io.to(recipientSocketId).emit('webrtc_signal', data);
-          } // Handle participant-left event
-          else if (type === 'participant-left') {
-            if (dev) {
-              log.info(`Participant ${from} temporarily left call ${callId}`);
-            }
-
-            // Do NOT delete the call from activeCalls map - keep it active
-            const callData = activeCalls.get(callId) as CallData | undefined;
-            if (callData) {
               try {
-                // Store more detailed participant status with proper structure
-                if (!callData.participantStatus) {
-                  callData.participantStatus = {};
-                }
+                await saveCallHistory({
+                  from: callData.from,
+                  to: callData.to,
+                  fromModel: 'User', // Using default model
+                  toModel: 'User', // Using default model
+                  callType: callData.callType || 'video',
+                  duration,
+                  status: 'ended',
+                  endedAt: new Date().toISOString(),
+                  conversationId: callConversationId, // Use the value we verified
+                });
+              } catch (error) {
+                log.error('Error saving call history:', error);
+              }
+            } else if (type === 'call-rejected') {
+              const callConversationId =
+                callData.conversationId || data.conversationId;
+              try {
+                await saveCallHistory({
+                  from: callData.from,
+                  to: callData.to,
+                  fromModel: 'User',
+                  toModel: 'User',
+                  callType: callData.callType || 'video',
+                  duration: 0,
+                  status: 'rejected',
+                  endedAt: new Date().toISOString(),
+                  conversationId: callConversationId,
+                });
+              } catch (error) {
+                log.error('Error saving rejected call history:', error);
+              }
+            }
 
-                // Update participant status
-                callData.participantStatus[from] = {
-                  status: 'left_temporarily',
-                  timestamp: Date.now(),
-                  reason: data.reason || 'unknown',
-                };
+            // Clean up call tracking
+            activeCalls.delete(callId);
+            pendingIceCandidates.delete(callId);
+            callSetupStatus.delete(callId);
+          }
 
-                // Keep the call active but mark it as waiting
-                callData.status = 'waiting';
-                callData.lastActivity = Date.now();
+          // Forward the signal to the recipient
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+        } else if (type === 'media-toggle') {
+          // Handle media toggles (mute/unmute, camera on/off)
+          log.info(
+            `Media toggle for call ${callId}: ${data.mediaType} - ${
+              data.enabled ? 'enabled' : 'disabled'
+            }`
+          );
 
-                // Store the conversationId explicitly to ensure it's available for reconnection
-                if (data.conversationId) {
-                  callData.conversationId = data.conversationId;
-                }
+          // Forward media toggle to the other party
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+        } else if (type === 'call-reconnect') {
+          // Handle reconnection attempt
+          log.info(`Call reconnection attempt for ${callId}`);
 
-                // Update the call data in our map
-                activeCalls.set(callId, callData);
+          const callData = activeCalls.get(callId);
+          if (callData) {
+            callData.reconnecting = true;
+            activeCalls.set(callId, callData);
+          }
 
-                if (dev) {
-                  log.info(
-                    `Call ${callId} marked as 'waiting' with participant ${from} temporarily left`
-                  );
-                }
+          // Forward to other party
+          io.to(recipientSocketId).emit('webrtc_signal', data);
+        } else if (type === 'participant-left') {
+          log.info(`Participant ${from} temporarily left call ${callId}`);
 
-                // Set a timeout to clean up the call if it stays inactive too long
-                setTimeout(() => {
-                  // If the call still exists and the participant hasn't rejoined
-                  const currentCallData = activeCalls.get(callId) as
-                    | CallData
-                    | undefined;
-                  if (!currentCallData) {
-                    return; // Call no longer exists
-                  }
+          // Do NOT delete the call from activeCalls map - keep it active
+          // But update its status to indicate the participant left
+          const callData = activeCalls.get(callId);
+          if (callData) {
+            callData.participantStatus = {
+              ...(callData.participantStatus || {}),
+              [from]: 'left_temporarily',
+            };
 
-                  // Check if this specific participant is still marked as temporarily left
-                  const participantStatus =
-                    currentCallData.participantStatus?.[from];
-                  if (
-                    participantStatus &&
-                    participantStatus.status === 'left_temporarily'
-                  ) {
-                    const timeSinceLeft =
-                      Date.now() - (participantStatus.timestamp || 0);
-                    const minutesLeft = Math.round(timeSinceLeft / 60000);
+            // Keep the call active but mark it as waiting
+            callData.status = 'waiting';
+            callData.lastActivity = Date.now();
+            activeCalls.set(callId, callData);
 
-                    if (dev) {
-                      log.info(
-                        `Call ${callId} checking inactive status - participant ${from} left for ${minutesLeft} minutes`
-                      );
-                    }
+            // Set a timeout to clean up the call if it stays inactive too long
+            setTimeout(() => {
+              // If the call still exists and the participant hasn't rejoined
+              const currentCallData = activeCalls.get(callId);
+              if (
+                currentCallData &&
+                currentCallData.participantStatus &&
+                currentCallData.participantStatus[from] === 'left_temporarily'
+              ) {
+                log.info(
+                  `Call ${callId} cleanup - participant ${from} never rejoined`
+                );
 
-                    // Check if all participants are marked as left
-                    let allParticipantsLeft = true;
-                    let anyParticipantsLeft = false;
+                // Only fully clean up if both participants left or if the waiting time exceeded
+                const allParticipantsLeft = Object.values(
+                  currentCallData.participantStatus
+                ).every(status => status === 'left_temporarily');
 
-                    // Safely check participant statuses
-                    if (currentCallData.participantStatus) {
-                      const statuses = Object.entries(
-                        currentCallData.participantStatus
-                      );
-                      if (statuses.length > 0) {
-                        anyParticipantsLeft = true;
+                const waitingTimeExceeded =
+                  Date.now() - (currentCallData.lastActivity || Date.now()) >
+                  3600000; // 1 hour
 
-                        // Check if all participants have left temporarily
-                        allParticipantsLeft = statuses.every(([_, status]) => {
-                          return status && status.status === 'left_temporarily';
+                if (allParticipantsLeft || waitingTimeExceeded) {
+                  // Clean up call resources
+                  activeCalls.delete(callId);
+                  pendingIceCandidates.delete(callId);
+                  callSetupStatus.delete(callId);
+
+                  // Notify any connected participants that the call expired
+                  Object.keys(currentCallData.participantStatus).forEach(
+                    participantId => {
+                      const participantSocketId =
+                        getSocketIdForUser(participantId);
+                      if (participantSocketId) {
+                        io.to(participantSocketId).emit('webrtc_signal', {
+                          type: 'call-expired',
+                          to: participantId,
+                          callId,
                         });
                       }
                     }
-
-                    // Performance optimization: Reduce timeout - 30 min is too long
-                    const waitingTimeExceeded = timeSinceLeft > 10 * 60 * 1000; // 10 minutes (reduced from 30)
-
-                    // Clean up if all participants left or waiting time exceeded
-                    if (
-                      (allParticipantsLeft && anyParticipantsLeft) ||
-                      waitingTimeExceeded
-                    ) {
-                      if (dev) {
-                        log.info(
-                          `Cleaning up inactive call ${callId} - ${
-                            allParticipantsLeft
-                              ? 'all participants left'
-                              : 'timeout exceeded after ' +
-                                minutesLeft +
-                                ' minutes'
-                          }`
-                        );
-                      }
-
-                      // Clean up call resources
-                      activeCalls.delete(callId);
-                      pendingIceCandidates.delete(callId);
-                      callSetupStatus.delete(callId);
-
-                      // Notify any connected participants that the call expired
-                      if (currentCallData.participantStatus) {
-                        Object.keys(currentCallData.participantStatus).forEach(
-                          participantId => {
-                            const participantSocketId =
-                              getSocketIdForUser(participantId);
-                            if (participantSocketId) {
-                              io.to(participantSocketId).emit('webrtc_signal', {
-                                type: 'call-expired',
-                                to: participantId,
-                                from: 'system',
-                                callId,
-                                reason: waitingTimeExceeded
-                                  ? 'inactivity_timeout'
-                                  : 'all_participants_left',
-                                message: waitingTimeExceeded
-                                  ? 'Call ended due to inactivity'
-                                  : 'Call ended because all participants left',
-                              });
-                            }
-                          }
-                        );
-                      }
-                    }
-                  }
-                }, 10 * 60 * 1000); // Performance optimization: 10 minute timeout (was 30)
-
-                // Forward the temporary leave signal to the other participant
-                const recipientSocketId = getSocketIdForUser(to);
-                if (recipientSocketId) {
-                  io.to(recipientSocketId).emit('webrtc_signal', {
-                    type: 'participant-left',
-                    from,
-                    to,
-                    callId,
-                    reason: data.reason || 'unknown',
-                    message: `Participant ${from} has temporarily left the call and may rejoin.`,
-                    timestamp: Date.now(),
-                  });
-                }
-              } catch (error) {
-                log.error(
-                  `Error handling participant-left for call ${callId}:`,
-                  error
-                );
-              }
-            } else {
-              log.warn(`Received participant-left for unknown call ${callId}`);
-            }
-          } else if (type === 'rejoin-call') {
-            if (dev) {
-              log.info(`User ${from} is rejoining call ${callId}`);
-            }
-
-            // Update participant status if the call exists
-            const callData = activeCalls.get(callId);
-            if (callData) {
-              // Update participant status
-              callData.participantStatus = {
-                ...(callData.participantStatus || {}),
-                [from]: 'rejoining', // Mark this participant as actively rejoining (transitional state)
-              };
-
-              // Track last activity for timeouts
-              callData.lastActivity = Date.now();
-
-              // Update other call properties as needed
-              if (callData.status === 'waiting') {
-                callData.status = 'reconnecting';
-              }
-
-              // Store the reconnection attempt
-              callData.reconnectAttempt = (callData.reconnectAttempt || 0) + 1;
-              callData.reconnectTimestamp = Date.now();
-
-              activeCalls.set(callId, callData);
-
-              // Clear any buffered candidates that might be stale
-              if (pendingIceCandidates.has(callId)) {
-                if (dev) {
-                  log.info(
-                    `Clearing any stale ICE candidates for call ${callId} before rejoin`
                   );
                 }
-                pendingIceCandidates.delete(callId);
               }
+            }, 3600000); // 1 hour timeout
+          }
 
-              if (dev) {
-                log.info(
-                  `Call ${callId} status updated for rejoin, now: ${callData.status}`
-                );
-              }
-            } else {
-              // If call data doesn't exist anymore, let the client know
-              if (dev) {
-                log.warn(
-                  `User ${from} tried to rejoin non-existent call ${callId}`
-                );
-              }
-              const callerSocketId = getSocketIdForUser(from);
-              if (callerSocketId) {
-                io.to(callerSocketId).emit('webrtc_signal', {
-                  type: 'call-expired',
-                  to: from,
-                  from: to,
-                  callId: callId,
-                });
-              }
-              return;
-            }
-
-            // Forward the rejoin signal to recipient
-            const recipientSocketId = getSocketIdForUser(to);
-            if (recipientSocketId) {
-              io.to(recipientSocketId).emit('webrtc_signal', data);
-            }
-          } else {
-            // For any other signal types, just forward
+          // Forward the temporary leave signal to the other participant
+          const recipientSocketId = getSocketIdForUser(to);
+          if (recipientSocketId) {
             io.to(recipientSocketId).emit('webrtc_signal', data);
           }
-        } catch (error) {
-          log.error('Error processing WebRTC signal:', error);
-        }
-      });
+        } else if (type === 'rejoin-call') {
+          log.info(`User ${from} is rejoining call ${callId}`);
 
-      // Performance optimization: Combined handler for ICE candidates
-      socket.on('ice_candidates_batch', async data => {
-        try {
-          const { from, to, callId, candidates } = data;
+          // Update participant status if the call exists
+          const callData = activeCalls.get(callId);
+          if (callData) {
+            // Update participant status
+            callData.participantStatus = {
+              ...(callData.participantStatus || {}),
+              [from]: 'active', // Mark this participant as active
+            };
 
-          if (!from || !to || !callId || !candidates || !candidates.length) {
-            log.warn('Invalid ICE candidates batch data');
+            // Track last activity for timeouts
+            callData.lastActivity = Date.now();
+
+            // Update other call properties as needed
+            if (callData.status === 'waiting') {
+              callData.status = 'connecting';
+            }
+
+            activeCalls.set(callId, callData);
+          } else {
+            // If call data doesn't exist anymore, let the client know
+            log.warn(
+              `User ${from} tried to rejoin non-existent call ${callId}`
+            );
+            const callerSocketId = getSocketIdForUser(from);
+            if (callerSocketId) {
+              io.to(callerSocketId).emit('webrtc_signal', {
+                type: 'call-expired',
+                to: from,
+                from: to,
+                callId: callId,
+              });
+            }
             return;
           }
 
+          // Forward the rejoin signal to recipient
           const recipientSocketId = getSocketIdForUser(to);
           if (recipientSocketId) {
-            // Forward the entire batch at once
-            io.to(recipientSocketId).emit('ice_candidates_batch', data);
-          } else {
-            // Buffer candidates if recipient not connected
-            candidates.forEach(candidate => {
-              bufferIceCandidates(callId, from, to, candidate);
-            });
+            io.to(recipientSocketId).emit('webrtc_signal', data);
           }
-        } catch (error) {
-          log.error('Error processing ICE candidates batch', error);
+        } else {
+          // For any other signal types, just forward
+          io.to(recipientSocketId).emit('webrtc_signal', data);
         }
-      });
+      } catch (error) {
+        log.error('Error processing WebRTC signal:', error);
+      }
+    });
 
-      // Performance optimization: Enhanced direct ICE handler
-      socket.on('direct_ice', data => {
-        try {
-          const { from, to, candidate, callId } = data;
+    // Enhanced direct ICE handler with less buffering for faster exchange
+    socket.on('direct_ice', data => {
+      try {
+        const { from, to, candidate, callId } = data;
 
-          if (!to || !candidate) return;
+        if (!to || !candidate) {
+          return;
+        }
 
-          // Get recipient's socket ID
-          const recipientSocketId = getSocketIdForUser(to);
-          if (recipientSocketId) {
-            // Forward candidate directly without any processing
-            socket.to(recipientSocketId).emit('direct_ice', {
-              from,
-              candidate,
-              callId,
-              timestamp: Date.now(),
-            });
-          } else {
-            // Buffer candidate if recipient not found
+        // Get recipient's socket ID
+        const recipientSocketId = getSocketIdForUser(to);
+        if (recipientSocketId) {
+          // Forward candidate directly without any processing
+          socket.to(recipientSocketId).emit('direct_ice', {
+            from,
+            candidate,
+            callId,
+            timestamp: Date.now(), // Add timestamp for tracking
+          });
+        } else {
+          // Buffer candidate if recipient not found
+          bufferIceCandidates(callId, from, to, candidate);
+        }
+      } catch (error) {
+        log.error('Error handling direct ICE candidate:', error);
+      }
+    });
+
+    // Dedicated endpoint for ICE candidate batches (more efficient)
+    socket.on('ice_candidates_batch', async data => {
+      try {
+        const { from, to, callId, candidates } = data;
+
+        if (!from || !to || !callId || !candidates || !candidates.length) {
+          log.warn('Invalid ICE candidates batch data');
+          return;
+        }
+
+        const recipientSocketId = getSocketIdForUser(to);
+        if (recipientSocketId) {
+          // Forward the entire batch
+          io.to(recipientSocketId).emit('ice_candidates_batch', data);
+          log.debug(
+            `ICE candidate batch (${candidates.length}) forwarded from ${from} to ${to}`
+          );
+        } else {
+          // Buffer candidates if recipient not connected
+          candidates.forEach(candidate => {
             bufferIceCandidates(callId, from, to, candidate);
-          }
-        } catch (error) {
-          log.error('Error handling direct ICE candidate:', error);
+          });
         }
-      });
+      } catch (error) {
+        log.error('Error processing ICE candidates batch', error);
+      }
+    });
 
-      // Individual ICE candidate handler - for backward compatibility
-      socket.on('ice_candidate', async data => {
-        try {
-          const { from, to, callId, candidate } = data;
+    // Improved individual ICE candidate handler
+    socket.on('ice_candidate', async data => {
+      try {
+        const { from, to, callId, candidate } = data;
 
-          if (!from || !to || !callId || !candidate) return;
-
-          const recipientSocketId = getSocketIdForUser(to);
-          if (recipientSocketId) {
-            // Forward directly
-            io.to(recipientSocketId).emit('ice_candidate', data);
-          } else {
-            // Buffer the candidate
-            bufferIceCandidates(callId, from, to, candidate);
-          }
-        } catch (error) {
-          log.error('Error processing ICE candidate', error);
+        if (!from || !to || !callId || !candidate) {
+          log.warn('Invalid ICE candidate data');
+          return;
         }
-      });
 
-      // Enhanced connection quality monitoring
-      socket.on('connection_quality', data => {
-        const { callId, from } = data;
+        const recipientSocketId = getSocketIdForUser(to);
+        if (recipientSocketId) {
+          // Forward directly without any processing or caching
+          io.to(recipientSocketId).emit('ice_candidate', data);
+          log.debug(`ICE candidate forwarded from ${from} to ${to}`);
+        } else {
+          // Buffer the candidate
+          bufferIceCandidates(callId, from, to, candidate);
+        }
+      } catch (error) {
+        log.error('Error processing ICE candidate', error);
+      }
+    });
+
+    // Enhanced connection quality monitoring
+    socket.on('connection_quality', data => {
+      try {
+        const { callId, quality, metrics } = data;
+
         if (!callId) return;
 
-        // Performance optimization: Limit quality data storage
-        // Just forward the quality info without storing
+        // Store quality data
+        if (!connectionQualityMetrics.has(callId)) {
+          connectionQualityMetrics.set(callId, []);
+        }
+
+        connectionQualityMetrics.get(callId).push({
+          timestamp: Date.now(),
+          quality,
+          metrics,
+        });
+
+        // Forward quality info to the other call participant
         const callData = activeCalls.get(callId);
         if (callData) {
           const otherParty =
-            callData.from === from ? callData.to : callData.from;
+            callData.from === data.from ? callData.to : callData.from;
           const otherPartySocketId = getSocketIdForUser(otherParty);
 
           if (otherPartySocketId) {
             io.to(otherPartySocketId).emit('connection_quality', data);
           }
         }
-      });
+      } catch (error) {
+        log.error('Error processing connection quality data', error);
+      }
+    });
 
-      // Optimize call stats handling by just forwarding
-      socket.on('call_stats', data => {
-        const { callId, from } = data;
-        if (!callId || !from) return;
+    // Enhanced call statistics monitoring
+    socket.on('call_stats', data => {
+      try {
+        const { callId, from, stats } = data;
 
-        // Just forward to the other party without storing
+        if (!callId || !from || !stats) return;
+
+        // Process and store stats
+        // Forward stats to other participant
         const callData = activeCalls.get(callId);
         if (callData) {
           const otherParty =
@@ -1151,199 +809,314 @@ app
             io.to(otherPartySocketId).emit('call_stats', data);
           }
         }
-      });
+      } catch (error) {
+        log.error('Error processing call stats:', error);
+      }
+    });
 
-      // Save call history to database with optimized approach
-      const saveCallHistory = async callData => {
-        try {
-          const {
-            from,
-            to,
-            callType,
-            duration,
-            startedAt,
-            endedAt,
-            status,
-            initiator,
-            conversationId,
-            // Add these defaults
-            fromModel = 'User',
-            toModel = 'User',
-          } = callData;
+    // Request for ICE candidates if some were missed
+    socket.on('request_ice_candidates', data => {
+      try {
+        const { callId, from, to } = data;
 
-          // Performance optimization: Use batch database operations
-          const callHistoryId = `${from}-${to}-${Date.now()}`;
-          pendingDbOperations.callHistory.set(callHistoryId, {
-            from,
-            to,
-            fromModel,
-            toModel,
-            callType,
-            duration,
-            startedAt: isValidDate(startedAt)
-              ? startedAt
-              : new Date(new Date().getTime() - duration * 1000),
-            endedAt: isValidDate(endedAt) ? endedAt : new Date(),
-            status: status || 'ended',
-            initiator: initiator || from,
-            conversationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-          scheduleBatchDbOperations();
+        if (!callId || !from || !to) return;
 
-          // Create call summary message in conversation, but only if the call was completed
-          if (conversationId && status === 'ended') {
-            try {
-              // First check if conversation exists without loading full data
-              const conversationExists = await Conversation.exists({
-                _id: conversationId,
-              });
+        log.info(`${from} requested ICE candidates for call ${callId}`);
 
-              if (!conversationExists) {
-                log.warn('Could not find conversation for call summary');
-                return;
-              }
-
-              // Create message content with call details
-              const callSymbol = callType === 'video' ? '🎥' : '📞';
-              let messageContent = '';
-
-              if (status === 'ended') {
-                // Format duration nicely
-                const durationText = formatCallDuration(duration);
-                messageContent = `${callSymbol} ${callType} call (${durationText})`;
-              } else if (status === 'missed') {
-                messageContent = `${callSymbol} Missed ${callType} call`;
-              } else if (status === 'rejected') {
-                messageContent = `${callSymbol} Declined ${callType} call`;
-              }
-
-              // Add message to batch operations
-              const messageId = `call-${callHistoryId}`;
-              pendingDbOperations.messages.set(messageId, {
-                conversation: conversationId,
-                sender: from,
-                receiver: to,
-                content: messageContent,
-                isRead: true,
-                readAt: new Date(),
-                messageType: 'call_summary',
-                metadata: {
-                  callType,
-                  duration,
-                  status,
-                  endedAt,
-                  startedAt: isValidDate(startedAt)
-                    ? startedAt
-                    : new Date(new Date().getTime() - duration * 1000),
-                },
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              });
-              scheduleBatchDbOperations();
-
-              // Update the conversation's last message - do this in background
-              Conversation.findByIdAndUpdate(
-                conversationId,
-                {
-                  // We don't have the message ID yet, so we'll update without it
-                  updatedAt: new Date(),
-                },
-                { new: false }
-              ).exec();
-
-              // Send approximate message data to clients immediately for better UX
-              const previewMessage = {
-                _id: messageId,
-                conversation: conversationId,
-                sender: { _id: from },
-                receiver: { _id: to },
-                content: messageContent,
-                isRead: true,
-                readAt: new Date(),
-                messageType: 'call_summary',
-                metadata: {
-                  callType,
-                  duration,
-                  status,
-                },
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                pending: true, // Mark as pending since it's not saved yet
-              };
-
-              // Broadcast to conversation room
-              const roomName = `conversation:${conversationId}`;
-              io.to(roomName).emit('new_message', previewMessage);
-
-              // Also send to individual users
-              io.to(from).emit('new_message', previewMessage);
-              io.to(to).emit('new_message', previewMessage);
-
-              if (dev) {
-                log.info(
-                  `Call summary queued for conversation ${conversationId}`
-                );
-              }
-            } catch (error) {
-              log.error('Error creating call summary message:', error);
-            }
+        // Check if we have stored ICE candidates for this call
+        if (pendingIceCandidates.has(callId)) {
+          // Flush candidates
+          flushCandidates(callId, to);
+        } else {
+          // Send notification to other party to resend their candidates
+          const otherPartySocketId = getSocketIdForUser(to);
+          if (otherPartySocketId) {
+            io.to(otherPartySocketId).emit('webrtc_signal', {
+              type: 'resend-candidates',
+              from,
+              to,
+              callId,
+            });
           }
-        } catch (error) {
-          log.error('Error saving call history:', error);
         }
-      };
+      } catch (error) {
+        log.error('Error resending ICE candidates', error);
+      }
+    });
 
-      // Performance optimization: Optimize online users request
-      socket.on('get_online_users', () => {
-        // Performance optimization: Send minimal data
-        const onlineUsers = Array.from(connectedUsers.values()).map(user => ({
-          userId: user.userId,
-          socketId: user.socketId,
-          userRole: user.userRole,
-          firstName: user.userData?.firstName,
-          lastName: user.userData?.lastName,
-        }));
+    // Advanced call quality monitoring
+    socket.on('call_metrics', data => {
+      try {
+        const { callId, from, metrics } = data;
 
-        socket.emit('users_update', onlineUsers);
-      });
+        if (!callId || !from || !metrics) {
+          log.warn('Incomplete call metrics received:', data);
+          return;
+        }
 
-      // Enhanced update_availability handler with database notification
-      socket.on('update_availability', async data => {
+        // Store metrics for analysis
+        if (!connectionQualityMetrics.has(callId)) {
+          connectionQualityMetrics.set(callId, []);
+        }
+
+        connectionQualityMetrics.get(callId).push({
+          timestamp: Date.now(),
+          from,
+          metrics,
+        });
+
+        // Log severe quality issues
+        if (metrics.packetsLost > 50 || metrics.jitter > 100) {
+          log.warn(
+            `Poor call quality detected for ${callId}: loss=${metrics.packetsLost}, jitter=${metrics.jitter}`
+          );
+        }
+
+        // Forward metrics to the other party for display
+        const callData = activeCalls.get(callId);
+        if (callData) {
+          const otherParty =
+            callData.from === from ? callData.to : callData.from;
+          const otherPartySocketId = getSocketIdForUser(otherParty);
+
+          if (otherPartySocketId) {
+            io.to(otherPartySocketId).emit('call_metrics', data);
+          }
+        }
+      } catch (error) {
+        log.error('Error processing call metrics:', error);
+      }
+    });
+
+    // Comprehensive call summary handling
+    socket.on('call_summary', async data => {
+      try {
+        const {
+          from,
+          to,
+          callType,
+          duration,
+          endedAt: clientEndedAt,
+          status,
+          conversationId,
+          // Add these defaults
+          fromModel = 'User',
+          toModel = 'User',
+        } = data;
+
+        if (
+          !from ||
+          !to ||
+          !callType ||
+          duration === undefined ||
+          !conversationId
+        ) {
+          log.warn('Call summary missing required data:', data);
+          return;
+        }
+
+        log.info(
+          `Call summary: ${status} ${callType} call between ${from} and ${to}, duration: ${duration}s`
+        );
+
+        // Validate dates and create valid ones if needed
+        const endedAt = isValidDate(new Date(clientEndedAt))
+          ? new Date(clientEndedAt)
+          : new Date();
+
+        const startedAt = new Date(endedAt.getTime() - duration * 1000);
+
+        // Create data object with valid dates
+        const callData = {
+          ...data,
+          fromModel,
+          toModel,
+          endedAt,
+          startedAt,
+        };
+
+        // Save to call history with validated dates
+        await saveCallHistory(callData);
+
+        // Clean up any call metrics
+        if (connectionQualityMetrics.has(data.callId)) {
+          connectionQualityMetrics.delete(data.callId);
+        }
+      } catch (error) {
+        log.error('Error saving call summary:', error);
+      }
+    });
+
+    // Save call history to database
+    const saveCallHistory = async callData => {
+      try {
+        const {
+          from,
+          to,
+          callType,
+          duration,
+          startedAt,
+          endedAt,
+          status,
+          initiator,
+          conversationId,
+          // Add these defaults
+          fromModel = 'User',
+          toModel = 'User',
+        } = callData;
+
+        // Create call history record with the required model fields
+        const callHistory = new CallHistory({
+          from,
+          to,
+          fromModel, // This is the required field that was missing
+          toModel, // This is the required field that was missing
+          callType,
+          duration,
+          startedAt: isValidDate(startedAt)
+            ? startedAt
+            : new Date(new Date().getTime() - duration * 1000),
+          endedAt: isValidDate(endedAt) ? endedAt : new Date(),
+          status: status || 'ended',
+          initiator: initiator || from,
+          conversationId,
+        });
+
+        await callHistory.save();
+        log.info('Call history saved successfully');
+
+        // Create call summary message in conversation
+        if (conversationId) {
+          try {
+            let conversation = await Conversation.findById(conversationId);
+
+            if (!conversation) {
+              log.warn('Could not find conversation for call summary');
+              return;
+            }
+
+            // Create message content with call details
+            const callSymbol = callType === 'video' ? '🎥' : '📞';
+            let messageContent = '';
+
+            if (status === 'ended') {
+              // Format duration nicely
+              const durationText = formatCallDuration(duration);
+              messageContent = `${callSymbol} ${callType} call (${durationText})`;
+            } else if (status === 'missed') {
+              messageContent = `${callSymbol} Missed ${callType} call`;
+            } else if (status === 'rejected') {
+              messageContent = `${callSymbol} Declined ${callType} call`;
+            }
+
+            // Create a message for the call
+            const callSummaryMessage = new Message({
+              conversation: conversationId,
+              sender: from,
+              receiver: to,
+              content: messageContent,
+              isRead: true,
+              readAt: new Date(),
+              messageType: 'call_summary',
+              metadata: {
+                callType,
+                duration,
+                status,
+                endedAt,
+                startedAt: isValidDate(startedAt)
+                  ? startedAt
+                  : new Date(new Date().getTime() - duration * 1000),
+              },
+            });
+
+            await callSummaryMessage.save();
+
+            // Update the conversation's last message
+            await Conversation.findByIdAndUpdate(conversationId, {
+              lastMessage: callSummaryMessage._id,
+              updatedAt: new Date(),
+            });
+
+            // Get populated message to broadcast
+            const populatedMessage = await Message.findById(
+              callSummaryMessage._id
+            )
+              .populate(
+                'sender',
+                '_id firstName lastName email image profilePhotoUrl role'
+              )
+              .populate(
+                'receiver',
+                '_id firstName lastName email image profilePhotoUrl role'
+              );
+
+            // Broadcast to conversation room
+            const roomName = `conversation:${conversationId}`;
+            io.to(roomName).emit('new_message', populatedMessage);
+
+            // Also send to individual users
+            io.to(from).emit('new_message', populatedMessage);
+            io.to(to).emit('new_message', populatedMessage);
+
+            log.info(`Call summary added to conversation ${conversationId}`);
+          } catch (error) {
+            log.error('Error creating call summary message:', error);
+          }
+        }
+      } catch (error) {
+        log.error('Error saving call history:', error);
+        // Just log the error but don't throw it further - prevents call failures
+      }
+    };
+
+    // Handle client requests for online users
+    socket.on('get_online_users', () => {
+      const onlineUsers = Array.from(connectedUsers.values()).map(user => ({
+        userId: user.userId,
+        socketId: user.socketId,
+        userRole: user.userRole,
+        firstName: user.userData?.firstName,
+        lastName: user.userData?.lastName,
+      }));
+
+      socket.emit('users_update', onlineUsers);
+      log.info(
+        `Sent online users list to ${socket.id}, count: ${onlineUsers.length}`
+      );
+    });
+
+    socket.on('update_availability', async data => {
+      try {
+        const { psychologistId, availabilityData } = data;
+
+        if (!psychologistId) {
+          log.warn('Update availability event missing psychologist ID');
+          return;
+        }
+
+        log.info(`Psychologist ${psychologistId} updated availability`);
+
+        // Find the psychologist to get their name for the notification
+        const psychologist =
+          await User.findById(psychologistId).select('firstName lastName');
+        const psychName = psychologist
+          ? `${psychologist.firstName} ${psychologist.lastName}`
+          : 'Your provider';
+
+        // CRITICAL FIX #1: Immediately broadcast to ALL clients
+        // This is the key part that ensures real-time UI updates
+        io.emit('availability_updated', {
+          psychologistId,
+          availabilityData,
+          timestamp: new Date().toISOString(),
+          psychologistName: psychName,
+        });
+
+        console.log('Emitted availability_updated to all clients');
+
+        // CRITICAL FIX #2: Create self-notification for psychologist
         try {
-          const { psychologistId, availabilityData } = data;
-
-          if (!psychologistId) {
-            log.warn('Update availability event missing psychologist ID');
-            return;
-          }
-
-          if (dev) {
-            log.info(`Psychologist ${psychologistId} updated availability`);
-          }
-
-          // Performance optimization: Load minimal psychologist data
-          const psychologist = await User.findById(psychologistId)
-            .select('firstName lastName')
-            .lean();
-
-          const psychName =
-            psychologist && 'firstName' in psychologist
-              ? `${psychologist.firstName} ${psychologist.lastName}`
-              : 'Your provider';
-
-          // Broadcast to all clients who might be viewing this psychologist's schedule
-          io.emit('availability_updated', {
-            psychologistId,
-            availabilityData,
-            timestamp: new Date().toISOString(),
-            psychologistName: psychName,
-          });
-
-          // Performance optimization: Create self-notification using batch system
-          const selfNotificationId = `self-${psychologistId}-${Date.now()}`;
-          pendingDbOperations.notifications.set(selfNotificationId, {
+          const selfNotification = new Notification({
             recipient: psychologistId,
             sender: psychologistId, // Self-notification
             type: 'system',
@@ -1355,39 +1128,83 @@ app
             meta: {
               type: 'availability_self_change',
               timestamp: new Date().toISOString(),
-              slots: data?.slots,
-              dayRange: data?.dayRange,
             },
-            createdAt: new Date(),
-            updatedAt: new Date(),
           });
-          scheduleBatchDbOperations();
 
-          // Performance optimization: Limit database query scope and cache results
-          try {
-            // Rather than querying all appointments, just get the user IDs
-            const activeUserIds = await mongoose.connection
-              .collection('appointments')
-              .distinct('userId', {
-                psychologistId: new mongoose.Types.ObjectId(psychologistId),
-                status: { $ne: 'canceled' },
-                startTime: { $gt: new Date() },
-              });
+          await selfNotification.save();
+          log.info(
+            `Created self-notification for psychologist ${psychologistId}`
+          );
 
-            // Limit the number of notifications to prevent overload
-            const limitedUserIds = activeUserIds.slice(0, 50); // Only notify the first 50 users
+          // Send socket notification to the psychologist
+          const psychologistSocketId = getSocketIdForUser(psychologistId);
+          if (psychologistSocketId) {
+            io.to(psychologistSocketId).emit('new_notification', {
+              notification: selfNotification.toObject(),
+              unreadCount: await Notification.countDocuments({
+                recipient: psychologistId,
+                isRead: false,
+              }),
+            });
+          }
+        } catch (error) {
+          log.error('Error creating self notification:', error);
+        }
 
-            if (dev) {
-              log.info(
-                `Creating notifications for ${limitedUserIds.length} users about availability update`
-              );
-            }
+        // CRITICAL FIX #3: Create and send notifications to users with appointments
+        try {
+          // Find all users who have appointments with this psychologist
+          const appointments = await mongoose.connection
+            .collection('appointments')
+            .find({
+              psychologistId: new mongoose.Types.ObjectId(psychologistId),
+              status: { $ne: 'canceled' }, // Only for active appointments
+              startTime: { $gt: new Date() }, // Only for future appointments
+            })
+            .toArray();
 
-            // Create notifications for each user and send socket events
-            for (const userId of limitedUserIds) {
-              // Performance optimization: Create notification using batch system
-              const notificationId = `avail-${psychologistId}-${userId}-${Date.now()}`;
-              pendingDbOperations.notifications.set(notificationId, {
+          const userIdsFromAppointments = appointments.map(apt =>
+            apt.userId.toString()
+          );
+
+          // Also add users from past appointments for broader notification reach
+          const pastAppointments = await mongoose.connection
+            .collection('appointments')
+            .find({
+              psychologistId: new mongoose.Types.ObjectId(psychologistId),
+              $and: [
+                { startTime: { $lt: new Date() } }, // Past appointments
+                // Limit to last 3 months for relevance
+                {
+                  startTime: {
+                    $gt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+                  },
+                },
+              ],
+            })
+            .toArray();
+
+          const userIdsFromPastAppointments = pastAppointments.map(apt =>
+            apt.userId.toString()
+          );
+
+          // Combine and deduplicate user IDs
+          const userIds = [
+            ...new Set([
+              ...userIdsFromAppointments,
+              ...userIdsFromPastAppointments,
+            ]),
+          ];
+
+          log.info(
+            `Creating notifications for ${userIds.length} users about availability update`
+          );
+
+          // Create notifications for each user and send socket events
+          for (const userId of userIds) {
+            try {
+              // Create database notification
+              const notification = new Notification({
                 recipient: userId,
                 sender: psychologistId,
                 type: 'appointment',
@@ -1402,594 +1219,830 @@ app
                   timestamp: new Date().toISOString(),
                   psychologistName: psychName,
                 },
-                createdAt: new Date(),
-                updatedAt: new Date(),
               });
 
-              // Get socket and send notification
+              await notification.save();
+              log.info(
+                `Created notification ${notification._id} for user ${userId}`
+              );
+
+              // CRITICAL FIX #4: Send multiple events to ensure client updates
+              // Get socket ID for this user
               const userSocketId = getSocketIdForUser(userId);
               if (userSocketId) {
+                // Send detailed notification event
+                io.to(userSocketId).emit('new_notification', {
+                  notification: notification.toObject(),
+                  unreadCount: await Notification.countDocuments({
+                    recipient: userId,
+                    isRead: false,
+                  }),
+                });
+
+                // Also send simpler notification count update
+                io.to(userSocketId).emit('notification_count_update', {
+                  unreadCount: await Notification.countDocuments({
+                    recipient: userId,
+                    isRead: false,
+                  }),
+                });
+
+                // Also emit a specialized appointment notification
                 io.to(userSocketId).emit('appointment_notification', {
                   type: 'availability_change',
                   psychologistId,
                   message: `${psychName} has updated their availability`,
                   timestamp: new Date().toISOString(),
-                  notificationId, // We don't have the real ID yet
+                  notificationId: notification._id,
                 });
-              }
-            }
 
-            // Run all database operations
-            scheduleBatchDbOperations();
-          } catch (error) {
-            log.error(
-              'Error processing availability update notifications:',
-              error
-            );
+                // Send a separate availability update event to force UI updates
+                io.to(userSocketId).emit('availability_updated', {
+                  psychologistId,
+                  psychologistName: psychName,
+                  timestamp: new Date().toISOString(),
+                });
+
+                console.log(`Sent notification events to user ${userId}`);
+              } else {
+                log.warn(`No socket found for user ${userId}`);
+              }
+            } catch (error) {
+              log.error(
+                `Error processing notification for user ${userId}:`,
+                error
+              );
+            }
           }
         } catch (error) {
-          log.error('Error in update_availability handler:', error);
+          log.error(
+            'Error processing availability update notifications:',
+            error
+          );
         }
-      });
-
-      interface NotificationData {
-        _id: string;
-        recipient: string;
-        sender: string | null;
-        type: string;
-        title: string;
-        content: string;
-        isRead: boolean;
-        relatedId: string | null;
-        relatedModel: string | null;
-        meta: Record<string, any>;
-        createdAt: Date;
-        updatedAt: Date;
+      } catch (error) {
+        log.error('Error in update_availability handler:', error);
       }
+    });
 
-      async function createNotification(
-        data
-      ): Promise<NotificationData | null> {
-        try {
-          const {
-            recipientId,
-            senderId,
-            type,
-            title,
-            content,
-            relatedId,
-            relatedModel,
-            meta,
-          } = data;
+    interface NotificationDocument extends mongoose.Document {
+      _id: mongoose.Types.ObjectId;
+      recipient: string;
+      sender: string | null;
+      type: string;
+      title: string;
+      content: string;
+      isRead: boolean;
+      relatedId: string | null;
+      relatedModel: string | null;
+      meta: Record<string, any>;
+    }
 
-          // Performance optimization: Use batch database operations
-          const notificationId = `${recipientId}-${
-            senderId || 'system'
-          }-${Date.now()}`;
+    async function createNotification(
+      data
+    ): Promise<NotificationDocument | null> {
+      try {
+        const {
+          recipientId,
+          senderId,
+          type,
+          title,
+          content,
+          relatedId,
+          relatedModel,
+          meta,
+        } = data;
 
-          pendingDbOperations.notifications.set(notificationId, {
-            recipient: recipientId,
-            sender: senderId || null,
-            type,
-            title,
-            content,
-            isRead: false,
-            relatedId: relatedId || null,
-            relatedModel: relatedModel || null,
-            meta: meta || {},
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-
-          scheduleBatchDbOperations();
-
-          // Return a temporary object with _id
-          return {
-            _id: notificationId,
-            recipient: recipientId,
-            sender: senderId || null,
-            type,
-            title,
-            content,
-            isRead: false,
-            relatedId: relatedId || null,
-            relatedModel: relatedModel || null,
-            meta: meta || {},
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        } catch (error) {
-          log.error('Error creating notification:', error);
-          return null;
-        }
-      }
-
-      socket.on('appointment_booked', async data => {
-        try {
-          const { appointmentId, psychologistId, userId, appointmentDetails } =
-            data;
-
-          if (!appointmentId || !psychologistId || !userId) {
-            log.warn('Appointment booked event missing required data');
-            return;
-          }
-
-          if (dev) {
-            log.info(`New appointment booked: ${appointmentId}`);
-          }
-
-          // Performance optimization: Load minimal psychologist data
-          let psychologist: {
-            _id: string;
-            firstName: string;
-            lastName: string;
-            profilePhotoUrl?: string;
-          } | null = null;
-          try {
-            const psychData = (await User.findById(psychologistId)
-              .select('_id firstName lastName profilePhotoUrl')
-              .lean()) as {
-              _id: string;
-              firstName: string;
-              lastName: string;
-              profilePhotoUrl?: string;
-            } | null;
-            psychologist = psychData;
-          } catch (err) {
-            log.error('Error fetching psychologist details:', err);
-          }
-
-          // Create simplified notification data
-          const notificationData = {
-            appointmentId,
-            appointmentDetails,
-            psychologistInfo: {
-              id: psychologist ? psychologist._id : psychologistId,
-              name: psychologist
-                ? `${psychologist.firstName} ${psychologist.lastName}`
-                : appointmentDetails.psychologistName || 'Your Provider',
-              profilePhoto:
-                psychologist && psychologist.profilePhotoUrl
-                  ? psychologist.profilePhotoUrl
-                  : '',
-              specializations: [],
-              sessionFee: appointmentDetails.sessionFee,
-            },
-            dateTime: appointmentDetails.dateTime,
-            endTime: appointmentDetails.endTime,
-            sessionFormat: appointmentDetails.sessionFormat,
-            timestamp: new Date().toISOString(),
-          };
-
-          // Create notifications
-          let psychNotification: NotificationData | null = null;
-          try {
-            psychNotification = await createNotification({
-              recipientId: psychologistId,
-              senderId: userId,
-              type: 'appointment',
-              title: 'New Appointment Booked',
-              content: 'You have a new appointment booked',
-              relatedId: appointmentId,
-              relatedModel: 'Appointment',
-              meta: {
-                ...notificationData,
-                type: 'new_booking', // This is important for client-side role filtering
-              },
-            });
-          } catch (err) {
-            log.error('Error creating psychologist notification:', err);
-          }
-
-          let userNotification: NotificationData | null = null;
-          try {
-            userNotification = await createNotification({
-              recipientId: userId,
-              senderId: psychologistId,
-              type: 'appointment',
-              title: 'Appointment Confirmed',
-              content: 'Your appointment has been confirmed',
-              relatedId: appointmentId,
-              relatedModel: 'Appointment',
-              meta: {
-                ...notificationData,
-                type: 'booking_confirmed', // This is important for client-side role filtering
-              },
-            });
-          } catch (err) {
-            log.error('Error creating user notification:', err);
-          }
-
-          // Notify the psychologist via socket
-          const psychologistSocketId = getSocketIdForUser(psychologistId);
-          if (psychologistSocketId) {
-            try {
-              io.to(psychologistSocketId).emit('appointment_notification', {
-                type: 'new_booking',
-                appointmentId,
-                userId,
-                details: notificationData,
-                message: 'New appointment booked',
-                timestamp: new Date().toISOString(),
-                notificationId:
-                  psychNotification && 'notification' in psychNotification
-                    ? (psychNotification as NotificationData)._id
-                    : null,
-              });
-
-              // Emit notification event
-              if (psychNotification) {
-                // Skip counting - just estimate
-                io.to(psychologistSocketId).emit('new_notification', {
-                  notification: psychNotification,
-                  unreadCount: 1, // Just show 1 to indicate there are unread notifications
-                });
-              }
-            } catch (err) {
-              log.error('Error emitting notification to psychologist:', err);
-            }
-          }
-
-          // Notify the user via socket
-          const userSocketId = getSocketIdForUser(userId);
-          if (userSocketId) {
-            try {
-              io.to(userSocketId).emit('appointment_notification', {
-                type: 'booking_confirmed',
-                appointmentId,
-                psychologistId,
-                details: notificationData,
-                message: 'Your appointment has been confirmed',
-                timestamp: new Date().toISOString(),
-                notificationId: userNotification ? userNotification._id : null,
-              });
-
-              // Emit notification event
-              if (userNotification) {
-                // Skip counting - just estimate
-                io.to(userSocketId).emit('new_notification', {
-                  notification: userNotification,
-                  unreadCount: 1, // Just show 1 to indicate there are unread notifications
-                });
-              }
-            } catch (err) {
-              log.error('Error emitting notification to user:', err);
-            }
-          }
-
-          // Broadcast calendar update
-          try {
-            io.emit('calendar_update', {
-              type: 'new_appointment',
-              appointmentId,
-              psychologistId,
-              timestamp: new Date().toISOString(),
-            });
-          } catch (err) {
-            log.error('Error broadcasting calendar update:', err);
-          }
-        } catch (error) {
-          log.error('Error in appointment_booked handler:', error);
-        }
-      });
-
-      // Optimize get_notifications for performance
-      socket.on(
-        'get_notifications',
-        async (
-          { userId, limit = 20, skip = 0, onlyUnread = false },
-          callback
-        ) => {
-          try {
-            if (!userId) {
-              callback({ success: false, error: 'User ID is required' });
-              return;
-            }
-
-            const query: { recipient: any; isRead?: boolean } = {
-              recipient: userId,
-            };
-            if (onlyUnread) {
-              query.isRead = false;
-            }
-
-            // Performance optimization: Use lean() for faster queries
-            const notifications = await Notification.find(query)
-              .sort({ createdAt: -1 })
-              .skip(skip)
-              .limit(limit)
-              .select('-__v') // Exclude unnecessary fields
-              .populate('sender', 'firstName lastName profilePhotoUrl -_id') // Limit populated fields
-              .lean();
-
-            // Performance optimization: Count in parallel with the find
-            const countPromise = Notification.countDocuments({
-              recipient: userId,
-              isRead: false,
-            });
-
-            const unreadCount = await countPromise;
-
-            callback({
-              success: true,
-              notifications,
-              unreadCount,
-              hasMore: notifications.length === limit,
-            });
-          } catch (error) {
-            log.error('Error fetching notifications:', error);
-            callback({
-              success: false,
-              error: 'Failed to fetch notifications',
-            });
-          }
-        }
-      );
-
-      // Optimize mark_notification_read for performance
-      socket.on(
-        'mark_notification_read',
-        async ({ notificationId, userId }, callback) => {
-          try {
-            if (!notificationId || !userId) {
-              callback?.({
-                success: false,
-                error: 'Notification ID and User ID are required',
-              });
-              return;
-            }
-
-            // Performance optimization: Don't wait for the update
-            const updatePromise = Notification.findOneAndUpdate(
-              { _id: notificationId, recipient: userId },
-              { isRead: true },
-              { new: true }
-            );
-
-            // Performance optimization: Count in parallel
-            const countPromise = Notification.countDocuments({
-              recipient: userId,
-              isRead: false,
-            });
-
-            // Wait for both operations
-            const [update, unreadCount] = await Promise.all([
-              updatePromise,
-              countPromise,
-            ]);
-
-            if (!update) {
-              callback?.({
-                success: false,
-                error: 'Notification not found or not authorized',
-              });
-              return;
-            }
-
-            callback?.({ success: true, notification: update });
-
-            // Emit update to socket
-            const userSocketId = getSocketIdForUser(userId);
-            if (userSocketId) {
-              io.to(userSocketId).emit('notification_count_update', {
-                unreadCount,
-              });
-            }
-          } catch (error) {
-            log.error('Error marking notification as read:', error);
-            callback?.({
-              success: false,
-              error: 'Failed to mark notification as read',
-            });
-          }
-        }
-      );
-
-      // Optimize mark_all_notifications_read
-      socket.on('mark_all_notifications_read', async ({ userId }, callback) => {
-        try {
-          if (!userId) {
-            callback?.({ success: false, error: 'User ID is required' });
-            return;
-          }
-
-          // Performance optimization: Just update without waiting
-          Notification.updateMany(
-            { recipient: userId, isRead: false },
-            { isRead: true }
-          ).exec(); // Don't await
-
-          callback?.({
-            success: true,
-            count: 0, // We don't know the exact count
-          });
-
-          // Emit zero count regardless
-          const userSocketId = getSocketIdForUser(userId);
-          if (userSocketId) {
-            io.to(userSocketId).emit('notification_count_update', {
-              unreadCount: 0,
-            });
-          }
-        } catch (error) {
-          log.error('Error marking all notifications as read:', error);
-          callback?.({
-            success: false,
-            error: 'Failed to mark notifications as read',
-          });
-        }
-      });
-
-      // Performance optimization: Simplify ping handling
-      socket.on('ping', data => {
-        socket.emit('pong', {
-          timestamp: Date.now(),
-          serverTime: new Date().toISOString(),
-          pingId: data.pingId,
+        const notification = new Notification({
+          recipient: recipientId,
+          sender: senderId || null,
+          type,
+          title,
+          content,
+          isRead: false,
+          relatedId: relatedId || null,
+          relatedModel: relatedModel || null,
+          meta: meta || {},
         });
-      });
 
-      // ======= CHAT FUNCTIONALITY =======
+        await notification.save();
+        log.info(
+          `Notification created: ${notification._id} for user ${recipientId}`
+        );
+        return notification;
+      } catch (error) {
+        log.error('Error creating notification:', error);
+        return null;
+      }
+    }
 
-      // Join a specific conversation room
-      socket.on('join_conversation', conversationId => {
-        if (!conversationId) {
+    socket.on('appointment_booked', async data => {
+      try {
+        const { appointmentId, psychologistId, userId, appointmentDetails } =
+          data;
+
+        if (!appointmentId || !psychologistId || !userId) {
+          log.warn('Appointment booked event missing required data');
           return;
         }
 
-        // Leave any other conversation rooms first
-        Array.from(socket.rooms).forEach(room => {
-          if (
-            room !== socket.id &&
-            room !== userId &&
-            room !== psychologistRoom &&
-            typeof room === 'string' &&
-            room.startsWith('conversation:')
-          ) {
-            socket.leave(room);
-          }
-        });
+        log.info(`New appointment booked: ${appointmentId}`);
+        console.log('⚡ appointment_booked event received:', data);
 
-        const roomName = `conversation:${conversationId}`;
-        socket.join(roomName);
-
-        // Keep track of who's in the conversation
-        if (!conversationRooms.has(conversationId)) {
-          conversationRooms.set(conversationId, new Set());
-        }
-        conversationRooms.get(conversationId).add(userId);
-      });
-
-      // Leave a specific conversation room
-      socket.on('leave_conversation', conversationId => {
-        if (!conversationId) return;
-
-        const roomName = `conversation:${conversationId}`;
-        socket.leave(roomName);
-
-        // Update room tracking
-        if (conversationRooms.has(conversationId)) {
-          conversationRooms.get(conversationId).delete(userId);
-        }
-      });
-
-      // Send message handler - optimized
-      socket.on('send_message', async messageData => {
+        // Fetch additional psychologist details to include in the notification
+        let psychologist: any = null;
         try {
-          const { conversationId, content, senderId, receiverId } = messageData;
+          psychologist = await User.findById(psychologistId).select(
+            '_id firstName lastName email profilePhotoUrl specializations sessionFee'
+          );
+          console.log('⚡ Found psychologist:', psychologist ? 'yes' : 'no');
+        } catch (err) {
+          console.error('⚡ Error fetching psychologist details:', err);
+        }
 
-          // Validate required data
-          if (!conversationId || !content || !senderId || !receiverId) {
-            socket.emit('message_error', {
-              error: 'Missing required message data',
-            });
-            return;
-          }
+        // Create a rich notification object with all needed details
+        // Use fallback values if psychologist is not found
+        const notificationData = {
+          appointmentId,
+          appointmentDetails,
+          psychologistInfo: {
+            id: psychologist ? psychologist._id : psychologistId,
+            name: psychologist
+              ? `${psychologist.firstName} ${psychologist.lastName}`
+              : appointmentDetails.psychologistName || 'Your Provider',
+            profilePhoto:
+              psychologist && psychologist.profilePhotoUrl
+                ? psychologist.profilePhotoUrl
+                : '',
+            specializations: psychologist
+              ? psychologist.specializations || []
+              : [],
+            sessionFee: psychologist
+              ? psychologist.sessionFee
+              : appointmentDetails.sessionFee,
+          },
+          dateTime: appointmentDetails.dateTime,
+          endTime: appointmentDetails.endTime,
+          sessionFormat: appointmentDetails.sessionFormat,
+          timestamp: new Date().toISOString(),
+        };
 
-          if (dev) {
-            log.info(
-              `Processing message in conversation ${conversationId} from ${senderId} to ${receiverId}`
-            );
-          }
+        console.log('⚡ Creating notification for psychologist and user');
+
+        // FIXED: Create notification for psychologist in database
+        let psychNotification: NotificationDocument | null = null;
+        try {
+          psychNotification = await createNotification({
+            recipientId: psychologistId,
+            senderId: userId,
+            type: 'appointment',
+            title: 'New Appointment Booked',
+            content: 'You have a new appointment booked',
+            relatedId: appointmentId,
+            relatedModel: 'Appointment',
+            meta: {
+              ...notificationData,
+              type: 'new_booking', // This is important for client-side role filtering
+            },
+          });
+
+          console.log(
+            '⚡ Created psychologist notification:',
+            psychNotification
+              ? (psychNotification as any)._id
+              : 'No ID available'
+          );
+        } catch (err) {
+          console.error('⚡ Error creating psychologist notification:', err);
+        }
+
+        // FIXED: Create notification for patient in database
+        let userNotification: NotificationDocument | null = null;
+        try {
+          userNotification = await createNotification({
+            recipientId: userId,
+            senderId: psychologistId,
+            type: 'appointment',
+            title: 'Appointment Confirmed',
+            content: 'Your appointment has been confirmed',
+            relatedId: appointmentId,
+            relatedModel: 'Appointment',
+            meta: {
+              ...notificationData,
+              type: 'booking_confirmed', // This is important for client-side role filtering
+            },
+          });
+
+          console.log(
+            '⚡ Created user notification:',
+            userNotification ? userNotification._id : 'No ID available'
+          );
+        } catch (err) {
+          console.error('⚡ Error creating user notification:', err);
+        }
+
+        // Notify the psychologist via socket with rich data
+        const psychologistSocketId = getSocketIdForUser(psychologistId);
+        if (psychologistSocketId) {
+          console.log(
+            '⚡ Emitting notification to psychologist socket:',
+            psychologistSocketId
+          );
 
           try {
-            // Performance optimization: Check if conversation exists with minimal query
-            const conversationExists = await Conversation.exists({
-              _id: conversationId,
+            io.to(psychologistSocketId).emit('appointment_notification', {
+              type: 'new_booking', // Match the meta.type in the database notification
+              appointmentId,
+              userId,
+              details: notificationData,
+              message: 'New appointment booked',
+              timestamp: new Date().toISOString(),
+              notificationId: psychNotification ? psychNotification._id : null,
             });
 
-            if (!conversationExists) {
-              socket.emit('message_error', { error: 'Conversation not found' });
-              return;
-            }
+            // Also emit the general notification event
+            if (psychNotification) {
+              let unreadCount = 0;
+              try {
+                unreadCount = await Notification.countDocuments({
+                  recipient: psychologistId,
+                  isRead: false,
+                });
+              } catch (err) {
+                console.error('⚡ Error counting notifications:', err);
+              }
 
-            // Performance optimization: Create temporary message for immediate display
-            const tempMessageId = `${senderId}-${Date.now()}`;
-            const tempMessage = {
-              _id: tempMessageId,
-              conversation: conversationId,
-              sender: { _id: senderId },
-              receiver: { _id: receiverId },
-              content,
-              isRead: false,
-              readAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              pending: true, // Mark as pending
-            };
-
-            // Broadcast to conversation room immediately
-            const roomName = `conversation:${conversationId}`;
-            io.to(roomName).emit('new_message', tempMessage);
-
-            // Check if receiver is in room
-            const receiverInRoom = io.sockets.adapter.rooms
-              .get(roomName)
-              ?.has(userSocketMap.get(receiverId));
-
-            // Only send direct notification if receiver is not in the room
-            if (!receiverInRoom) {
-              io.to(receiverId).emit('message_notification', {
-                message: tempMessage,
-                conversation: conversationId,
+              io.to(psychologistSocketId).emit('new_notification', {
+                notification: psychNotification,
+                unreadCount: unreadCount,
               });
             }
+          } catch (err) {
+            console.error(
+              '⚡ Error emitting notification to psychologist:',
+              err
+            );
+          }
+        } else {
+          console.log('⚡ No socket found for psychologist:', psychologistId);
+        }
 
-            // Performance optimization: Use batch database operation
-            pendingDbOperations.messages.set(tempMessageId, {
-              conversation: conversationId,
-              sender: senderId,
-              receiver: receiverId,
-              content,
-              isRead: false,
-              readAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+        // Notify the user via socket with rich data
+        const userSocketId = getSocketIdForUser(userId);
+        if (userSocketId) {
+          console.log('⚡ Emitting notification to user socket:', userSocketId);
+
+          try {
+            io.to(userSocketId).emit('appointment_notification', {
+              type: 'booking_confirmed', // Match the meta.type in the database notification
+              appointmentId,
+              psychologistId,
+              details: notificationData,
+              message: 'Your appointment has been confirmed',
+              timestamp: new Date().toISOString(),
+              notificationId: userNotification ? userNotification._id : null,
             });
 
-            // Update conversation in background without waiting
-            Conversation.findByIdAndUpdate(
-              conversationId,
-              { updatedAt: new Date() },
-              { new: false }
-            ).exec();
+            // Also emit the general notification event
+            if (userNotification) {
+              let unreadCount = 0;
+              try {
+                unreadCount = await Notification.countDocuments({
+                  recipient: userId,
+                  isRead: false,
+                });
+              } catch (err) {
+                console.error('⚡ Error counting notifications:', err);
+              }
 
-            // Schedule batch operations
-            scheduleBatchDbOperations();
-          } catch (error) {
-            log.error('Database error when processing message:', error);
-            throw error;
+              io.to(userSocketId).emit('new_notification', {
+                notification: userNotification,
+                unreadCount: unreadCount,
+              });
+            }
+          } catch (err) {
+            console.error('⚡ Error emitting notification to user:', err);
+          }
+        } else {
+          console.log('⚡ No socket found for user:', userId);
+        }
+
+        // Broadcast calendar update to all relevant parties
+        try {
+          io.emit('calendar_update', {
+            type: 'new_appointment',
+            appointmentId,
+            psychologistId,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error('⚡ Error broadcasting calendar update:', err);
+        }
+
+        console.log(
+          '⚡ appointment_booked event processing completed successfully'
+        );
+      } catch (error) {
+        log.error('Error in appointment_booked handler:', error);
+        console.error('⚡ Error in appointment_booked handler:', error);
+      }
+    });
+
+    socket.on('update_availability', async data => {
+      const selfNotification = new Notification({
+        recipient: data.psychologistId,
+        sender: data.psychologistId, // Self-notification
+        type: 'system',
+        title: 'Availability Updated',
+        content: 'You have successfully updated your availability schedule',
+        isRead: false,
+        relatedId: null,
+        relatedModel: null,
+        meta: {
+          type: 'availability_self_change',
+          timestamp: new Date().toISOString(),
+          slots: data?.slots,
+          dayRange: data?.dayRange,
+        },
+      });
+
+      await selfNotification.save();
+      log.info(
+        `Created self-notification for psychologist ${data.psychologistId}`
+      );
+
+      // Send socket notification to the psychologist
+      const psychologistSocketId = getSocketIdForUser(data.psychologistId);
+      if (psychologistSocketId) {
+        io.to(psychologistSocketId).emit('appointment_notification', {
+          type: 'availability_self_change',
+          message: 'You have successfully updated your availability schedule',
+          timestamp: new Date().toISOString(),
+          notificationId: selfNotification._id,
+        });
+
+        // Also emit a more general notification event
+        io.to(psychologistSocketId).emit('new_notification', {
+          notification: selfNotification.toObject(),
+          unreadCount: await Notification.countDocuments({
+            recipient: data.psychologistId,
+            isRead: false,
+          }),
+        });
+      }
+    });
+
+    // Enhanced update_availability handler with database notification
+    socket.on('update_availability', async data => {
+      try {
+        const { psychologistId, availabilityData } = data;
+
+        if (!psychologistId) {
+          log.warn('Update availability event missing psychologist ID');
+          return;
+        }
+
+        log.info(`Psychologist ${psychologistId} updated availability`);
+
+        // Find the psychologist to get their name for the notification
+        const psychologist =
+          await User.findById(psychologistId).select('firstName lastName');
+        const psychName = psychologist
+          ? `${psychologist.firstName} ${psychologist.lastName}`
+          : 'Your provider';
+
+        // Broadcast to all clients who might be viewing this psychologist's schedule
+        io.emit('availability_updated', {
+          psychologistId,
+          availabilityData,
+          timestamp: new Date().toISOString(),
+          psychologistName: psychName,
+        });
+
+        // Find all users who have appointments with this psychologist and send targeted notifications
+        try {
+          // Fetch from database all users with appointments for this psychologist
+          const appointments = await mongoose.connection
+            .collection('appointments')
+            .find({
+              psychologistId: new mongoose.Types.ObjectId(psychologistId),
+              status: { $ne: 'canceled' }, // Only for active appointments
+              startTime: { $gt: new Date() }, // Only for future appointments
+            })
+            .toArray();
+
+          const userIds = [
+            ...new Set(appointments.map(apt => apt.userId.toString())),
+          ];
+
+          // Create notifications for each user and send socket events
+          for (const userId of userIds) {
+            // Create database notification
+            const notification = await createNotification({
+              recipientId: userId,
+              senderId: psychologistId,
+              type: 'appointment',
+              title: 'Availability Updated',
+              content: `${psychName} has updated their availability`,
+              relatedId: null,
+              relatedModel: null,
+              meta: {
+                psychologistId,
+                type: 'availability_change',
+                timestamp: new Date().toISOString(),
+              },
+            });
+
+            // Send targeted socket notifications to these users
+            const userSocketId = getSocketIdForUser(userId);
+            if (userSocketId) {
+              io.to(userSocketId).emit('appointment_notification', {
+                type: 'availability_change',
+                psychologistId,
+                message: `${psychName} has updated their availability`,
+                timestamp: new Date().toISOString(),
+                notificationId: notification?._id,
+              });
+            }
           }
         } catch (error) {
-          log.error('Error sending message:', error);
-          socket.emit('message_error', {
-            error: 'Failed to send message',
-            details: error.message,
-          });
+          log.error(
+            'Error processing availability update notifications:',
+            error
+          );
         }
-      });
+      } catch (error) {
+        log.error('Error in update_availability handler:', error);
+      }
+    });
 
-      // Add typing indicator support
-      socket.on('typing', ({ conversationId, userId, typing }) => {
-        if (!conversationId) return;
-
-        const roomName = `conversation:${conversationId}`;
-        socket.to(roomName).emit('user_typing', {
-          conversationId,
-          userId,
-          typing,
-        });
-      });
-
-      // Enhanced mark read function - optimized
-      socket.on('mark_read', async ({ conversationId, userId }) => {
+    // Add a route to get notifications from the database
+    socket.on(
+      'get_notifications',
+      async (
+        { userId, limit = 20, skip = 0, onlyUnread = false },
+        callback
+      ) => {
         try {
-          if (!conversationId || !userId) {
+          if (!userId) {
+            callback({ success: false, error: 'User ID is required' });
             return;
           }
 
-          // Performance optimization: Don't wait for database update
-          Message.updateMany(
+          const query: { recipient: any; isRead?: boolean } = {
+            recipient: userId,
+          };
+          if (onlyUnread) {
+            query.isRead = false;
+          }
+
+          const notifications = await Notification.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('sender', 'firstName lastName profilePhotoUrl')
+            .lean();
+
+          const unreadCount = await Notification.countDocuments({
+            recipient: userId,
+            isRead: false,
+          });
+
+          callback({
+            success: true,
+            notifications,
+            unreadCount,
+            hasMore: notifications.length === limit,
+          });
+        } catch (error) {
+          log.error('Error fetching notifications:', error);
+          callback({
+            success: false,
+            error: 'Failed to fetch notifications',
+          });
+        }
+      }
+    );
+
+    // Add a route to mark notifications as read
+    socket.on(
+      'mark_notification_read',
+      async ({ notificationId, userId }, callback) => {
+        try {
+          if (!notificationId || !userId) {
+            callback?.({
+              success: false,
+              error: 'Notification ID and User ID are required',
+            });
+            return;
+          }
+
+          const update = await Notification.findOneAndUpdate(
+            { _id: notificationId, recipient: userId },
+            { isRead: true },
+            { new: true }
+          );
+
+          if (!update) {
+            callback?.({
+              success: false,
+              error: 'Notification not found or not authorized',
+            });
+            return;
+          }
+
+          callback?.({ success: true, notification: update });
+
+          // Emit an event to update badge counts
+          const userSocketId = getSocketIdForUser(userId);
+          if (userSocketId) {
+            const unreadCount = await Notification.countDocuments({
+              recipient: userId,
+              isRead: false,
+            });
+
+            io.to(userSocketId).emit('notification_count_update', {
+              unreadCount,
+            });
+          }
+        } catch (error) {
+          log.error('Error marking notification as read:', error);
+          callback?.({
+            success: false,
+            error: 'Failed to mark notification as read',
+          });
+        }
+      }
+    );
+
+    // Add a route to mark all notifications as read
+    socket.on('mark_all_notifications_read', async ({ userId }, callback) => {
+      try {
+        if (!userId) {
+          callback?.({ success: false, error: 'User ID is required' });
+          return;
+        }
+
+        const result = await Notification.updateMany(
+          { recipient: userId, isRead: false },
+          { isRead: true }
+        );
+
+        callback?.({
+          success: true,
+          count: result.modifiedCount,
+        });
+
+        // Emit an event to update badge counts
+        const userSocketId = getSocketIdForUser(userId);
+        if (userSocketId) {
+          io.to(userSocketId).emit('notification_count_update', {
+            unreadCount: 0,
+          });
+        }
+      } catch (error) {
+        log.error('Error marking all notifications as read:', error);
+        callback?.({
+          success: false,
+          error: 'Failed to mark notifications as read',
+        });
+      }
+    });
+
+    // Handle ping to keep connection alive
+    socket.on('ping', data => {
+      // Response with pong
+      socket.emit('pong', {
+        timestamp: Date.now(),
+        serverTime: new Date().toISOString(),
+        pingId: data.pingId,
+      });
+    });
+
+    // ======= CHAT FUNCTIONALITY =======
+
+    // Join a specific conversation room
+    socket.on('join_conversation', conversationId => {
+      if (!conversationId) {
+        log.warn('Join conversation event received without conversation ID');
+        return;
+      }
+
+      // Leave any other conversation rooms first
+      Array.from(socket.rooms).forEach(room => {
+        if (
+          room !== socket.id &&
+          room !== userId &&
+          room !== psychologistRoom
+        ) {
+          socket.leave(room);
+        }
+      });
+
+      const roomName = `conversation:${conversationId}`;
+      socket.join(roomName);
+
+      // Keep track of who's in the conversation
+      if (!conversationRooms.has(conversationId)) {
+        conversationRooms.set(conversationId, new Set());
+      }
+      conversationRooms.get(conversationId).add(userId);
+
+      log.info(
+        `Socket ${socket.id} (user ${userId}) joined conversation: ${conversationId}`
+      );
+      log.info(
+        `Room ${roomName} now has ${
+          io.sockets.adapter.rooms.get(roomName)?.size || 0
+        } members`
+      );
+    });
+
+    // Leave a specific conversation room
+    socket.on('leave_conversation', conversationId => {
+      if (!conversationId) return;
+
+      const roomName = `conversation:${conversationId}`;
+      socket.leave(roomName);
+
+      // Update room tracking
+      if (conversationRooms.has(conversationId)) {
+        conversationRooms.get(conversationId).delete(userId);
+      }
+
+      log.info(
+        `Socket ${socket.id} (user ${userId}) left conversation: ${conversationId}`
+      );
+    });
+
+    // Join psychologist room
+    socket.on('join_psychologist_room', () => {
+      if (userRole === 'psychologist') {
+        socket.join(psychologistRoom);
+        log.info(`Psychologist ${userId} joined the psychologist room`);
+      }
+    });
+
+    // Leave psychologist room
+    socket.on('leave_psychologist_room', () => {
+      socket.leave(psychologistRoom);
+      log.info(`User ${userId} left the psychologist room`);
+    });
+
+    // Send message handler
+    socket.on('send_message', async messageData => {
+      try {
+        const { conversationId, content, senderId, receiverId } = messageData;
+
+        // Validate required data
+        if (!conversationId || !content || !senderId || !receiverId) {
+          log.warn(`Missing data in message: ${JSON.stringify(messageData)}`);
+          socket.emit('message_error', {
+            error: 'Missing required message data',
+          });
+          return;
+        }
+
+        log.info(
+          `Processing message in conversation ${conversationId} from ${senderId} to ${receiverId}`
+        );
+
+        try {
+          // Find conversation and verify it exists
+          const conversation = await Conversation.findById(conversationId)
+            .populate('user', '_id firstName lastName email image role')
+            .populate(
+              'psychologist',
+              '_id firstName lastName email profilePhotoUrl role'
+            );
+
+          if (!conversation) {
+            log.warn(`Conversation not found: ${conversationId}`);
+            socket.emit('message_error', { error: 'Conversation not found' });
+            return;
+          }
+
+          // Create message in database
+          const newMessage = new Message({
+            conversation: conversationId,
+            sender: senderId,
+            receiver: receiverId,
+            content,
+            isRead: false,
+            readAt: null,
+          });
+
+          await newMessage.save();
+          log.info(`Message saved to database with ID: ${newMessage._id}`);
+
+          // Update the conversation's last message
+          await Conversation.findByIdAndUpdate(conversationId, {
+            lastMessage: newMessage._id,
+            updatedAt: new Date(), // Force update the updatedAt timestamp
+          });
+
+          // Get populated message to broadcast
+          const populatedMessage = await Message.findById(newMessage._id)
+            .populate(
+              'sender',
+              '_id firstName lastName email image profilePhotoUrl role'
+            )
+            .populate(
+              'receiver',
+              '_id firstName lastName email image profilePhotoUrl role'
+            );
+
+          // Ensure the// Ensure the message has proper sender information
+          const enhancedMessage = {
+            ...populatedMessage.toObject(),
+            sender: populatedMessage.sender || {
+              _id: senderId,
+              firstName:
+                conversation.user._id.toString() === senderId
+                  ? conversation.user.firstName
+                  : conversation.psychologist.firstName,
+              lastName:
+                conversation.user._id.toString() === senderId
+                  ? conversation.user.lastName
+                  : conversation.psychologist.lastName,
+              email:
+                conversation.user._id.toString() === senderId
+                  ? conversation.user.email
+                  : conversation.psychologist.email,
+              image:
+                conversation.user._id.toString() === senderId
+                  ? conversation.user.image
+                  : conversation.psychologist.profilePhotoUrl,
+              role:
+                conversation.user._id.toString() === senderId
+                  ? 'user'
+                  : 'psychologist',
+            },
+          };
+
+          // SIMPLIFIED NOTIFICATION STRATEGY to avoid duplicates
+          const roomName = `conversation:${conversationId}`;
+
+          // 1. Broadcast to conversation room
+          io.to(roomName).emit('new_message', enhancedMessage);
+
+          // 2. Check if the receiver is in the conversation room
+          const receiverInRoom = io.sockets.adapter.rooms
+            .get(roomName)
+            ?.has(userSocketMap.get(receiverId));
+
+          // 3. Only send direct notification if receiver is not in the room
+          if (!receiverInRoom) {
+            io.to(receiverId).emit('message_notification', {
+              message: enhancedMessage,
+              conversation: conversationId,
+            });
+          }
+
+          log.info(`Message processing complete for ID: ${newMessage._id}`);
+        } catch (error) {
+          log.error('Database error when processing message:', error);
+          throw error;
+        }
+      } catch (error) {
+        log.error('Error sending message:', error);
+        socket.emit('message_error', {
+          error: 'Failed to send message',
+          details: error.message,
+        });
+      }
+    });
+
+    // Add typing indicator support
+    socket.on('typing', ({ conversationId, userId, typing }) => {
+      if (!conversationId) return;
+
+      const roomName = `conversation:${conversationId}`;
+      socket.to(roomName).emit('user_typing', {
+        conversationId,
+        userId,
+        typing,
+      });
+    });
+
+    // Enhanced mark read function
+    socket.on('mark_read', async ({ conversationId, userId }) => {
+      try {
+        if (!conversationId || !userId) {
+          log.warn('Mark read event missing data:', {
+            conversationId,
+            userId,
+          });
+          return;
+        }
+
+        log.info(
+          `Marking messages as read in conversation ${conversationId} for user ${userId}`
+        );
+
+        try {
+          // Update all unread messages in this conversation sent to this user
+          const result = await Message.updateMany(
             {
               conversation: conversationId,
               receiver: userId,
@@ -1999,236 +2052,420 @@ app
               isRead: true,
               readAt: new Date(),
             }
-          ).exec(); // Don't await
+          );
 
-          // Notify conversation room immediately
+          log.info(`Updated ${result.modifiedCount} messages as read`);
+
+          // Notify conversation room that messages have been read
           const roomName = `conversation:${conversationId}`;
           io.to(roomName).emit('messages_read', {
             conversationId,
             userId,
           });
+
+          // Also notify senders directly
+          const messages = await Message.find({
+            conversation: conversationId,
+            receiver: userId,
+            isRead: true,
+          }).select('sender');
+
+          const senderIds = [
+            ...new Set(messages.map(msg => msg.sender.toString())),
+          ];
+
+          senderIds.forEach(senderId => {
+            const senderSocketId = getSocketIdForUser(senderId);
+            if (senderSocketId) {
+              io.to(senderSocketId).emit('messages_read', {
+                conversationId,
+                userId,
+              });
+            }
+          });
         } catch (error) {
-          log.error('Error marking messages as read:', error);
+          log.error('Database error when marking messages as read:', error);
+          throw error;
         }
-      });
-
-      // Handle disconnect
-      const handleDisconnect = () => {
-        // Get user data before removing from maps
-        const userData = connectedUsers.get(socket.id);
-
-        if (userData) {
-          const userId = userData.userId;
-
-          if (dev) {
-            log.info(`User disconnected: ${userId} (${socket.id})`);
-          }
-
-          // Update user connections tracking
-          if (userConnections.has(userId)) {
-            userConnections.get(userId).delete(socket.id);
-
-            // Check if user has other active connections
-            const otherConnections = userConnections.get(userId).size;
-
-            if (dev) {
-              log.info(
-                `User ${userId} has ${otherConnections} remaining connections`
-              );
-            }
-
-            // If user has other active connections, don't fully disconnect them
-            if (otherConnections > 0) {
-              // We still need to remove this specific socket, but not the user entirely
-              connectedUsers.delete(socket.id);
-              return;
-            } else {
-              // No other connections, remove the user from all tracking
-              userConnections.delete(userId);
-            }
-          }
-
-          // Check for any active calls and mark them as ended
-          activeCalls.forEach(async (callData, callId) => {
-            if (callData.from === userId || callData.to === userId) {
-              if (dev) {
-                log.info(`Ending call ${callId} due to user disconnect`);
-              }
-
-              // If call was connected, save call history
-              if (callData.status === 'connected' && callData.acceptTime) {
-                const duration = Math.floor(
-                  (new Date().getTime() - callData.acceptTime.getTime()) / 1000
-                );
-
-                await saveCallHistory({
-                  from: callData.from,
-                  to: callData.to,
-                  fromModel: 'User',
-                  toModel: 'User',
-                  callType: callData.callType,
-                  duration,
-                  endedAt: new Date().toISOString(),
-                  status: 'ended',
-                  conversationId: callData.conversationId,
-                });
-              }
-              // If call was still ringing, mark as missed
-              else if (callData.status === 'ringing') {
-                await saveCallHistory({
-                  from: callData.from,
-                  to: callData.to,
-                  fromModel: 'User',
-                  toModel: 'User',
-                  callType: callData.callType,
-                  duration: 0,
-                  endedAt: new Date().toISOString(),
-                  status: 'missed',
-                  conversationId: callData.conversationId,
-                });
-              }
-
-              // Delete from active calls
-              activeCalls.delete(callId);
-              pendingIceCandidates.delete(callId);
-              callSetupStatus.delete(callId);
-
-              // Notify the other party
-              const otherParty =
-                callData.from === userId ? callData.to : callData.from;
-              const otherPartySocketId = getSocketIdForUser(otherParty);
-
-              if (otherPartySocketId) {
-                // Create a unique key for this call-ended signal
-                const cacheKey = `call-ended:${callId}:${userId}:${otherParty}`;
-
-                // Only send if not a duplicate
-                if (!recentSignalsCache.has(cacheKey)) {
-                  recentSignalsCache.set(cacheKey, Date.now());
-
-                  io.to(otherPartySocketId).emit('webrtc_signal', {
-                    type: 'call-ended',
-                    from: userId,
-                    to: otherParty,
-                    callId,
-                    reason: 'disconnected',
-                    conversationId: callData.conversationId,
-                  });
-                }
-              }
-            }
-          });
-
-          // Clean up any active signal handlers for this user
-          for (const [key, value] of activeSignalHandling.entries()) {
-            if (key.includes(userId)) {
-              clearTimeout(value.timeout);
-              activeSignalHandling.delete(key);
-            }
-          }
-
-          // Remove from maps
-          connectedUsers.delete(socket.id);
-          userSocketMap.delete(userId);
-
-          // Remove from any conversation rooms
-          conversationRooms.forEach((users, roomId) => {
-            users.delete(userId);
-          });
-
-          // Emit user disconnection event
-          io.emit('user_disconnected', {
-            userId,
-            socketId: socket.id,
-          });
-        }
-      };
-
-      // Basic event handlers stay the same
-      socket.on('check_user_online', (userId, callback) => {
-        // Check if the user has a socket connection
-        const isOnline = userSocketMap.has(userId);
-        callback(isOnline);
-      });
-
-      socket.on('disconnect', handleDisconnect);
-      socket.on('user_logout', handleDisconnect);
+      } catch (error) {
+        log.error('Error marking messages as read:', error);
+      }
     });
 
-    // Performance optimization: More efficient cleanup intervals
-    const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    // Handle explicit user logout
+    socket.on('user_logout', () => {
+      handleDisconnect();
+    });
 
-    setInterval(() => {
-      const now = Date.now();
+    // ======= ENHANCED VIDEO CALL HELPERS =======
 
-      // Clean up stale cache entries
-      for (const [key, timestamp] of recentSignalsCache.entries()) {
-        // Keep only entries from the last 5 minutes
-        if (now - timestamp > 5 * 60 * 1000) {
-          recentSignalsCache.delete(key);
+    // New endpoint to check if a user can receive calls
+    socket.on('check_call_availability', async (targetUserId, callback) => {
+      try {
+        const targetSocketId = getSocketIdForUser(targetUserId);
+
+        if (!targetSocketId) {
+          // User is offline
+          callback({ available: false, reason: 'offline' });
+          return;
         }
-      }
 
-      // Clean up old active calls (more aggressive timeout)
-      for (const [callId, callData] of activeCalls.entries()) {
-        const callAge = now - callData.startTime.getTime();
+        // Check if user is in an active call
+        let userInCall = false;
 
-        // Clean up calls older than 1 hour (reduced from 2 hours)
-        if (callAge > 60 * 60 * 1000) {
-          log.warn(`Cleaning up stale call: ${callId}`);
-          activeCalls.delete(callId);
-          pendingIceCandidates.delete(callId);
-          callSetupStatus.delete(callId);
+        for (const [, callData] of activeCalls.entries()) {
+          if (callData.from === targetUserId || callData.to === targetUserId) {
+            if (
+              callData.status === 'connected' ||
+              callData.status === 'ringing'
+            ) {
+              userInCall = true;
+              break;
+            }
+          }
         }
-      }
 
-      // Performance optimization: Add memory usage monitoring in dev mode
-      if (dev) {
-        const memoryUsage = process.memoryUsage();
-        log.info(
-          `Memory usage - RSS: ${Math.round(
-            memoryUsage.rss / 1024 / 1024
-          )}MB, Heap: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
+        if (userInCall) {
+          callback({ available: false, reason: 'busy' });
+          return;
+        }
+
+        // If not in a call, they should be available
+        callback({ available: true });
+      } catch (error) {
+        log.error('Error checking call availability:', error);
+        callback({ available: false, reason: 'error' });
+      }
+    });
+
+    // New endpoint to get device capabilities
+    socket.on('report_device_capabilities', capabilities => {
+      try {
+        // Store device capabilities with user
+        if (connectedUsers.has(socket.id)) {
+          const userData = connectedUsers.get(socket.id);
+          userData.deviceCapabilities = capabilities;
+          connectedUsers.set(socket.id, userData);
+
+          log.info(
+            `Updated device capabilities for user ${
+              userData.userId
+            }: ${JSON.stringify(capabilities)}`
+          );
+        }
+      } catch (error) {
+        log.error('Error storing device capabilities:', error);
+      }
+    });
+
+    // Handle disconnect
+    const handleDisconnect = () => {
+      // Get user data before removing from maps
+      const userData = connectedUsers.get(socket.id);
+
+      if (userData) {
+        const userId = userData.userId;
+        log.info(`User disconnected: ${userId} (${socket.id})`);
+
+        // Update user connections tracking
+        if (userConnections.has(userId)) {
+          userConnections.get(userId).delete(socket.id);
+
+          // Check if user has other active connections
+          const otherConnections = userConnections.get(userId).size;
+          log.info(
+            `User ${userId} has ${otherConnections} remaining connections`
+          );
+
+          // If user has other active connections, don't fully disconnect them
+          if (otherConnections > 0) {
+            // We still need to remove this specific socket, but not the user entirely
+            connectedUsers.delete(socket.id);
+
+            // Don't update userSocketMap if user has other connections
+            // This ensures messages still route to their active sessions
+
+            return;
+          } else {
+            // No other connections, remove the user from all tracking
+            userConnections.delete(userId);
+          }
+        }
+
+        // Check for any active calls and mark them as ended
+        activeCalls.forEach(async (callData, callId) => {
+          if (callData.from === userId || callData.to === userId) {
+            log.info(`Ending call ${callId} due to user disconnect`);
+
+            // If call was connected, save call history
+            if (callData.status === 'connected' && callData.acceptTime) {
+              const duration = Math.floor(
+                (new Date().getTime() - callData.acceptTime.getTime()) / 1000
+              );
+
+              await saveCallHistory({
+                from: callData.from,
+                to: callData.to,
+                fromModel: 'User',
+                toModel: 'User',
+                callType: callData.callType,
+                duration,
+                endedAt: new Date().toISOString(),
+                status: 'ended',
+                conversationId: callData.conversationId,
+              });
+            }
+            // If call was still ringing, mark as missed
+            else if (callData.status === 'ringing') {
+              await saveCallHistory({
+                from: callData.from,
+                to: callData.to,
+                fromModel: 'User',
+                toModel: 'User',
+                callType: callData.callType,
+                duration: 0,
+                endedAt: new Date().toISOString(),
+                status: 'missed',
+                conversationId: callData.conversationId,
+              });
+            }
+
+            // Delete from active calls
+            activeCalls.delete(callId);
+            pendingIceCandidates.delete(callId);
+            callSetupStatus.delete(callId);
+
+            // Notify the other party
+            const otherParty =
+              callData.from === userId ? callData.to : callData.from;
+            const otherPartySocketId = getSocketIdForUser(otherParty);
+
+            if (otherPartySocketId) {
+              // Create a unique key for this call-ended signal
+              const cacheKey = `call-ended:${callId}:${userId}:${otherParty}`;
+
+              // Only send if not a duplicate
+              if (!recentSignalsCache.has(cacheKey)) {
+                recentSignalsCache.set(cacheKey, true);
+
+                io.to(otherPartySocketId).emit('webrtc_signal', {
+                  type: 'call-ended',
+                  from: userId,
+                  to: otherParty,
+                  callId,
+                  reason: 'disconnected',
+                  conversationId: callData.conversationId,
+                });
+
+                // Expire cache entry after 5 seconds
+                setTimeout(() => {
+                  recentSignalsCache.delete(cacheKey);
+                }, 5000);
+              }
+            }
+          }
+        });
+
+        // Clean up any active signal handlers for this user
+        for (const [key, value] of activeSignalHandling.entries()) {
+          if (key.includes(userId)) {
+            clearTimeout(value.timeout);
+            activeSignalHandling.delete(key);
+          }
+        }
+
+        // Remove from maps
+        connectedUsers.delete(socket.id);
+        userSocketMap.delete(userId);
+
+        // Remove from any conversation rooms
+        conversationRooms.forEach((users, roomId) => {
+          users.delete(userId);
+        });
+
+        // Emit user disconnection event
+        io.emit('user_disconnected', {
+          userId,
+          socketId: socket.id,
+        });
+
+        // Broadcast updated user list
+        io.emit(
+          'users_update',
+          Array.from(connectedUsers.values()).map(user => ({
+            userId: user.userId,
+            socketId: user.socketId,
+            userRole: user.userRole,
+            firstName: user.userData?.firstName,
+            lastName: user.userData?.lastName,
+          }))
         );
       }
-    }, CLEANUP_INTERVAL);
+    };
 
-    process.on('SIGTERM', () => {
-      log.info('SIGTERM signal received, shutting down gracefully');
+    // Add a handler for checking if a user is online
+    socket.on('check_user_online', (userId, callback) => {
+      // Check if the user has a socket connection
+      const isOnline = userSocketMap.has(userId);
+      log.debug(`Checking if user ${userId} is online: ${isOnline}`);
+      callback(isOnline);
+    });
 
-      // Close Socket.IO
-      io.close(() => {
-        log.info('Socket.IO server closed');
+    // Handler for getting user info
+    socket.on('get_user_info', (userId, callback) => {
+      log.info(`Getting info for user: ${userId}`);
 
-        // Fixed MongoDB connection closing
-        mongoose.connection
-          .close()
-          .then(() => {
-            log.info('MongoDB connection closed');
-            process.exit(0);
-          })
-          .catch(err => {
-            log.error('Error closing MongoDB connection:', err);
-            process.exit(1);
-          });
+      // Find the user in the connected users map
+      let userInfo: {
+        userId: string;
+        firstName: string;
+        lastName: string;
+        role?: string;
+      } | null = null;
+      for (const [, user] of connectedUsers.entries()) {
+        if (user.userId === userId) {
+          userInfo = {
+            userId: user.userId,
+            firstName: user.userData?.firstName || 'User',
+            lastName: user.userData?.lastName || '',
+            role: user.userRole,
+          };
+          break;
+        }
+      }
+
+      // If user info wasn't found in connected users, try to get minimal info
+      if (!userInfo) {
+        userInfo = {
+          userId,
+          firstName: 'User',
+          lastName: '',
+        };
+      }
+
+      log.debug(`Returning user info:`, userInfo);
+      callback(userInfo);
+    });
+
+    // Add a heartbeat mechanism to keep WebRTC connections alive
+    setInterval(() => {
+      const onlineUsers = Array.from(connectedUsers.values()).map(user => ({
+        userId: user.userId,
+        socketId: user.socketId,
+      }));
+
+      // Send a heartbeat to all connected clients to keep NAT mappings alive
+      if (onlineUsers.length > 0) {
+        io.emit('heartbeat', {
+          timestamp: Date.now(),
+          serverTime: new Date().toISOString(),
+        });
+      }
+    }, 20000);
+
+    socket.on('disconnect', () => {
+      handleDisconnect();
+    });
+  });
+
+  // Periodic cleanup of stale data
+  setInterval(() => {
+    const now = Date.now();
+
+    // Clean up any call-ended signal caches older than 5 minutes
+    let cacheCleanupCount = 0;
+    for (const [key, timestamp] of recentSignalsCache.entries()) {
+      if (now - timestamp > 300000) {
+        // 5 minutes
+        recentSignalsCache.delete(key);
+        cacheCleanupCount++;
+      }
+    }
+
+    if (cacheCleanupCount > 0) {
+      log.info(`Cleaned up ${cacheCleanupCount} stale cache entries`);
+    }
+
+    // Clean up any active calls that are more than 2 hours old (likely abandoned)
+    let callCleanupCount = 0;
+    for (const [callId, callData] of activeCalls.entries()) {
+      const callAge = now - callData.startTime.getTime();
+      if (callAge > 7200000) {
+        // 2 hours
+        log.warn(
+          `Cleaning up stale call: ${callId}, age: ${Math.floor(
+            callAge / 60000
+          )} minutes`
+        );
+        activeCalls.delete(callId);
+        pendingIceCandidates.delete(callId);
+        callSetupStatus.delete(callId);
+        callCleanupCount++;
+      }
+    }
+
+    if (callCleanupCount > 0) {
+      log.info(`Cleaned up ${callCleanupCount} stale call records`);
+    }
+  }, 600000); // Run every 10 minutes
+
+  return io;
+}
+
+// Now handle the different server modes based on Turbopack
+// If Turbopack is running, only start the WebSocket server
+if (isTurbopackRunning) {
+  log.info('Starting in Turbopack mode - WebSocket server only');
+
+  // Create Express app without Next.js handling
+  const expressApp = express();
+  expressApp.use(compression());
+
+  // Create HTTP server
+  const server = createServer(expressApp);
+
+  // Set up Socket.IO
+  setupSocketServer(server);
+
+  // Start server on the separate port
+  server.listen(serverPort, () => {
+    log.info(
+      `> WebSocket server listening at http://localhost:${serverPort} in Turbopack mode`
+    );
+  });
+} else {
+  if (!app) {
+    log.error('Failed to initialize Next.js app');
+    process.exit(1);
+  }
+
+  app
+    .prepare()
+    .then(() => {
+      const server = createServer((req, res) => {
+        const parsedUrl = parse(req.url!, true);
+        if (!handle) {
+          res.writeHead(500);
+          res.end('Internal Server Error - Next.js handler not initialized');
+          return;
+        }
+        handle(req, res, parsedUrl);
       });
 
-      // Force exit after 10 seconds
-      setTimeout(() => {
-        log.error('Forced shutdown after timeout');
-        process.exit(1);
-      }, 10000);
-    });
+      // Set up Socket.IO
+      setupSocketServer(server);
 
-    server.listen(port, () => {
-      log.info(
-        `> Server listening at http://localhost:${port} as ${
-          dev ? 'development' : process.env.NODE_ENV
-        }`
-      );
+      server.listen(port, () => {
+        log.info(
+          `> Server listening at http://localhost:${port} as ${
+            dev ? 'development' : process.env.NODE_ENV
+          }`
+        );
+        log.info('> Socket.IO server initialized.');
+      });
+    })
+    .catch(err => {
+      log.error('Error starting server:', err);
+      process.exit(1);
     });
-  })
-  .catch(err => {
-    log.error('Error starting server:', err);
-    process.exit(1);
-  });
+}

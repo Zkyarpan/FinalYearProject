@@ -1,7 +1,9 @@
 {
   "private": true,
   "scripts": {
-    "dev": "nodemon",
+    "dev:next": "next dev --turbopack",
+    "dev:server": "cross-env NEXT_TURBOPACK=true SERVER_PORT=3001 ts-node --project tsconfig.server.json server.ts",
+    "dev": "concurrently \"npm run dev:next\" \"npm run dev:server\"",
     "build": "next build && tsc --project tsconfig.server.json",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "analyze": "ANALYZE=true next build",
@@ -121,6 +123,7 @@
     "@types/react-dom": "^18.3.5",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "9.1.2",
     "i": "^0.3.7",
     "nodemon": "^3.1.9",
     "postcss": "^8.4.49",

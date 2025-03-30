@@ -18,7 +18,6 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import Loader from '@/components/common/Loader';
 import {
   Table,
   TableBody,
@@ -58,8 +57,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { DEFAULT_AVATAR } from '@/constants';
 
 // Define TypeScript interfaces
@@ -76,6 +75,8 @@ interface UserProfile {
 interface PsychologistData {
   email: string;
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   profilePhotoUrl?: string;
 }
@@ -85,32 +86,31 @@ interface User {
   email: string;
   role: 'user' | 'admin' | 'psychologist';
   isActive: boolean;
+  isVerified: boolean;
   createdAt: string;
   profileData?: UserProfile | null;
   psychologistData?: PsychologistData | null;
+  profile?: any;
+  firstName?: string;
+  lastName?: string;
   displayName?: string;
   profileImage?: string | null;
   psychologistImage?: string | null;
+  image?: string | null;
 }
 
-export default function UsersPage(): JSX.Element {
+export default function UsersManagement(): JSX.Element {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalUsers, setTotalUsers] = useState<number>(0);
-  const [showUserDetailsDialog, setShowUserDetailsDialog] =
-    useState<boolean>(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [detailsTab, setDetailsTab] = useState<string>('basic');
-  const [approvalFeedback, setApprovalFeedback] = useState<string>('');
-  const [showFeedbackDialog, setShowFeedbackDialog] = useState<boolean>(false);
-  const [approvalAction, setApprovalAction] = useState<
-    'approve' | 'reject' | null
-  >(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState<boolean>(false);
 
   const fetchUsers = async (
     page: number,
@@ -163,6 +163,26 @@ export default function UsersPage(): JSX.Element {
     fetchUsers(1, searchTerm, roleFilter, statusFilter);
   };
 
+  const handleDeleteUser = async (id: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete user (${response.status})`);
+      }
+
+      toast.success('User deleted successfully');
+      fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user. Please try again.');
+    }
+  };
+
   const handleStatusChange = async (
     id: string,
     isActive: boolean
@@ -181,76 +201,28 @@ export default function UsersPage(): JSX.Element {
         );
       }
 
-      const data = await response.json();
       toast.success(
-        data.Result?.message ||
-          `User ${isActive ? 'activated' : 'deactivated'} successfully`
+        `User ${isActive ? 'activated' : 'deactivated'} successfully`
       );
 
       // Update the user in the list
       setUsers(
         users.map(user => (user._id === id ? { ...user, isActive } : user))
       );
-
-      // If user details dialog is open, update the selected user
-      if (selectedUser && selectedUser._id === id) {
-        setSelectedUser({ ...selectedUser, isActive });
-      }
     } catch (error) {
       console.error(`Error updating user status:`, error);
       toast.error(`Failed to update user status. Please try again.`);
     }
   };
 
-  const handlePsychologistApproval = async (
-    userId: string,
-    action: 'approve' | 'reject',
-    feedback: string = ''
-  ) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action, feedback }),
-      });
+  const viewUserDetails = (user: User) => {
+    setSelectedUser(user);
+    setShowDetailsDialog(true);
+  };
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to ${action} psychologist (${response.status})`
-        );
-      }
-
-      const data = await response.json();
-      toast.success(
-        data.Result?.message || `Psychologist ${action}ed successfully`
-      );
-
-      // Refresh user list
-      fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
-
-      // Close the dialog
-      setShowFeedbackDialog(false);
-      setApprovalFeedback('');
-      setApprovalAction(null);
-
-      // If the user details dialog is open, update the psychologist data
-      if (selectedUser && selectedUser._id === userId) {
-        const updatedPsychologistData = {
-          ...selectedUser.psychologistData,
-          approvalStatus: action === 'approve' ? 'approved' : 'rejected',
-          adminFeedback: feedback,
-        };
-
-        setSelectedUser({
-          ...selectedUser,
-          psychologistData: updatedPsychologistData as PsychologistData,
-        });
-      }
-    } catch (error) {
-      console.error(`Error ${action}ing psychologist:`, error);
-      toast.error(`Failed to ${action} psychologist. Please try again.`);
-    }
+  const confirmDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setShowDeleteDialog(true);
   };
 
   const resetPassword = async (userId: string) => {
@@ -268,144 +240,143 @@ export default function UsersPage(): JSX.Element {
         throw new Error(`Failed to reset password (${response.status})`);
       }
 
-      const data = await response.json();
-      toast.success(
-        data.Result?.message || 'Password reset email sent successfully'
-      );
+      toast.success('Password reset email sent successfully');
     } catch (error) {
       console.error('Error resetting password:', error);
       toast.error('Failed to reset password. Please try again.');
     }
   };
 
-  const viewUserDetails = (user: User) => {
-    setSelectedUser(user);
-    setShowUserDetailsDialog(true);
-
-    // Set appropriate tab based on user role and data
-    if (user.role === 'psychologist') {
-      setDetailsTab('psychologist');
-    } else if (user.profileData) {
-      setDetailsTab('profile');
-    } else {
-      setDetailsTab('basic');
+  // Helper function to get user's name safely
+  const getUserName = (user: User): string => {
+    // Check for displayName first
+    if (user.displayName) return user.displayName;
+    
+    // Check for direct firstName/lastName properties
+    if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
+    
+    // Check profile data
+    if (user.profileData?.firstName && user.profileData?.lastName) {
+      return `${user.profileData.firstName} ${user.profileData.lastName}`;
     }
+    
+    // Check psychologist data
+    if (user.psychologistData?.firstName && user.psychologistData?.lastName) {
+      return `${user.psychologistData.firstName} ${user.psychologistData.lastName}`;
+    }
+    
+    if (user.psychologistData?.fullName) return user.psychologistData.fullName;
+    
+    // Check for profile
+    if (user.profile?.firstName && user.profile?.lastName) {
+      return `${user.profile.firstName} ${user.profile.lastName}`;
+    }
+    
+    // Fall back to email (username)
+    return user.email.split('@')[0];
   };
 
-  const startApprovalProcess = (action: 'approve' | 'reject') => {
-    setApprovalAction(action);
-    setApprovalFeedback('');
-    setShowFeedbackDialog(true);
+  // Helper function to get user's avatar safely
+  const getUserAvatar = (user: User): string => {
+    return (
+      user.profileImage ||
+      user.image ||
+      user.psychologistImage ||
+      user.psychologistData?.profilePhotoUrl ||
+      user.profileData?.image ||
+      DEFAULT_AVATAR
+    );
   };
 
-  const getUserImage = (user: User) => {
-    if (user.profileImage) return user.profileImage;
-    if (user.role === 'psychologist' && user.psychologistImage)
-      return user.psychologistImage;
-    return DEFAULT_AVATAR;
+  // Get initials for avatar fallback
+  const getInitials = (user: User): string => {
+    const name = getUserName(user);
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
   };
 
+  // Helper to get badge color for role
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
         return 'destructive';
       case 'psychologist':
-        return 'outline';
+        return 'default';
       default:
         return 'secondary';
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Users Management</h1>
           <p className="text-sm text-muted-foreground">
-            Total users: {totalUsers} | Showing page {currentPage} of{' '}
-            {totalPages}
+            Total users: {totalUsers} | Showing page {currentPage} of {totalPages}
           </p>
         </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button
-            variant="outline"
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
             size="sm"
-            className="gap-1 h-9"
-            onClick={() =>
-              fetchUsers(currentPage, searchTerm, roleFilter, statusFilter)
-            }
+            onClick={() => fetchUsers(currentPage, searchTerm, roleFilter, statusFilter)}
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Refresh</span>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
-
-          <Button variant="outline" size="sm" className="gap-1 h-9">
-            <ArrowDown className="h-3.5 w-3.5" />
-            <span>Export</span>
-          </Button>
-
-          <Button variant="default" size="sm" className="gap-1 h-9">
-            <span>Add User</span>
+          <Button size="sm">
+            <User className="h-4 w-4 mr-2" />
+            Add User
           </Button>
         </div>
       </div>
 
-      <Card className="border-border/40">
+      <Card>
         <CardContent className="p-4 space-y-4">
-          {/* Search and filters */}
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex flex-grow items-center gap-2">
-              <div className="relative flex-grow w-full max-w-md">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search by email..."
-                    className="w-full pl-10 pr-4 py-2 text-sm rounded-md border focus:ring-1 focus:ring-primary focus:outline-none"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  />
-                </div>
-              </div>
-              <Button
-                onClick={handleSearch}
-                variant="secondary"
-                size="sm"
-                className="h-9"
-              >
-                Search
-              </Button>
+          {/* Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:w-1/2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by email or name..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
             </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex gap-2 w-full md:w-auto">
               <Select
                 value={roleFilter}
-                onValueChange={value => {
+                onValueChange={(value) => {
                   setRoleFilter(value);
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="w-[130px] h-9">
+                <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="psychologist">Psychologist</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="user">Users</SelectItem>
+                  <SelectItem value="psychologist">Psychologists</SelectItem>
+                  <SelectItem value="admin">Admins</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select
                 value={statusFilter}
-                onValueChange={value => {
+                onValueChange={(value) => {
                   setStatusFilter(value);
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="w-[130px] h-9">
+                <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -414,66 +385,56 @@ export default function UsersPage(): JSX.Element {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button onClick={handleSearch}>Search</Button>
             </div>
           </div>
 
-          {/* Users table */}
+          {/* Users Table */}
           {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader />
+            <div className="py-20 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+              <p className="mt-2 text-sm text-muted-foreground">Loading users...</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-hidden">
+            <div className="rounded-md border">
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      Joined Date
-                    </TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Joined Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.length > 0 ? (
-                    users.map(user => (
-                      <TableRow key={user._id} className="hover:bg-muted/50">
+                    users.map((user) => (
+                      <TableRow key={user._id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                              <img
-                                src={getUserImage(user)}
-                                alt={user.displayName || 'User'}
-                                className="h-full w-full object-cover"
-                                onError={e => {
-                                  e.currentTarget.src = DEFAULT_AVATAR;
-                                }}
-                              />
-                            </div>
+                            <Avatar>
+                              <AvatarImage src={getUserAvatar(user)} alt={getUserName(user)} />
+                              <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                            </Avatar>
                             <div>
-                              <div className="font-medium">
-                                {user.displayName}
-                              </div>
-                              {user.role === 'psychologist' &&
-                                user.psychologistData && (
-                                  <Badge
-                                    variant={
-                                      user.psychologistData.approvalStatus ===
-                                      'approved'
-                                        ? 'default'
-                                        : user.psychologistData
-                                              .approvalStatus === 'rejected'
-                                          ? 'destructive'
-                                          : 'outline'
-                                    }
-                                    className="mt-1 text-xs"
-                                  >
-                                    {user.psychologistData.approvalStatus}
-                                  </Badge>
-                                )}
+                              <p className="font-medium">{getUserName(user)}</p>
+                              {user.role === 'psychologist' && user.psychologistData && (
+                                <Badge 
+                                  variant={
+                                    user.psychologistData.approvalStatus === 'approved' 
+                                      ? 'default' 
+                                      : user.psychologistData.approvalStatus === 'rejected'
+                                        ? 'destructive'
+                                        : 'outline'
+                                  }
+                                  className="text-xs mt-1"
+                                >
+                                  {user.psychologistData.approvalStatus}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -483,84 +444,51 @@ export default function UsersPage(): JSX.Element {
                             {user.role}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(user.createdAt).toLocaleDateString()}
+                        <TableCell>
+                          {user.isActive ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                              Inactive
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={user.isActive ? 'default' : 'destructive'}
-                          >
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
+                          {new Date(user.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                 <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem
-                                onClick={() => viewUserDetails(user)}
-                              >
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => viewUserDetails(user)}>
                                 <User className="h-4 w-4 mr-2" /> View Details
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => resetPassword(user._id)}
-                              >
+                              <DropdownMenuItem onClick={() => resetPassword(user._id)}>
                                 <Lock className="h-4 w-4 mr-2" /> Reset Password
                               </DropdownMenuItem>
-
-                              {user.role === 'psychologist' &&
-                                user.psychologistData?.approvalStatus ===
-                                  'pending' && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        startApprovalProcess('approve')
-                                      }
-                                      className="text-green-500"
-                                    >
-                                      <Check className="h-4 w-4 mr-2" /> Approve
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        startApprovalProcess('reject')
-                                      }
-                                      className="text-red-500"
-                                    >
-                                      <X className="h-4 w-4 mr-2" /> Reject
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-
                               <DropdownMenuSeparator />
                               {user.isActive ? (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleStatusChange(user._id, false)
-                                  }
-                                  className="text-red-500"
-                                >
+                                <DropdownMenuItem onClick={() => handleStatusChange(user._id, false)} className="text-red-600">
                                   <Ban className="h-4 w-4 mr-2" /> Deactivate
                                 </DropdownMenuItem>
                               ) : (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleStatusChange(user._id, true)
-                                  }
-                                  className="text-green-500"
-                                >
+                                <DropdownMenuItem onClick={() => handleStatusChange(user._id, true)} className="text-green-600">
                                   <Unlock className="h-4 w-4 mr-2" /> Activate
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem onClick={() => confirmDeleteUser(user)} className="text-red-600">
+                                <X className="h-4 w-4 mr-2" /> Delete User
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -568,18 +496,13 @@ export default function UsersPage(): JSX.Element {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-10 text-muted-foreground"
-                      >
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <User className="h-8 w-8 text-muted-foreground/60" />
-                          <p>No users found</p>
-                          {(searchTerm ||
-                            roleFilter !== 'all' ||
-                            statusFilter !== 'all') && (
-                            <Button
-                              variant="link"
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <User className="h-8 w-8 text-muted-foreground/60 mb-2" />
+                          <p className="text-muted-foreground">No users found</p>
+                          {(searchTerm || roleFilter !== 'all' || statusFilter !== 'all') && (
+                            <Button 
+                              variant="link" 
                               onClick={() => {
                                 setSearchTerm('');
                                 setRoleFilter('all');
@@ -601,277 +524,112 @@ export default function UsersPage(): JSX.Element {
 
           {/* Pagination */}
           {!isLoading && totalPages > 1 && (
-            <div className="flex justify-center py-4">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      className={
-                        currentPage === 1
-                          ? 'pointer-events-none opacity-50'
-                          : 'cursor-pointer'
-                      }
-                    />
-                  </PaginationItem>
-
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    // Show a window of 5 pages centered on current page
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      // Less than 5 pages, show all
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      // Near start, show first 5
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      // Near end, show last 5
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      // In middle, show window around current
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <PaginationItem key={pageNum}>
-                        <PaginationLink
-                          isActive={pageNum === currentPage}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className="cursor-pointer"
-                        >
-                          {pageNum}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                      }
-                      className={
-                        currentPage === totalPages
-                          ? 'pointer-events-none opacity-50'
-                          : 'cursor-pointer'
-                      }
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage > 1) setCurrentPage(currentPage - 1);
+                    }}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        isActive={pageNum === currentPage}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(pageNum);
+                        }}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                    }}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </CardContent>
       </Card>
 
       {/* User Details Dialog */}
       {selectedUser && (
-        <Dialog
-          open={showUserDetailsDialog}
-          onOpenChange={setShowUserDetailsDialog}
-        >
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+        <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" /> User Details
-              </DialogTitle>
+              <DialogTitle>User Details</DialogTitle>
             </DialogHeader>
-
-            <div className="py-4">
-              <div className="flex justify-center mb-6">
-                <div className="flex flex-col items-center">
-                  <div className="h-20 w-20 rounded-full bg-muted overflow-hidden mb-2">
-                    <img
-                      src={getUserImage(selectedUser)}
-                      alt={selectedUser.displayName || 'User'}
-                      className="h-full w-full object-cover"
-                      onError={e => {
-                        e.currentTarget.src = DEFAULT_AVATAR;
-                      }}
-                    />
-                  </div>
-                  <h2 className="text-xl font-semibold">
-                    {selectedUser.displayName || 'User'}
-                  </h2>
-
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={getRoleBadgeVariant(selectedUser.role)}>
-                      {selectedUser.role}
-                    </Badge>
-
-                    <Badge
-                      variant={
-                        selectedUser.isActive ? 'default' : 'destructive'
-                      }
-                    >
-                      {selectedUser.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-
-                    {selectedUser.role === 'psychologist' &&
-                      selectedUser.psychologistData && (
-                        <Badge
-                          variant={
-                            selectedUser.psychologistData.approvalStatus ===
-                            'approved'
-                              ? 'default'
-                              : selectedUser.psychologistData.approvalStatus ===
-                                  'rejected'
-                                ? 'destructive'
-                                : 'outline'
-                          }
-                        >
-                          {selectedUser.psychologistData.approvalStatus}
-                        </Badge>
-                      )}
-                  </div>
-                </div>
+            <div className="flex flex-col items-center py-4">
+              <Avatar className="h-24 w-24 mb-4">
+                <AvatarImage src={getUserAvatar(selectedUser)} alt={getUserName(selectedUser)} />
+                <AvatarFallback className="text-lg">{getInitials(selectedUser)}</AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-semibold">{getUserName(selectedUser)}</h2>
+              <p className="text-sm text-muted-foreground mb-1">{selectedUser.email}</p>
+              <div className="flex gap-2 mb-4">
+                <Badge variant={getRoleBadgeVariant(selectedUser.role)}>
+                  {selectedUser.role}
+                </Badge>
+                <Badge variant={selectedUser.isActive ? "default" : "destructive"}>
+                  {selectedUser.isActive ? "Active" : "Inactive"}
+                </Badge>
               </div>
-
-              {/* Tabs for different sections */}
-              <Tabs
-                value={detailsTab}
-                onValueChange={setDetailsTab}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                  {selectedUser.profileData && (
-                    <TabsTrigger value="profile">Profile</TabsTrigger>
-                  )}
-                  {selectedUser.role === 'psychologist' && (
-                    <TabsTrigger value="psychologist">Psychologist</TabsTrigger>
-                  )}
-                </TabsList>
-
-                {/* Basic Info Tab */}
-                <TabsContent value="basic" className="space-y-4 mt-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{selectedUser.email}</p>
+              <div className="w-full border-t pt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Joined Date:</span>
+                  <span>
+                    {new Date(selectedUser.createdAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Verified:</span>
+                  <span>{selectedUser.isVerified ? "Yes" : "No"}</span>
+                </div>
+                {selectedUser.role === 'psychologist' && selectedUser.psychologistData && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approval Status:</span>
+                    <span className="capitalize">{selectedUser.psychologistData.approvalStatus}</span>
                   </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground">Joined Date</p>
-                    <p className="font-medium">
-                      {new Date(selectedUser.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </TabsContent>
-
-                {/* Profile Tab */}
-                <TabsContent value="profile" className="space-y-4 mt-4">
-                  {selectedUser.profileData ? (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Phone</p>
-                          <p className="font-medium">
-                            {selectedUser.profileData.phone || 'Not provided'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Age</p>
-                          <p className="font-medium">
-                            {selectedUser.profileData.age || 'Not provided'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-muted-foreground">Gender</p>
-                        <p className="font-medium capitalize">
-                          {selectedUser.profileData.gender || 'Not provided'}
-                        </p>
-                      </div>
-
-                      {selectedUser.profileData.briefBio && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Bio</p>
-                          <p className="text-sm mt-1">
-                            {selectedUser.profileData.briefBio}
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <p className="text-muted-foreground">
-                        No profile information available
-                      </p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Psychologist Tab */}
-                <TabsContent value="psychologist" className="space-y-4 mt-4">
-                  {selectedUser.psychologistData ? (
-                    <>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Email</p>
-                        <p className="font-medium">
-                          {selectedUser.psychologistData.email}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Approval Status
-                        </p>
-                        <Badge
-                          variant={
-                            selectedUser.psychologistData.approvalStatus ===
-                            'approved'
-                              ? 'default'
-                              : selectedUser.psychologistData.approvalStatus ===
-                                  'rejected'
-                                ? 'destructive'
-                                : 'outline'
-                          }
-                        >
-                          {selectedUser.psychologistData.approvalStatus}
-                        </Badge>
-                      </div>
-
-                      {selectedUser.psychologistData.approvalStatus ===
-                        'pending' && (
-                        <div className="flex gap-2 mt-4">
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={() => startApprovalProcess('approve')}
-                          >
-                            <Check className="h-4 w-4 mr-2" /> Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="w-full"
-                            onClick={() => startApprovalProcess('reject')}
-                          >
-                            <X className="h-4 w-4 mr-2" /> Reject
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <p className="text-muted-foreground">
-                        No psychologist information available
-                      </p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+                )}
+              </div>
             </div>
-
-            <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 justify-between sm:justify-between">
-              <Button
-                variant={selectedUser.isActive ? 'destructive' : 'default'}
-                onClick={() => {
-                  handleStatusChange(selectedUser._id, !selectedUser.isActive);
-                }}
+            <DialogFooter className="flex justify-between">
+              <Button 
+                variant={selectedUser.isActive ? "destructive" : "default"} 
+                onClick={() => handleStatusChange(selectedUser._id, !selectedUser.isActive)}
               >
                 {selectedUser.isActive ? (
                   <>
@@ -883,11 +641,7 @@ export default function UsersPage(): JSX.Element {
                   </>
                 )}
               </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => setShowUserDetailsDialog(false)}
-              >
+              <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
                 Close
               </Button>
             </DialogFooter>
@@ -895,53 +649,33 @@ export default function UsersPage(): JSX.Element {
         </Dialog>
       )}
 
-      {/* Approval Feedback Dialog */}
-      <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {approvalAction === 'approve' ? 'Approve' : 'Reject'} Psychologist
-            </DialogTitle>
-            <DialogDescription>
-              {approvalAction === 'approve'
-                ? 'Provide any feedback for approving this psychologist.'
-                : 'Please provide a reason for rejecting this psychologist application.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <Textarea
-              placeholder="Enter feedback or rejection reason..."
-              className="min-h-[100px]"
-              value={approvalFeedback}
-              onChange={e => setApprovalFeedback(e.target.value)}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowFeedbackDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={approvalAction === 'approve' ? 'default' : 'destructive'}
-              onClick={() => {
-                if (selectedUser) {
-                  handlePsychologistApproval(
-                    selectedUser._id,
-                    approvalAction!,
-                    approvalFeedback
-                  );
-                }
-              }}
-            >
-              {approvalAction === 'approve' ? 'Approve' : 'Reject'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      {selectedUser && (
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete user {selectedUser.email}? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex justify-between sm:justify-between">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => handleDeleteUser(selectedUser._id)}
+              >
+                Delete User
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

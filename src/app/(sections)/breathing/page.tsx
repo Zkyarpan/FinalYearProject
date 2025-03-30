@@ -28,7 +28,7 @@ export default function BreathingPage() {
   return (
     <div className="pb-20">
       {/* Hero section */}
-      <div className="relative">
+      <div className="relative bg-card rounded-md">
         <div className="absolute inset-0 bg-[url('/breathing-pattern.svg')] opacity-10"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
@@ -41,7 +41,7 @@ export default function BreathingPage() {
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button
-                className="bg-white text-blue-600 hover:bg-white/90"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white border-0"
                 size="lg"
                 onClick={scrollToExercise}
               >

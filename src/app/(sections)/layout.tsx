@@ -21,15 +21,20 @@ import { usePathname, useRouter } from 'next/navigation';
 import UserSidebar from '@/components/UserSidebar';
 import Link from 'next/link';
 import UserActions from '@/components/UserActions';
+import AdminActions from '@/components/AdminActions';
 import Image from 'next/image';
 import NavItem from '@/components/NavItem';
 import LoginModal from '@/components/LoginModel';
-import { getNavItemsByRole, USER_NAV_ITEMS } from '@/components/NavItems';
+import {
+  getNavItemsByRole,
+  USER_NAV_ITEMS,
+  ADMIN_NAV_ITEMS,
+} from '@/components/NavItems';
 import AccountSection from '@/components/AccountSection';
 import { DEFAULT_AVATAR } from '@/constants';
 import FilterSection from '@/components/FilterSection';
 import PsychologistProfileHighlights from '@/components/PsychologistProfileHighlights';
-import UserProfileRightSection from '@/components/UserProfileRightSection';
+import Logout from '@/icons/Logout';
 
 const routeTitles = {
   // User routes
@@ -45,8 +50,6 @@ const routeTitles = {
   '/appointments': 'Appointments',
   '/inbox': 'Inbox',
   '/sessions': 'Your Sessions',
-  '/exercises': 'Exercises',
-  '/breathing': 'Breathing Exercises',
 
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
@@ -59,22 +62,33 @@ const routeTitles = {
 
   // Admin routes
   '/dashboard/admin': 'Dashboard',
-  '/admin/users': 'Users Management',
-  '/admin/psychologists': 'Psychologists Management',
-  '/admin/articles': 'Articles Management',
-  '/admin/blogs': 'Blogs Management',
-  '/admin/settings': 'System Settings',
-  '/admin/exercises': 'Exercises Management',
+  '/dashboard/admin/users': 'Users Management',
+  '/dashboard/admin/psychologist': 'Psychologists Management',
+  '/dashboard/admin/articles': 'Articles Management',
+  '/dashboard/admin/blogs': 'Blogs Management',
+  '/dashboard/admin/settings': 'System Settings',
+  '/dashboard/admin/security': 'Security Settings',
+  '/dashboard/admin/reports': 'Analytics & Reports',
 };
 
 const RootLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const { isAuthenticated, profileImage, role, firstName, lastName, logout } =
-    useUserStore();
+  const {
+    isAuthenticated,
+    profileImage,
+    role,
+    firstName,
+    lastName,
+    email,
+    logout,
+  } = useUserStore();
   const pathname = usePathname();
   const router = useRouter();
+
+  const isAdminRoute = pathname.startsWith('/dashboard/admin');
+  const isAdminUser = role === 'admin';
 
   const NAV_ITEMS =
     isAuthenticated && role
@@ -140,8 +154,6 @@ const RootLayout = ({ children }) => {
     );
   };
 
-  const psychologistId = pathname.split('/')[2];
-
   const showBackButton =
     isNestedBlogRoute ||
     isNestedArticleRoute ||
@@ -155,22 +167,17 @@ const RootLayout = ({ children }) => {
     pathname !== '/psychologist' &&
     isPsychologistProfileRoute(pathname);
 
-  const isUserProfilePage = pathname => {
-    const pathParts = pathname.split('/');
-    return pathParts.length >= 2 && pathParts[1] === 'user' && pathParts[2];
-  };
-
-  // Updated showRightSidebar condition to include /articles path
+  // Updated showRightSidebar condition to exclude admin routes
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
       (isAuthenticated && !isDashboardPage && role === 'user')) &&
+    !isAdminRoute &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
-      pathname === '/articles' || // Added articles path
+      pathname === '/articles' ||
       pathname === '/psychologist' ||
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
-      isUserProfilePage(pathname) ||
       pathname === '/' ||
       isAccountPage);
 
@@ -223,18 +230,6 @@ const RootLayout = ({ children }) => {
       return null;
     }
 
-    if (isUserProfilePage(pathname)) {
-      const userId = pathname.split('/')[2];
-      // You might want to fetch the user name from an API or store
-      // For now I'm using a placeholder
-      return (
-        <UserProfileRightSection
-          userId={userId}
-          userName={firstName || 'User'}
-        />
-      );
-    }
-
     const sections = {
       '/blogs': BlogRightSection,
       '/psychologist': FilterSection,
@@ -268,6 +263,168 @@ const RootLayout = ({ children }) => {
     return null;
   };
 
+  // Special rendering for admin routes
+  if (isAdminRoute && isAdminUser) {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground">
+        {/* Mobile Header for Admin */}
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur z-[10]">
+          <div className="container mx-auto px-4 h-full">
+            <div className="flex items-center justify-between h-full">
+              <div className="flex items-center">
+                <Sheet
+                  open={isMobileMenuOpen}
+                  onOpenChange={setIsMobileMenuOpen}
+                >
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" className="lg:hidden">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-[280px] sm:w-[350px]">
+                    <SheetHeader>
+                      <SheetTitle>
+                        <div className="flex items-center gap-2">
+                          <Image
+                            alt="Mentality Admin"
+                            width={32}
+                            height={32}
+                            className="object-contain dark:bg-white rounded-full"
+                            src="/Logo1.png?v=1"
+                          />
+                          <span className="text-xl font-semibold">
+                            Admin Panel
+                          </span>
+                        </div>
+                      </SheetTitle>
+                    </SheetHeader>
+                    <nav className="mt-5 overflow-auto scroll-smooth">
+                      {ADMIN_NAV_ITEMS.map(item => (
+                        <button
+                          key={item.text}
+                          onClick={() => handleNavigation(item.href)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                            pathname === item.href
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'hover:bg-muted'
+                          }`}
+                        >
+                          {item.icon}
+                          <span>{item.text}</span>
+                        </button>
+                      ))}
+                    </nav>
+                  </SheetContent>
+                </Sheet>
+                <Link
+                  href="/dashboard/admin"
+                  className="flex items-center ml-2"
+                >
+                  <Image
+                    alt="Mentality"
+                    width={32}
+                    height={32}
+                    className="object-contain dark:bg-white rounded-full"
+                    src="/Logo1.png?v=1"
+                  />
+                  <span className="ml-2 text-xl font-semibold">Admin</span>
+                </Link>
+              </div>
+
+              <AdminActions
+                email={email || 'admin@mentality.com'}
+                logout={logout}
+                router={router}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Sidebar for Admin */}
+        <div className="hidden lg:flex w-[240px] border-r border-border fixed left-0 top-0 h-screen flex-col py-4 bg-background z-[10]">
+          <div className="px-4 py-2 mb-4">
+            <Link href="/dashboard/admin" className="flex items-center">
+              <Image
+                alt="Mentality"
+                width={40}
+                height={30}
+                className="object-contain dark:bg-white rounded-full"
+                src="/Logo1.png?v=1"
+                priority={true}
+              />
+              <div className="ml-2 flex flex-col">
+                <span className="text-lg font-semibold">Admin Panel</span>
+                <span className="text-xs text-muted-foreground">
+                  Mentality Platform
+                </span>
+              </div>
+            </Link>
+          </div>
+
+          <div className="px-3 mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full rounded-md bg-muted/50 border border-border py-2 pl-3 pr-4 text-sm outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <nav className="px-3 flex-1 overflow-auto">
+            <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
+              MAIN NAVIGATION
+            </div>
+            {ADMIN_NAV_ITEMS.map(item => (
+              <NavItem
+                key={item.text}
+                {...item}
+                isActive={pathname === item.href}
+                onClick={e => {
+                  e.preventDefault();
+                  handleNavigation(item.href);
+                }}
+              />
+            ))}
+          </nav>
+
+          <div className="mt-auto px-3 py-3 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <div className="font-medium">Admin Account</div>
+                <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                  {email || 'admin@mentality.com'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Area for Admin */}
+        <div className="lg:ml-[240px] flex-1 flex flex-col min-h-screen">
+          {/* Fixed Header */}
+          <div className="hidden lg:flex h-14 border-b border-border bg-background/95 backdrop-blur fixed top-0 right-0 left-[240px] z-[10]">
+            <div className="w-full px-6 flex items-center justify-between">
+              <h1 className="text-xl font-semibold">{title}</h1>
+              <AdminActions
+                email={email || 'admin@mentality.com'}
+                logout={logout}
+                router={router}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 pt-16 lg:pt-14">
+            <div className="max-w-full px-4 lg:px-6 py-4 lg:py-6">
+              {children}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original layout for non-admin routes
   return (
     <>
       <div className="flex min-h-screen bg-background text-foreground">
@@ -327,11 +484,13 @@ const RootLayout = ({ children }) => {
                             <span>{item.text}</span>
                           </button>
                         ))}
-                        <AccountSection
-                          firstName={firstName || 'Anonymous'}
-                          profileImage={profileImage || '/default-avatar.jpg'}
-                          role={role ?? undefined}
-                        />
+                        {isAuthenticated && !isAdminUser && (
+                          <AccountSection
+                            firstName={firstName || 'Anonymous'}
+                            profileImage={profileImage || '/default-avatar.jpg'}
+                            role={role ?? undefined}
+                          />
+                        )}
                       </nav>
                     </SheetContent>
                   </Sheet>
@@ -397,7 +556,7 @@ const RootLayout = ({ children }) => {
                   }}
                 />
               ))}
-              {isAuthenticated && (
+              {isAuthenticated && !isAdminUser && (
                 <div className="mt-4">
                   <AccountSection
                     firstName={firstName || 'User'}

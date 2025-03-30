@@ -129,8 +129,8 @@ export const ADMIN_NAV_ITEMS = [
     href: '/dashboard/admin/psychologist',
   },
   {
-    icon: <Exercise />,
-    text: 'Manage Exercises',
+    icon: <Welness />,
+    text: 'Breathing',
     href: '/dashboard/admin/exercises',
   },
   {

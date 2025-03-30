@@ -4,95 +4,160 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import User from '@/models/User';
 import Profile from '@/models/Profile';
-import Blog from '@/models/Blogs';
-import Story from '@/models/Stories'; 
-import Appointment from '@/models/Appointment';
-import Conversation from '@/models/Conversation';
+import Psychologist from '@/models/Psychologist';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import { withAuth } from '@/middleware/authMiddleware';
+import { Types } from 'mongoose';
+
+interface MongoUser {
+  _id: Types.ObjectId;
+  email: string;
+  role: string;
+  isActive: boolean;
+  isVerified: boolean;
+  createdAt: Date;
+  firstName?: string;
+  lastName?: string;
+  // Add other fields as needed
+}
 
 export async function GET(req: NextRequest) {
   return withAuth(
     async (req: NextRequest, token: any) => {
       try {
         await connectDB();
-        console.log('Connected to database for user dashboard metrics');
 
-        const userId = token._id;
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
 
-        // Fetch counts for user-specific data
-        const [
-          userProfile,
-          totalBlogs,
-          publishedBlogs,
-          draftBlogs,
-          totalStories,
-          publishedStories,
-          totalAppointments,
-          upcomingAppointments,
-          completedAppointments,
-          activeConversations,
-        ] = await Promise.all([
-          Profile.findOne({ user: userId }).lean(),
-          Blog.countDocuments({ author: userId }),
-          Blog.countDocuments({ author: userId, isPublished: true }),
-          Blog.countDocuments({ author: userId, isPublished: false }),
-          Story.countDocuments({ author: userId }),
-          Story.countDocuments({ author: userId, isPublished: true }),
-          Appointment.countDocuments({ userId }),
-          Appointment.countDocuments({
-            userId,
-            status: 'scheduled',
-            startTime: { $gt: new Date() },
-          }),
-          Appointment.countDocuments({ userId, status: 'completed' }),
-          Conversation.countDocuments({
-            $or: [
-              { user1: userId, status: 'active' },
-              { user2: userId, status: 'active' },
-            ],
-          }),
+        // Parse query parameters
+        const searchParams = req.nextUrl.searchParams;
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '10');
+        const search = searchParams.get('search') || '';
+        const role = searchParams.get('role') || 'all';
+        const status = searchParams.get('status') || 'all';
+
+        // Build query
+        const query: any = {};
+
+        // Add search condition
+        if (search) {
+          query.$or = [{ email: { $regex: search, $options: 'i' } }];
+        }
+
+        // Add role filter
+        if (role && role !== 'all') {
+          query.role = role;
+        }
+
+        // Add status filter
+        if (status && status !== 'all') {
+          query.isActive = status === 'active';
+        }
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+
+        // Get total count for pagination
+        const totalUsers = await User.countDocuments(query);
+        const totalPages = Math.ceil(totalUsers / limit);
+
+        // Get users with pagination
+        const users = await User.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean<MongoUser[]>();
+
+        // Get profiles and psychologist data
+        const userIds = users.map(user => user._id);
+
+        const [profiles, psychologists] = await Promise.all([
+          Profile.find({ user: { $in: userIds } }).lean(),
+          Psychologist.find({ userId: { $in: userIds } }).lean(),
         ]);
 
-        // Calculate profile completion percentage
-        const profileCompletion = calculateProfileCompletion(userProfile);
-
-        // Get wellness data (could be from a separate model, using mock data for now)
-        const wellnessData = await getWellnessData(userId);
-
-        // Get recent activities
-        const recentActivities = await getUserRecentActivities(userId);
-
-        // Get upcoming appointments
-        const nearestAppointments = await getNearestAppointments(userId);
-
-        // Get recent conversations
-        const recentConversations = await getRecentConversations(userId);
-
-        const dashboardData = {
-          metrics: {
-            profileCompletion,
-            totalBlogs,
-            publishedBlogs,
-            draftBlogs,
-            totalStories,
-            publishedStories,
-            totalAppointments,
-            upcomingAppointments,
-            completedAppointments,
-            activeConversations,
-          },
-          wellnessData,
-          recentActivities,
-          nearestAppointments,
-          recentConversations,
-        };
-
-        return NextResponse.json(createSuccessResponse(200, dashboardData), {
-          status: 200,
+        // Create a map for quick lookups
+        const profileMap = new Map();
+        profiles.forEach(profile => {
+          profileMap.set(profile.user.toString(), profile);
         });
+
+        const psychologistMap = new Map();
+        psychologists.forEach(psych => {
+          if (psych.userId) {
+            psychologistMap.set(psych.userId.toString(), psych);
+          } else if (psych.email) {
+            // Try to find by email if userId is not available
+            const matchingUser = users.find(
+              user => user.email === psych.email
+            ) as MongoUser | undefined;
+
+            if (matchingUser) {
+              // Now TypeScript knows matchingUser._id exists
+              psychologistMap.set(matchingUser._id.toString(), psych);
+            }
+          }
+        });
+
+        // Enhance user data with profile and psychologist information
+        const enhancedUsers = users.map(user => {
+          const userId = user._id.toString();
+          const profile = profileMap.get(userId);
+          const psychologist = psychologistMap.get(userId);
+
+          // Set display name based on available data
+          let displayName = '';
+
+          if (profile && profile.firstName && profile.lastName) {
+            displayName = `${profile.firstName} ${profile.lastName}`;
+            user.firstName = profile.firstName;
+            user.lastName = profile.lastName;
+          } else if (psychologist) {
+            if (psychologist.firstName && psychologist.lastName) {
+              displayName = `${psychologist.firstName} ${psychologist.lastName}`;
+              user.firstName = psychologist.firstName;
+              user.lastName = psychologist.lastName;
+            } else if (psychologist.fullName) {
+              displayName = psychologist.fullName;
+            }
+          }
+
+          if (!displayName) {
+            // Extract name from email as fallback
+            displayName = user.email.split('@')[0];
+          }
+
+          return {
+            ...user,
+            displayName,
+            profileData: profile || null,
+            psychologistData: psychologist || null,
+            profileImage: profile?.image || null,
+            psychologistImage: psychologist?.profilePhotoUrl || null,
+          };
+        });
+
+        return NextResponse.json(
+          createSuccessResponse(200, {
+            users: enhancedUsers,
+            totalUsers,
+            totalPages,
+            currentPage: page,
+          }),
+          { status: 200 }
+        );
       } catch (error: any) {
-        console.error('Error fetching user dashboard data:', error);
+        console.error('Error fetching users:', error);
         return NextResponse.json(
           createErrorResponse(500, error.message || 'Internal Server Error'),
           { status: 500 }
@@ -100,303 +165,210 @@ export async function GET(req: NextRequest) {
       }
     },
     req,
-    ['user', 'psychologist', 'admin'] // Allow all authenticated users
+    ['admin'] // Only allow admins
   );
 }
 
-// Calculate how complete a user's profile is
-function calculateProfileCompletion(profile: any): number {
-  if (!profile) return 0;
+// Handle specific user operations
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(
+    async (req: NextRequest, token: any) => {
+      try {
+        await connectDB();
 
-  const requiredFields = [
-    'firstName',
-    'lastName',
-    'phone',
-    'age',
-    'gender',
-    'briefBio',
-    'struggles',
-  ];
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
 
-  const optionalFields = [
-    'image',
-    'address',
-    'emergencyContact',
-    'emergencyPhone',
-  ];
+        const userId = params.id;
+        const { isActive } = await req.json();
 
-  // Count required fields
-  let completedRequired = 0;
-  requiredFields.forEach(field => {
-    if (
-      profile[field] &&
-      (typeof profile[field] !== 'string' || profile[field].trim() !== '') &&
-      (!Array.isArray(profile[field]) || profile[field].length > 0)
-    ) {
-      completedRequired++;
-    }
-  });
+        const updatedUser = await User.findByIdAndUpdate(
+          userId,
+          { isActive },
+          { new: true }
+        );
 
-  // Count optional fields
-  let completedOptional = 0;
-  optionalFields.forEach(field => {
-    if (
-      profile[field] &&
-      (typeof profile[field] !== 'string' || profile[field].trim() !== '')
-    ) {
-      completedOptional++;
-    }
-  });
+        if (!updatedUser) {
+          return NextResponse.json(createErrorResponse(404, 'User not found'), {
+            status: 404,
+          });
+        }
 
-  // Calculate percentage with required fields weighted more heavily
-  const requiredWeight = 0.7;
-  const optionalWeight = 0.3;
-
-  const requiredPercentage =
-    (completedRequired / requiredFields.length) * requiredWeight;
-  const optionalPercentage =
-    (completedOptional / optionalFields.length) * optionalWeight;
-
-  return Math.round((requiredPercentage + optionalPercentage) * 100);
+        return NextResponse.json(
+          createSuccessResponse(200, {
+            message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+            user: updatedUser,
+          }),
+          { status: 200 }
+        );
+      } catch (error: any) {
+        console.error('Error updating user:', error);
+        return NextResponse.json(
+          createErrorResponse(500, error.message || 'Internal Server Error'),
+          { status: 500 }
+        );
+      }
+    },
+    req,
+    ['admin'] // Only allow admins
+  );
 }
 
-// Generate wellness data - replace with actual wellness metrics model if available
-async function getWellnessData(userId: string) {
-  // This would ideally come from a wellness tracking model
-  // Using mock data for demonstration
+// Handle user deletion
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(
+    async (req: NextRequest, token: any) => {
+      try {
+        await connectDB();
 
-  // Get day of week (0-6, 0 is Sunday)
-  const today = new Date();
-  const dayOfWeek = today.getDay();
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
 
-  // Create past 7 days data (realistic random values that trend slightly upward)
-  interface DataPoint {
-    date: string;
-    value: number;
-  }
-  
-  const moodData: DataPoint[] = [];
-  const sleepData: DataPoint[] = [];
-  const mindfulnessData: DataPoint[] = [];
+        const userId = params.id;
 
-  // Base values with small random fluctuations
-  let moodBase = 65 + Math.floor(Math.random() * 10);
-  let sleepBase = 6 + Math.random() * 2;
-  let mindfulnessBase = 30 + Math.floor(Math.random() * 20);
+        // Find and delete the user
+        const deletedUser = await User.findByIdAndDelete(userId);
 
-  // Create data for the last 7 days
-  for (let i = 0; i < 7; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - i));
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        if (!deletedUser) {
+          return NextResponse.json(createErrorResponse(404, 'User not found'), {
+            status: 404,
+          });
+        }
 
-    // Add slight upward trend with random variations
-    moodBase += Math.floor(Math.random() * 5) - 2;
-    moodBase = Math.min(Math.max(moodBase, 50), 95); // Keep between 50-95
+        // Also clean up related data (optional, can be adjusted based on business logic)
+        await Profile.deleteOne({ user: userId });
 
-    sleepBase += Math.random() * 0.4 - 0.2;
-    sleepBase = Math.min(Math.max(sleepBase, 5), 9); // Keep between 5-9 hours
-
-    mindfulnessBase += Math.floor(Math.random() * 6) - 2;
-    mindfulnessBase = Math.min(Math.max(mindfulnessBase, 20), 60); // Keep between 20-60 min
-
-    moodData.push({
-      date: dayName,
-      value: moodBase,
-    });
-
-    sleepData.push({
-      date: dayName,
-      value: Math.round(sleepBase * 10) / 10,
-    });
-
-    mindfulnessData.push({
-      date: dayName,
-      value: Math.round(mindfulnessBase),
-    });
-  }
-
-  // Calculate overall wellness score (weighted average of the latest values)
-  const latestMood = moodData[6].value;
-  const latestSleep = sleepData[6].value;
-  const latestMindfulness = mindfulnessData[6].value;
-
-  // Normalize each component
-  const normalizedMood = latestMood / 100;
-  const normalizedSleep = Math.min(latestSleep / 8, 1); // 8 hours is optimal
-  const normalizedMindfulness = Math.min(latestMindfulness / 40, 1); // 40 min is optimal
-
-  // Weighted score
-  const wellnessScore =
-    (normalizedMood * 0.5 +
-      normalizedSleep * 0.3 +
-      normalizedMindfulness * 0.2) *
-    100;
-
-  return {
-    wellnessScore: Math.round(wellnessScore * 100) / 100,
-    moodData,
-    sleepData,
-    mindfulnessData,
-    stressLevel: Math.round(100 - wellnessScore),
-    insights: [
-      {
-        title: 'Sleep Quality',
-        value: latestSleep.toFixed(1) + 'h',
-        change: '+0.3h',
-        status: 'improved',
-      },
-      {
-        title: 'Mindfulness',
-        value: latestMindfulness + 'min',
-        change: '+5min',
-        status: 'improved',
-      },
-      {
-        title: 'Mood',
-        value: latestMood + '%',
-        change: '+2%',
-        status: 'stable',
-      },
-    ],
-  };
+        return NextResponse.json(
+          createSuccessResponse(200, {
+            message: 'User deleted successfully',
+          }),
+          { status: 200 }
+        );
+      } catch (error: any) {
+        console.error('Error deleting user:', error);
+        return NextResponse.json(
+          createErrorResponse(500, error.message || 'Internal Server Error'),
+          { status: 500 }
+        );
+      }
+    },
+    req,
+    ['admin'] // Only allow admins
+  );
 }
 
-// Get user's recent activities
-async function getUserRecentActivities(userId: string) {
-  try {
-    // Get recent blog posts
-    const recentBlogs = await Blog.find({ author: userId })
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .select('title isPublished createdAt')
-      .lean();
+// Handle psychologist approval/rejection
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(
+    async (req: NextRequest, token: any) => {
+      try {
+        await connectDB();
 
-    // Get recent story posts
-    const recentStories = await Story.find({ author: userId })
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .select('title isPublished createdAt')
-      .lean();
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
 
-    // Get recent appointments
-    const recentAppointments = await Appointment.find({ userId })
-      .sort({ startTime: -1 })
-      .limit(3)
-      .populate('psychologistId', 'firstName lastName')
-      .select('status startTime duration')
-      .lean();
+        const userId = params.id;
+        const { action, feedback } = await req.json();
 
-    // Format all activities in a unified way
-    const activities = [
-      ...recentBlogs.map((blog: any) => ({
-        id: blog._id.toString(),
-        type: 'blog',
-        title: blog.isPublished ? 'Published Blog' : 'Created Blog Draft',
-        description: blog.title,
-        timestamp: blog.createdAt,
-        status: blog.isPublished ? 'published' : 'draft',
-      })),
-      ...recentStories.map((story: any) => ({
-        id: story._id.toString(),
-        type: 'story',
-        title: story.isPublished ? 'Shared Story' : 'Created Story Draft',
-        description: story.title,
-        timestamp: story.createdAt,
-        status: story.isPublished ? 'published' : 'draft',
-      })),
-      ...recentAppointments.map((appointment: any) => {
-        const psychName = appointment.psychologistId
-          ? `Dr. ${appointment.psychologistId.firstName} ${appointment.psychologistId.lastName}`
-          : 'a therapist';
+        // First get the user to check if they're a psychologist
+        const user = await User.findById(userId);
 
-        return {
-          id: appointment._id.toString(),
-          type: 'appointment',
-          title: `${appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)} Appointment`,
-          description: `Session with ${psychName}`,
-          timestamp: appointment.startTime,
-          status: appointment.status,
-        };
-      }),
-    ];
+        if (!user) {
+          return NextResponse.json(createErrorResponse(404, 'User not found'), {
+            status: 404,
+          });
+        }
 
-    // Sort by timestamp (newest first) and return the top 6
-    return activities
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )
-      .slice(0, 6);
-  } catch (error) {
-    console.error('Error getting user activities:', error);
-    return [];
-  }
-}
+        if (user.role !== 'psychologist') {
+          return NextResponse.json(
+            createErrorResponse(400, 'User is not a psychologist'),
+            { status: 400 }
+          );
+        }
 
-// Get user's nearest upcoming appointments
-async function getNearestAppointments(userId: string) {
-  try {
-    const appointments = await Appointment.find({
-      userId,
-      status: 'scheduled',
-      startTime: { $gt: new Date() },
-    })
-      .sort({ startTime: 1 })
-      .limit(3)
-      .populate('psychologistId', 'firstName lastName profilePhoto')
-      .lean();
+        // Find and update the psychologist record
+        let psychologist = await Psychologist.findOne({ userId });
 
-    return appointments.map((appointment: any) => {
-      const psychName = appointment.psychologistId
-        ? `Dr. ${appointment.psychologistId.firstName} ${appointment.psychologistId.lastName}`
-        : 'Unknown Provider';
+        if (!psychologist) {
+          // Try to find by email if userId is not available
+          const psychByEmail = await Psychologist.findOne({
+            email: user.email,
+          });
 
-      return {
-        id: appointment._id.toString(),
-        providerName: psychName,
-        providerPhoto: appointment.psychologistId?.profilePhoto || null,
-        date: appointment.startTime,
-        duration: appointment.duration,
-        format: appointment.sessionFormat || 'video',
-        status: appointment.status,
-      };
-    });
-  } catch (error) {
-    console.error('Error getting upcoming appointments:', error);
-    return [];
-  }
-}
+          if (!psychByEmail) {
+            return NextResponse.json(
+              createErrorResponse(404, 'Psychologist record not found'),
+              { status: 404 }
+            );
+          }
 
-// Get user's recent conversations
-async function getRecentConversations(userId: string) {
-  try {
-    // Find conversations where user is either user1 or user2
-    const conversations = await Conversation.find({
-      $or: [{ user1: userId }, { user2: userId }],
-    })
-      .sort({ updatedAt: -1 })
-      .limit(3)
-      .populate('user1', 'firstName lastName image')
-      .populate('user2', 'firstName lastName image')
-      .select('lastMessage lastMessageTimestamp')
-      .lean();
+          // Update the record with the userId for future lookups
+          psychByEmail.userId = new Types.ObjectId(userId);
+          psychologist = psychByEmail;
+        }
 
-    return conversations.map((convo: any) => {
-      // Determine the other user in the conversation
-      const otherUser =
-        convo.user1._id.toString() === userId ? convo.user2 : convo.user1;
+        // Update approval status
+        psychologist.approvalStatus =
+          action === 'approve' ? 'approved' : 'rejected';
+        psychologist.adminFeedback = feedback || '';
 
-      return {
-        id: convo._id.toString(),
-        otherUserName: `${otherUser.firstName} ${otherUser.lastName}`,
-        otherUserPhoto: otherUser.image || '/default-avatar.jpg',
-        lastMessage: convo.lastMessage || 'No messages yet',
-        timestamp: convo.lastMessageTimestamp || convo.updatedAt,
-      };
-    });
-  } catch (error) {
-    console.error('Error getting recent conversations:', error);
-    return [];
-  }
+        if (action === 'approve') {
+          psychologist.approvedAt = new Date();
+        } else {
+          psychologist.rejectedAt = new Date();
+        }
+
+        await psychologist.save();
+
+        return NextResponse.json(
+          createSuccessResponse(200, {
+            message: `Psychologist ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+            psychologist,
+          }),
+          { status: 200 }
+        );
+      } catch (error: any) {
+        console.error('Error updating psychologist approval:', error);
+        return NextResponse.json(
+          createErrorResponse(500, error.message || 'Internal Server Error'),
+          { status: 500 }
+        );
+      }
+    },
+    req,
+    ['admin'] // Only allow admins
+  );
 }

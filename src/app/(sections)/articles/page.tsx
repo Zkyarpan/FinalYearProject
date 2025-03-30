@@ -7,6 +7,10 @@ import Skeleton from '@/components/common/Skeleton';
 import { generateSlug } from '@/helpers/generateSlug';
 import { useUserStore } from '@/store/userStore';
 import { useRouter } from 'next/navigation';
+import { MessageCircle, Edit, User, Calendar, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import LoginModal from '@/components/LoginModel';
 
 interface Author {
   _id: string;
@@ -43,9 +47,43 @@ interface ApiResponse {
   };
 }
 
+interface UserProfile {
+  _id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  image: string;
+  address?: string;
+  phone: string;
+  age: number;
+  gender?: string;
+  preferredCommunication: 'video' | 'audio' | 'chat' | 'in-person';
+  struggles: string[];
+  briefBio: string;
+  profileCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  metricsOverview: {
+    blogCount: number;
+    commentCount: number;
+    storiesCount: number;
+    articleCount?: number;
+    lastActive: string;
+  };
+}
+
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
+};
+
+// Format date string nicely
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 };
 
 const ArticleOwnershipTag = ({
@@ -79,8 +117,11 @@ const ArticlesPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const userId = useUserStore(state => state._id);
   const isAuthenticated = useUserStore(state => state.isAuthenticated);
+  const getAuthHeaders = useUserStore(state => state.getAuthHeaders);
   const router = useRouter();
 
   const defaultImage = '/default-image.jpg';
@@ -90,7 +131,12 @@ const ArticlesPage = () => {
   const fetchArticles = async (page = 1) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/articles/index?page=${page}&limit=10`);
+      let url = `/api/articles/index?page=${page}&limit=10`;
+
+      // Get auth headers for ownership check
+      const headers = getAuthHeaders ? getAuthHeaders() : {};
+
+      const res = await fetch(url, { headers });
       if (!res.ok) {
         throw new Error('Failed to fetch articles');
       }
@@ -122,6 +168,11 @@ const ArticlesPage = () => {
     setCurrentPage(page);
     fetchArticles(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAuthorClick = (author: Author, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    router.push(`/user/${author._id}`);
   };
 
   const renderPagination = () => {
@@ -170,8 +221,12 @@ const ArticlesPage = () => {
       <main className="min-h-screen">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">{error}</h1>
-            <p className="text-gray-600">Please try again later.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+              {error}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please try again later.
+            </p>
           </div>
         </div>
       </main>
@@ -182,7 +237,9 @@ const ArticlesPage = () => {
     <main className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">Mental Health Articles</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Mental Health Articles
+          </h1>
           {isAuthenticated && (
             <button
               onClick={() => {
@@ -245,30 +302,62 @@ const ArticlesPage = () => {
                         />
                       </div>
 
-                      <h2 className="text-xl font-bold mb-3">
+                      <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
                         {articles[0].title}
                       </h2>
-                      <p className="text-sm mb-4 line-clamp-3">
+                      <p className="text-sm mb-4 line-clamp-3 text-gray-700 dark:text-gray-300">
                         {truncateText(articles[0].content, 200)}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="relative h-8 w-8">
+                          <div
+                            className="relative h-8 w-8 cursor-pointer"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAuthorClick(articles[0].author);
+                            }}
+                          >
                             <Image
                               src={articles[0].author.avatar || defaultAvatar}
                               alt={`Profile picture of ${articles[0].author.name}`}
                               fill
-                              className="rounded-full object-cover"
+                              className="rounded-full object-cover hover:opacity-80 transition-opacity"
                               sizes="32px"
                             />
                           </div>
-                          <span className="text-sm font-semibold">
+                          <span
+                            className="text-sm font-semibold text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAuthorClick(articles[0].author);
+                            }}
+                          >
                             {articles[0].author.name}
                           </span>
                         </div>
-                        <span className="text-xs">
-                          {articles[0].publishDate}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {articles[0].publishDate}
+                          </span>
+                          {articles[0].isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="p-1 h-auto"
+                              onClick={e => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                router.push(
+                                  `/articles/edit/${articles[0]._id}`
+                                );
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -281,7 +370,7 @@ const ArticlesPage = () => {
                     <Link
                       key={article._id}
                       href={`/articles/${generateSlug(article.title)}`}
-                      className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg"
+                      className="group block overflow-hidden rounded-2xl border bg-white dark:bg-[#171717] transition-all hover:shadow-lg dark:border-[#333333]"
                     >
                       <article className="h-full relative">
                         <div className="relative h-[200px] w-full">
@@ -309,31 +398,63 @@ const ArticlesPage = () => {
                             />
                           </div>
 
-                          <h2 className="font-semibold text-lg mb-2">
+                          <h2 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">
                             {article.title}
                           </h2>
-                          <p className="text-sm line-clamp-2 mb-4">
+                          <p className="text-sm line-clamp-2 mb-4 text-gray-700 dark:text-gray-300">
                             {truncateText(article.content, 120)}
                           </p>
 
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div className="relative h-6 w-6">
+                              <div
+                                className="relative h-6 w-6 cursor-pointer"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAuthorClick(article.author);
+                                }}
+                              >
                                 <Image
                                   src={article.author.avatar || defaultAvatar}
                                   alt={`Profile picture of ${article.author.name}`}
                                   fill
-                                  className="rounded-full object-cover"
+                                  className="rounded-full object-cover hover:opacity-80 transition-opacity"
                                   sizes="24px"
                                 />
                               </div>
-                              <span className="text-xs font-semibold">
+                              <span
+                                className="text-xs font-semibold text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAuthorClick(article.author);
+                                }}
+                              >
                                 {article.author.name}
                               </span>
                             </div>
-                            <span className="text-xs">
-                              {article.publishDate}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {article.publishDate}
+                              </span>
+                              {article.isOwner && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1 h-auto"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    router.push(
+                                      `/articles/edit/${article._id}`
+                                    );
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </article>
@@ -346,8 +467,10 @@ const ArticlesPage = () => {
             </>
           ) : (
             <div className="text-center py-12">
-              <h2 className="text-xl font-semibold">No articles found</h2>
-              <p className="mt-2">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                No articles found
+              </h2>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
                 Be the first to share your mental health insights
               </p>
               {isAuthenticated && (

@@ -13,6 +13,8 @@ import Calendar from '@/icons/Calendar';
 import Messages from '@/icons/Messages';
 import Availability from '@/icons/Availability';
 import Computer from '@/icons/Computer';
+import Exercise from '@/icons/Exercise';
+import Welness from '@/icons/Welness';
 
 export const USER_NAV_ITEMS = [
   {
@@ -24,12 +26,6 @@ export const USER_NAV_ITEMS = [
     icon: <Calendar />,
     text: 'Appointments',
     href: '/appointments',
-  },
-
-  {
-    icon: <StoriesIcon />,
-    text: 'Stories',
-    href: '/stories',
   },
   {
     icon: <Messages />,
@@ -51,7 +47,11 @@ export const USER_NAV_ITEMS = [
     text: 'Psychologist',
     href: '/psychologist',
   },
-
+  {
+    icon: <Welness />,
+    text: 'Breathing',
+    href: '/breathing',
+  },
   {
     icon: <ArticlesIcon />,
     text: 'Articles',
@@ -79,6 +79,11 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
     icon: <Users />,
     text: 'My Patients',
     href: '/psychologist/patients',
+  },
+  {
+    icon: <Welness />,
+    text: 'Breathing',
+    href: '/breathing',
   },
   {
     icon: <Availability />,
@@ -127,6 +132,11 @@ export const ADMIN_NAV_ITEMS = [
     icon: <PsychologistIcon />,
     text: 'Psychologists',
     href: '/dashboard/admin/psychologist',
+  },
+  {
+    icon: <Exercise />,
+    text: 'Manage Exercises',
+    href: '/dashboard/admin/exercises',
   },
   {
     icon: <ArticlesIcon />,

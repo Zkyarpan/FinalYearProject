@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Skeleton from '@/components/common/Skeleton';
 import { generateSlug } from '@/helpers/generateSlug';
 import { useUserStore } from '@/store/userStore';
@@ -66,6 +67,118 @@ const BlogOwnershipTag = ({
   return <span className={`${baseClasses} ${style}`}>Your Blog</span>;
 };
 
+const AuthorProfile = ({ author }: { author: Author }) => {
+  const [showPopover, setShowPopover] = useState(false);
+  const [popoverTimeout, setPopoverTimeout] = useState<NodeJS.Timeout | null>(
+    null
+  );
+  const router = useRouter();
+  const defaultAvatar = '/default-avatar.jpg';
+
+  const handleMouseEnter = () => {
+    if (popoverTimeout) clearTimeout(popoverTimeout);
+    setShowPopover(true);
+  };
+
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setShowPopover(false);
+    }, 300);
+    setPopoverTimeout(timeout);
+  };
+
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(`/user/${author._id}`);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (popoverTimeout) clearTimeout(popoverTimeout);
+    };
+  }, [popoverTimeout]);
+
+  return (
+    <div className="flex items-center gap-2 relative">
+      <div
+        className="relative h-6 w-6 cursor-pointer"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <Image
+          src={author.avatar || defaultAvatar}
+          alt={`Profile picture of ${author.name}`}
+          fill
+          className="rounded-full object-cover"
+          sizes="24px"
+        />
+      </div>
+      <span
+        onClick={handleAuthorClick}
+        className="text-xs font-semibold hover:underline cursor-pointer transition-all"
+      >
+        {author.name}
+      </span>
+    </div>
+  );
+};
+
+const FeaturedAuthorProfile = ({ author }: { author: Author }) => {
+  const [showPopover, setShowPopover] = useState(false);
+  const [popoverTimeout, setPopoverTimeout] = useState<NodeJS.Timeout | null>(
+    null
+  );
+  const router = useRouter();
+  const defaultAvatar = '/default-avatar.jpg';
+
+  const handleMouseEnter = () => {
+    if (popoverTimeout) clearTimeout(popoverTimeout);
+    setShowPopover(true);
+  };
+
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setShowPopover(false);
+    }, 300);
+    setPopoverTimeout(timeout);
+  };
+
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(`/user/${author._id}`);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (popoverTimeout) clearTimeout(popoverTimeout);
+    };
+  }, [popoverTimeout]);
+
+  return (
+    <div className="flex items-center gap-3 relative">
+      <div
+        className="relative h-8 w-8 cursor-pointer"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <Image
+          src={author.avatar || defaultAvatar}
+          alt={`Profile picture of ${author.name}`}
+          fill
+          className="rounded-full object-cover"
+          sizes="32px"
+        />
+      </div>
+      <span
+        onClick={handleAuthorClick}
+        className="text-sm font-semibold hover:underline cursor-pointer transition-all"
+      >
+        {author.name}
+      </span>
+    </div>
+  );
+};
+
 const BlogPage = () => {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +187,6 @@ const BlogPage = () => {
   const isAuthenticated = useUserStore(state => state.isAuthenticated);
 
   const defaultImage = '/default-image.jpg';
-  const defaultAvatar = '/default-avatar.jpg';
   const defaultAlt = 'Alternative Image';
 
   useEffect(() => {
@@ -157,20 +269,7 @@ const BlogPage = () => {
                         {truncateText(blogs[0].content, 200)}
                       </p>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="relative h-8 w-8">
-                            <Image
-                              src={blogs[0].author.avatar || defaultAvatar}
-                              alt={`Profile picture of ${blogs[0].author.name}`}
-                              fill
-                              className="rounded-full object-cover"
-                              sizes="32px"
-                            />
-                          </div>
-                          <span className="text-sm font-semibold">
-                            {blogs[0].author.name}
-                          </span>
-                        </div>
+                        <FeaturedAuthorProfile author={blogs[0].author} />
                         <span className="text-xs">{blogs[0].publishDate}</span>
                       </div>
                     </div>
@@ -219,20 +318,7 @@ const BlogPage = () => {
                           </p>
 
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="relative h-6 w-6">
-                                <Image
-                                  src={blog.author.avatar || defaultAvatar}
-                                  alt={`Profile picture of ${blog.author.name}`}
-                                  fill
-                                  className="rounded-full object-cover"
-                                  sizes="24px"
-                                />
-                              </div>
-                              <span className="text-xs font-semibold">
-                                {blog.author.name}
-                              </span>
-                            </div>
+                            <AuthorProfile author={blog.author} />
                             <span className="text-xs">{blog.publishDate}</span>
                           </div>
                         </div>

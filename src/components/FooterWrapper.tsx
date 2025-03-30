@@ -28,7 +28,9 @@ const FooterWrapper = () => {
     '/notifications',
     '/settings',
     '/inbox',
-    '/sessions'
+    '/sessions',
+    '/exercises',
+    '/breathing',
   ];
 
   const shouldHideFooter = pathname => {

@@ -29,6 +29,7 @@ import AccountSection from '@/components/AccountSection';
 import { DEFAULT_AVATAR } from '@/constants';
 import FilterSection from '@/components/FilterSection';
 import PsychologistProfileHighlights from '@/components/PsychologistProfileHighlights';
+import UserProfileRightSection from '@/components/UserProfileRightSection';
 
 const routeTitles = {
   // User routes
@@ -44,6 +45,8 @@ const routeTitles = {
   '/appointments': 'Appointments',
   '/inbox': 'Inbox',
   '/sessions': 'Your Sessions',
+  '/exercises': 'Exercises',
+  '/breathing': 'Breathing Exercises',
 
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',
@@ -61,6 +64,7 @@ const routeTitles = {
   '/admin/articles': 'Articles Management',
   '/admin/blogs': 'Blogs Management',
   '/admin/settings': 'System Settings',
+  '/admin/exercises': 'Exercises Management',
 };
 
 const RootLayout = ({ children }) => {
@@ -151,6 +155,11 @@ const RootLayout = ({ children }) => {
     pathname !== '/psychologist' &&
     isPsychologistProfileRoute(pathname);
 
+  const isUserProfilePage = pathname => {
+    const pathParts = pathname.split('/');
+    return pathParts.length >= 2 && pathParts[1] === 'user' && pathParts[2];
+  };
+
   // Updated showRightSidebar condition to include /articles path
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
@@ -161,6 +170,7 @@ const RootLayout = ({ children }) => {
       pathname === '/psychologist' ||
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
+      isUserProfilePage(pathname) ||
       pathname === '/' ||
       isAccountPage);
 
@@ -181,8 +191,8 @@ const RootLayout = ({ children }) => {
         role === 'psychologist'
           ? '/dashboard/psychologist'
           : role === 'admin'
-          ? '/dashboard/admin'
-          : '/dashboard';
+            ? '/dashboard/admin'
+            : '/dashboard';
       router.push(dashboardPath);
     } else {
       router.push('/');
@@ -211,6 +221,18 @@ const RootLayout = ({ children }) => {
 
     if (isDashboardPage && isAuthenticated) {
       return null;
+    }
+
+    if (isUserProfilePage(pathname)) {
+      const userId = pathname.split('/')[2];
+      // You might want to fetch the user name from an API or store
+      // For now I'm using a placeholder
+      return (
+        <UserProfileRightSection
+          userId={userId}
+          userName={firstName || 'User'}
+        />
+      );
     }
 
     const sections = {

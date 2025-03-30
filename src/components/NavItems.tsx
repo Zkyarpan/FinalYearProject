@@ -76,11 +76,6 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
     href: '/dashboard/psychologist',
   },
   {
-    icon: <Users />,
-    text: 'My Patients',
-    href: '/psychologist/patients',
-  },
-  {
     icon: <Welness />,
     text: 'Breathing',
     href: '/breathing',

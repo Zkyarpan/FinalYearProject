@@ -267,20 +267,6 @@ const UserDashboard = () => {
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Input placeholder="Search..." className="w-[200px] pl-9" />
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => router.push('/settings')}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
 
         {/* Time Range and Actions */}

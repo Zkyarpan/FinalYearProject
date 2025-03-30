@@ -58,6 +58,12 @@ export async function withAuth(
     const tokenPayload = token as TokenPayload;
     const userRole = tokenPayload.role;
 
+    // Log token information for debugging
+    console.log('Token information:', {
+      id: tokenPayload.id,
+      role: tokenPayload.role,
+    });
+
     if (!allowedRoles.includes(userRole)) {
       const roleMessages: Record<string, string> = {
         user: 'This area is restricted to psychologists only',
@@ -93,7 +99,14 @@ export async function withAuth(
       }
     }
 
-    return handler(req, tokenPayload);
+    // FIX: Create a normalized token object that has both id and _id properties
+    // This ensures the API route will be able to access the ID regardless of which field name it uses
+    const normalizedToken = {
+      ...tokenPayload,
+      _id: tokenPayload.id, // Add _id field for backward compatibility
+    };
+
+    return handler(req, normalizedToken);
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json(

@@ -118,31 +118,7 @@ export const ADMIN_NAV_ITEMS = [
     text: 'Dashboard',
     href: '/dashboard/admin',
   },
-  {
-    icon: <Users />,
-    text: 'Users',
-    href: '/dashboard/admin/users',
-  },
-  {
-    icon: <PsychologistIcon />,
-    text: 'Psychologists',
-    href: '/dashboard/admin/psychologist',
-  },
-  {
-    icon: <Welness />,
-    text: 'Breathing',
-    href: '/dashboard/admin/exercises',
-  },
-  {
-    icon: <ArticlesIcon />,
-    text: 'Articles',
-    href: '/dashboard/admin/articles',
-  },
-  {
-    icon: <BlogIcon />,
-    text: 'Blogs',
-    href: '/dashboard/admin/blogs',
-  },
+
   {
     icon: <Settings />,
     text: 'Settings',

@@ -53,71 +53,93 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-// Define type for Admin Dashboard Data
-interface AdminDashboardData {
-  systemStats: {
-    totalUsers: number;
-    totalPsychologists: number;
-    pendingPsychologists: number;
-    totalAppointments: number;
-    totalArticles: number;
-    totalBlogs: number;
-    totalPayments: number;
-    totalRevenue: number;
-    activeConversations: number;
-  };
-  recentUsers: Array<{
-    id: string;
-    email: string;
-    role: string;
-    isVerified: boolean;
-    createdAt: string;
-  }>;
-  pendingApprovals: Array<{
-    id: string;
-    name: string;
-    email: string;
-    specializations: string[];
-    experience: number;
-    appliedAt: string;
-  }>;
-  recentActivities: Array<{
-    id: string;
-    type: string;
-    title: string;
-    description: string;
-    status: string;
-    timestamp: string;
-  }>;
-  userGrowthData: Array<{
-    month: string;
-    users: number;
-    psychologists: number;
-    totalUsers: number;
-  }>;
-  revenueData: Array<{
-    month: string;
-    revenue: number;
-    transactions: number;
-  }>;
-  contentStats: {
-    articles: {
-      total: number;
-      published: number;
-      draft: number;
-    };
-    blogs: {
-      total: number;
-      published: number;
-      draft: number;
-    };
-  };
-  appointmentStats: {
+// Define types for the dashboard data
+interface SystemStats {
+  totalUsers: number;
+  totalPsychologists: number;
+  pendingPsychologists: number;
+  totalAppointments: number;
+  totalArticles: number;
+  totalBlogs: number;
+  totalPayments: number;
+  totalRevenue: number;
+  activeConversations: number;
+}
+
+interface RecentUser {
+  id: string;
+  email: string;
+  role: string;
+  isVerified: boolean;
+  createdAt: string;
+}
+
+interface PendingApproval {
+  id: string;
+  name: string;
+  email: string;
+  specializations: string[];
+  experience: number;
+  appliedAt: string;
+}
+
+interface RecentActivity {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  status: string;
+  timestamp: string;
+}
+
+interface UserGrowthData {
+  month: string;
+  users: number;
+  psychologists: number;
+  totalUsers: number;
+}
+
+interface RevenueData {
+  month: string;
+  revenue: number;
+  transactions: number;
+}
+
+interface ContentStats {
+  articles: {
     total: number;
-    completed: number;
-    scheduled: number;
-    canceled: number;
+    published: number;
+    draft: number;
   };
+  blogs: {
+    total: number;
+    published: number;
+    draft: number;
+  };
+}
+
+interface AppointmentStats {
+  total: number;
+  completed: number;
+  scheduled: number;
+  canceled: number;
+}
+
+interface AdminDashboardData {
+  systemStats: SystemStats;
+  recentUsers: RecentUser[];
+  pendingApprovals: PendingApproval[];
+  recentActivities: RecentActivity[];
+  userGrowthData: UserGrowthData[];
+  revenueData: RevenueData[];
+  contentStats: ContentStats;
+  appointmentStats: AppointmentStats;
+}
+
+interface ApiResponse {
+  IsSuccess: boolean;
+  Result: AdminDashboardData;
+  ErrorMessage?: Array<{ message: string }>;
 }
 
 const AdminDashboard = () => {
@@ -135,11 +157,12 @@ const AdminDashboard = () => {
       try {
         setLoading(true);
         const response = await fetch('/api/dashboard/admin');
+
         if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
+          throw new Error(`Failed to fetch dashboard data: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data: ApiResponse = await response.json();
 
         if (data.IsSuccess) {
           setDashboardData(data.Result);
@@ -148,9 +171,9 @@ const AdminDashboard = () => {
         }
       } catch (err) {
         console.error('Error fetching admin dashboard data:', err);
-        setError(
-          err instanceof Error ? err.message : 'Failed to load dashboard data'
-        );
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to load dashboard data';
+        setError(errorMessage);
         toast.error('Could not load dashboard data. Please try again later.');
       } finally {
         setLoading(false);
@@ -164,7 +187,6 @@ const AdminDashboard = () => {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -197,12 +219,20 @@ const AdminDashboard = () => {
     }
   };
 
-  // Prepare monthly growth data for simple chart visualization
+  // Function to prepare graph data for visualization
   const getUserGrowthData = () => {
     if (!dashboardData?.userGrowthData) return [];
+
     return dashboardData.userGrowthData.map((item, index) => ({
-      x: index * (400 / (dashboardData.userGrowthData.length - 1)),
-      y: 200 - (item.totalUsers / 10) * 4, // Scale down to fit in 200px height
+      x: index * (400 / Math.max(1, dashboardData.userGrowthData.length - 1)),
+      y:
+        200 -
+        (item.totalUsers /
+          Math.max(
+            1,
+            Math.max(...dashboardData.userGrowthData.map(d => d.totalUsers))
+          )) *
+          180,
       month: item.month,
       value: item.totalUsers,
       key: `${item.month}-${index}`,
@@ -212,9 +242,13 @@ const AdminDashboard = () => {
   // Prepare monthly revenue data for chart visualization
   const getRevenueData = () => {
     if (!dashboardData?.revenueData) return [];
+
+    const maxRevenue = Math.max(
+      ...dashboardData.revenueData.map(d => d.revenue)
+    );
     return dashboardData.revenueData.map((item, index) => ({
-      x: index * (400 / (dashboardData.revenueData.length - 1)),
-      y: 200 - (item.revenue / 1000) * 10, // Scale down to fit in 200px height
+      x: index * (400 / Math.max(1, dashboardData.revenueData.length - 1)),
+      y: 200 - (item.revenue / Math.max(1, maxRevenue)) * 180,
       month: item.month,
       value: item.revenue,
       key: `${item.month}-${index}`,
@@ -230,9 +264,8 @@ const AdminDashboard = () => {
 
       if (response.ok) {
         toast.success('Psychologist approved successfully');
-        // Refresh data
-        const updatedData = await response.json();
-        // Update the pending approvals list
+
+        // Update the dashboard data without refetching
         if (dashboardData) {
           setDashboardData({
             ...dashboardData,
@@ -243,6 +276,8 @@ const AdminDashboard = () => {
               ...dashboardData.systemStats,
               pendingPsychologists:
                 dashboardData.systemStats.pendingPsychologists - 1,
+              totalPsychologists:
+                dashboardData.systemStats.totalPsychologists + 1,
             },
           });
         }
@@ -269,9 +304,8 @@ const AdminDashboard = () => {
 
       if (response.ok) {
         toast.success('Psychologist rejected');
-        // Refresh data
-        const updatedData = await response.json();
-        // Update the pending approvals list
+
+        // Update the dashboard data without refetching
         if (dashboardData) {
           setDashboardData({
             ...dashboardData,
@@ -327,6 +361,7 @@ const AdminDashboard = () => {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
         <Card className="p-6 text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Error Loading Dashboard</h2>
           <p className="text-gray-500 mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
@@ -390,7 +425,7 @@ const AdminDashboard = () => {
   const revenueData = getRevenueData();
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-[1200px]">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
@@ -468,48 +503,62 @@ const AdminDashboard = () => {
           <TabsContent value="overview" className="space-y-8">
             {/* Quick Stats Grid */}
             <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Total Users</h3>
-                  <Users className="h-5 w-5 text-blue-500" />
+                  <div className="p-2 rounded-full bg-blue-100">
+                    <Users className="h-5 w-5 text-blue-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.systemStats.totalUsers}
+                  {data.systemStats.totalUsers.toLocaleString()}
                 </p>
                 <div className="flex items-center mt-2 text-xs text-gray-500">
                   <p>
                     <span className="text-green-500 font-medium">
                       +
                       {data.userGrowthData[data.userGrowthData.length - 1]
-                        ?.totalUsers || 0}
+                        ?.users || 0}
                     </span>{' '}
                     this month
                   </p>
                 </div>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Psychologists</h3>
-                  <User className="h-5 w-5 text-purple-500" />
+                  <div className="p-2 rounded-full bg-purple-100">
+                    <User className="h-5 w-5 text-purple-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.systemStats.totalPsychologists}
+                  {data.systemStats.totalPsychologists.toLocaleString()}
                 </p>
-                <div className="flex items-center mt-2 text-xs text-gray-500">
-                  <p className="text-yellow-500 font-medium">
+                <div className="flex items-center mt-2 text-xs">
+                  <p
+                    className={
+                      data.systemStats.pendingPsychologists > 0
+                        ? 'text-yellow-500 font-medium'
+                        : 'text-gray-500'
+                    }
+                  >
                     {data.systemStats.pendingPsychologists} pending approval
                   </p>
                 </div>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Content</h3>
-                  <FileText className="h-5 w-5 text-green-500" />
+                  <div className="p-2 rounded-full bg-green-100">
+                    <FileText className="h-5 w-5 text-green-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.systemStats.totalArticles + data.systemStats.totalBlogs}
+                  {(
+                    data.systemStats.totalArticles + data.systemStats.totalBlogs
+                  ).toLocaleString()}
                 </p>
                 <div className="flex items-center mt-2 text-xs text-gray-500">
                   <p>
@@ -519,34 +568,100 @@ const AdminDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Revenue</h3>
-                  <CreditCard className="h-5 w-5 text-green-500" />
+                  <div className="p-2 rounded-full bg-green-100">
+                    <CreditCard className="h-5 w-5 text-green-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  ${data.systemStats.totalRevenue.toFixed(2)}
+                  $
+                  {data.systemStats.totalRevenue.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
                 <div className="flex items-center mt-2 text-xs text-gray-500">
-                  <p>{data.systemStats.totalPayments} successful payments</p>
+                  <p>
+                    {data.systemStats.totalPayments.toLocaleString()} payments
+                  </p>
                 </div>
               </Card>
             </div>
 
             {/* Charts Row */}
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">User Growth</h2>
                 <div className="relative h-[200px] w-full">
                   <svg className="h-full w-full">
-                    <path
-                      d={`M ${userGrowthData[0]?.x || 0} ${userGrowthData[0]?.y || 0} ${userGrowthData
-                        .map(point => `L ${point.x} ${point.y}`)
-                        .join(' ')}`}
-                      fill="none"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
+                    {/* Grid lines */}
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
                     />
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="400"
+                      y2="0"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+                    <line
+                      x1="0"
+                      y1="50"
+                      x2="400"
+                      y2="50"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="400"
+                      y2="100"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="150"
+                      x2="400"
+                      y2="150"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="200"
+                      x2="400"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+
+                    {/* Chart line */}
+                    {userGrowthData.length > 0 && (
+                      <path
+                        d={`M ${userGrowthData[0]?.x || 0} ${userGrowthData[0]?.y || 0} ${userGrowthData
+                          .map(point => `L ${point.x} ${point.y}`)
+                          .join(' ')}`}
+                        fill="none"
+                        stroke="#3B82F6"
+                        strokeWidth="2"
+                      />
+                    )}
+
+                    {/* Data points */}
                     {userGrowthData.map(point => (
                       <circle
                         key={point.key}
@@ -557,45 +672,116 @@ const AdminDashboard = () => {
                       />
                     ))}
                   </svg>
+
+                  {/* Month labels */}
                   <div className="absolute bottom-0 flex w-full justify-between text-sm text-gray-500">
                     {data.userGrowthData.map((item, idx) => (
-                      <span key={`month-label-${idx}`}>{item.month}</span>
+                      <span
+                        key={`month-label-${idx}`}
+                        className="transform -translate-x-1/2"
+                        style={{
+                          left: `${(idx / Math.max(1, data.userGrowthData.length - 1)) * 100}%`,
+                        }}
+                      >
+                        {item.month}
+                      </span>
                     ))}
                   </div>
                 </div>
+
+                {/* Legend */}
                 <div className="mt-4 flex justify-between text-sm">
                   <div className="flex items-center">
                     <span className="h-2 w-2 rounded-full bg-blue-500 mr-1"></span>
                     <span>
                       Regular Users:{' '}
-                      {data.userGrowthData.reduce((a, b) => a + b.users, 0)}
+                      {data.userGrowthData
+                        .reduce((a, b) => a + b.users, 0)
+                        .toLocaleString()}
                     </span>
                   </div>
                   <div className="flex items-center">
                     <span className="h-2 w-2 rounded-full bg-purple-500 mr-1"></span>
                     <span>
                       Psychologists:{' '}
-                      {data.userGrowthData.reduce(
-                        (a, b) => a + b.psychologists,
-                        0
-                      )}
+                      {data.userGrowthData
+                        .reduce((a, b) => a + b.psychologists, 0)
+                        .toLocaleString()}
                     </span>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">Revenue</h2>
                 <div className="relative h-[200px] w-full">
                   <svg className="h-full w-full">
-                    <path
-                      d={`M ${revenueData[0]?.x || 0} ${revenueData[0]?.y || 0} ${revenueData
-                        .map(point => `L ${point.x} ${point.y}`)
-                        .join(' ')}`}
-                      fill="none"
-                      stroke="#10B981"
-                      strokeWidth="2"
+                    {/* Grid lines */}
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
                     />
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="400"
+                      y2="0"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+                    <line
+                      x1="0"
+                      y1="50"
+                      x2="400"
+                      y2="50"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="400"
+                      y2="100"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="150"
+                      x2="400"
+                      y2="150"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="200"
+                      x2="400"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+
+                    {/* Chart line */}
+                    {revenueData.length > 0 && (
+                      <path
+                        d={`M ${revenueData[0]?.x || 0} ${revenueData[0]?.y || 0} ${revenueData
+                          .map(point => `L ${point.x} ${point.y}`)
+                          .join(' ')}`}
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="2"
+                      />
+                    )}
+
+                    {/* Data points */}
                     {revenueData.map(point => (
                       <circle
                         key={point.key}
@@ -606,12 +792,24 @@ const AdminDashboard = () => {
                       />
                     ))}
                   </svg>
+
+                  {/* Month labels */}
                   <div className="absolute bottom-0 flex w-full justify-between text-sm text-gray-500">
                     {data.revenueData.map((item, idx) => (
-                      <span key={`month-label-${idx}`}>{item.month}</span>
+                      <span
+                        key={`month-label-${idx}`}
+                        className="transform -translate-x-1/2"
+                        style={{
+                          left: `${(idx / Math.max(1, data.revenueData.length - 1)) * 100}%`,
+                        }}
+                      >
+                        {item.month}
+                      </span>
                     ))}
                   </div>
                 </div>
+
+                {/* Legend */}
                 <div className="mt-4 flex justify-between text-sm">
                   <div className="flex items-center">
                     <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span>
@@ -619,14 +817,19 @@ const AdminDashboard = () => {
                       Total Revenue: $
                       {data.revenueData
                         .reduce((a, b) => a + b.revenue, 0)
-                        .toFixed(2)}
+                        .toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                     </span>
                   </div>
                   <div className="flex items-center">
                     <span className="h-2 w-2 rounded-full bg-gray-500 mr-1"></span>
                     <span>
                       Transactions:{' '}
-                      {data.revenueData.reduce((a, b) => a + b.transactions, 0)}
+                      {data.revenueData
+                        .reduce((a, b) => a + b.transactions, 0)
+                        .toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -635,7 +838,7 @@ const AdminDashboard = () => {
 
             {/* Pending Approvals and Recent Activity */}
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">Pending Approvals</h2>
                   {data.systemStats.pendingPsychologists > 0 && (
@@ -658,7 +861,10 @@ const AdminDashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     {data.pendingApprovals.map(approval => (
-                      <div key={approval.id} className="border rounded-lg p-4">
+                      <div
+                        key={approval.id}
+                        className="border rounded-lg p-4 hover:shadow-sm transition-shadow"
+                      >
                         <div className="flex justify-between mb-2">
                           <h3 className="font-medium">{approval.name}</h3>
                           <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
@@ -682,7 +888,8 @@ const AdminDashboard = () => {
                             Experience:{' '}
                           </span>
                           <span className="text-sm">
-                            {approval.experience} years
+                            {approval.experience}{' '}
+                            {approval.experience === 1 ? 'year' : 'years'}
                           </span>
                         </div>
                         <div className="mb-3">
@@ -704,7 +911,7 @@ const AdminDashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full"
+                            className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
                             onClick={() => handleReject(approval.id)}
                           >
                             <XCircle className="h-4 w-4 mr-1" /> Reject
@@ -728,7 +935,7 @@ const AdminDashboard = () => {
                 )}
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">Recent Activity</h2>
                   <Button
@@ -750,7 +957,7 @@ const AdminDashboard = () => {
                     {data.recentActivities.map(activity => (
                       <div
                         key={activity.id}
-                        className="flex items-start space-x-3 pb-3 border-b last:border-0"
+                        className="flex items-start space-x-3 pb-3 border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors"
                       >
                         <div
                           className={`p-2 rounded-full ${
@@ -810,32 +1017,36 @@ const AdminDashboard = () => {
           {/* Users Tab Content */}
           <TabsContent value="users" className="space-y-8">
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">User Statistics</h2>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Total Users</span>
                     <span className="font-bold">
-                      {data.systemStats.totalUsers}
+                      {data.systemStats.totalUsers.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Regular Users</span>
                     <span className="font-bold">
-                      {data.systemStats.totalUsers -
-                        data.systemStats.totalPsychologists}
+                      {(
+                        data.systemStats.totalUsers -
+                        data.systemStats.totalPsychologists
+                      ).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Psychologists</span>
                     <span className="font-bold">
-                      {data.systemStats.totalPsychologists}
+                      {data.systemStats.totalPsychologists.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Pending Approvals</span>
-                    <span className="font-bold text-yellow-500">
-                      {data.systemStats.pendingPsychologists}
+                    <span
+                      className={`font-bold ${data.systemStats.pendingPsychologists > 0 ? 'text-yellow-500' : 'text-gray-500'}`}
+                    >
+                      {data.systemStats.pendingPsychologists.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -850,7 +1061,7 @@ const AdminDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">
                   Recent Registrations
                 </h2>
@@ -863,11 +1074,11 @@ const AdminDashboard = () => {
                     data.recentUsers.slice(0, 5).map(user => (
                       <div
                         key={user.id}
-                        className="flex justify-between items-center border-b pb-2"
+                        className="flex justify-between items-center border-b pb-2 hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors"
                       >
                         <div>
                           <p className="font-medium text-sm">{user.email}</p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mt-1">
                             <Badge
                               variant="outline"
                               className="text-xs capitalize"
@@ -904,7 +1115,7 @@ const AdminDashboard = () => {
               </Card>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <h2 className="text-lg font-semibold mb-4">
                 Pending Psychologist Approvals
               </h2>
@@ -915,54 +1126,85 @@ const AdminDashboard = () => {
                   <p className="text-lg text-gray-500">No pending approvals</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Specializations</TableHead>
-                      <TableHead>Experience</TableHead>
-                      <TableHead>Applied On</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.pendingApprovals.map(approval => (
-                      <TableRow key={approval.id}>
-                        <TableCell className="font-medium">
-                          {approval.name}
-                        </TableCell>
-                        <TableCell>{approval.email}</TableCell>
-                        <TableCell>
-                          {approval.specializations.slice(0, 2).join(', ')}
-                          {approval.specializations.length > 2 && '...'}
-                        </TableCell>
-                        <TableCell>{approval.experience} years</TableCell>
-                        <TableCell>{formatDate(approval.appliedAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8"
-                              onClick={() => handleApprove(approval.id)}
-                            >
-                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-red-200 text-red-600 hover:bg-red-50"
-                              onClick={() => handleReject(approval.id)}
-                            >
-                              <XCircle className="h-3 w-3 mr-1" /> Reject
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Specializations</TableHead>
+                        <TableHead>Experience</TableHead>
+                        <TableHead>Applied On</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.pendingApprovals.map(approval => (
+                        <TableRow
+                          key={approval.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <TableCell className="font-medium">
+                            {approval.name}
+                          </TableCell>
+                          <TableCell>{approval.email}</TableCell>
+                          <TableCell>
+                            {approval.specializations.slice(0, 2).join(', ')}
+                            {approval.specializations.length > 2 && '...'}
+                          </TableCell>
+                          <TableCell>
+                            {approval.experience}{' '}
+                            {approval.experience === 1 ? 'year' : 'years'}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(approval.appliedAt)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
+                                      onClick={() => handleApprove(approval.id)}
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />{' '}
+                                      Approve
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Approve this psychologist</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                                      onClick={() => handleReject(approval.id)}
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />{' '}
+                                      Reject
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Reject this psychologist</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
 
               {data.systemStats.pendingPsychologists > 0 && (
@@ -984,25 +1226,25 @@ const AdminDashboard = () => {
           {/* Content Tab */}
           <TabsContent value="content" className="space-y-8">
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">Articles</h2>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span>Total Articles</span>
                     <span className="font-bold">
-                      {data.contentStats.articles.total}
+                      {data.contentStats.articles.total.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Published</span>
                     <span className="font-bold text-green-600">
-                      {data.contentStats.articles.published}
+                      {data.contentStats.articles.published.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Drafts</span>
                     <span className="font-bold text-yellow-600">
-                      {data.contentStats.articles.draft}
+                      {data.contentStats.articles.draft.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -1017,25 +1259,25 @@ const AdminDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">Blogs</h2>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span>Total Blogs</span>
                     <span className="font-bold">
-                      {data.contentStats.blogs.total}
+                      {data.contentStats.blogs.total.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Published</span>
                     <span className="font-bold text-green-600">
-                      {data.contentStats.blogs.published}
+                      {data.contentStats.blogs.published.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Drafts</span>
                     <span className="font-bold text-yellow-600">
-                      {data.contentStats.blogs.draft}
+                      {data.contentStats.blogs.draft.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -1051,62 +1293,83 @@ const AdminDashboard = () => {
               </Card>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <h2 className="text-lg font-semibold mb-4">
                 Recent Publications
               </h2>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Published</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.recentActivities
-                    .filter(
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Published</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.recentActivities
+                      .filter(
+                        activity =>
+                          activity.type === 'article' ||
+                          activity.type === 'blog'
+                      )
+                      .slice(0, 5)
+                      .map(activity => (
+                        <TableRow
+                          key={activity.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <TableCell className="font-medium max-w-xs truncate">
+                            {activity.description}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {activity.type}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={getStatusColor(activity.status)}
+                            >
+                              {activity.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(activity.timestamp)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8"
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/admin/${activity.type}s/${activity.id}`
+                                )
+                              }
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {data.recentActivities.filter(
                       activity =>
                         activity.type === 'article' || activity.type === 'blog'
-                    )
-                    .slice(0, 5)
-                    .map(activity => (
-                      <TableRow key={activity.id}>
-                        <TableCell className="font-medium">
-                          {activity.description}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {activity.type}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={getStatusColor(activity.status)}
-                          >
-                            {activity.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(activity.timestamp)}</TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            onClick={() =>
-                              router.push(
-                                `/dashboard/admin/${activity.type}s/${activity.id}`
-                              )
-                            }
-                          >
-                            View
-                          </Button>
+                    ).length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="text-center py-4 text-gray-500"
+                        >
+                          No recent publications
                         </TableCell>
                       </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="mt-4 flex gap-2">
                 <Button
@@ -1127,56 +1390,65 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Additional tabs content for appointments and finance would go here */}
+          {/* Appointments Tab Content */}
           <TabsContent value="appointments" className="space-y-8">
             <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Total</h3>
-                  <Calendar className="h-5 w-5 text-blue-500" />
+                  <div className="p-2 rounded-full bg-blue-100">
+                    <Calendar className="h-5 w-5 text-blue-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.appointmentStats.total}
+                  {data.appointmentStats.total.toLocaleString()}
                 </p>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Scheduled</h3>
-                  <Clock className="h-5 w-5 text-yellow-500" />
+                  <div className="p-2 rounded-full bg-yellow-100">
+                    <Clock className="h-5 w-5 text-yellow-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.appointmentStats.scheduled}
+                  {data.appointmentStats.scheduled.toLocaleString()}
                 </p>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Completed</h3>
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <div className="p-2 rounded-full bg-green-100">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.appointmentStats.completed}
+                  {data.appointmentStats.completed.toLocaleString()}
                 </p>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium">Canceled</h3>
-                  <XCircle className="h-5 w-5 text-red-500" />
+                  <div className="p-2 rounded-full bg-red-100">
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  </div>
                 </div>
                 <p className="text-2xl font-bold">
-                  {data.appointmentStats.canceled}
+                  {data.appointmentStats.canceled.toLocaleString()}
                 </p>
               </Card>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <h2 className="text-lg font-semibold mb-4">
                 Appointment Management
               </h2>
               <p className="text-gray-500 mb-4">
-                View and manage all appointments across the platform.
+                View and manage all appointments across the platform. Monitor
+                sessions, track cancellations, and handle scheduling issues.
               </p>
               <Button
                 onClick={() => router.push('/dashboard/admin/appointments')}
@@ -1187,21 +1459,26 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          {/* Finance Tab Content */}
           <TabsContent value="finance" className="space-y-8">
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">Revenue Overview</h2>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Total Revenue</span>
                     <span className="font-bold">
-                      ${data.systemStats.totalRevenue.toFixed(2)}
+                      $
+                      {data.systemStats.totalRevenue.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Transactions</span>
                     <span className="font-bold">
-                      {data.systemStats.totalPayments}
+                      {data.systemStats.totalPayments.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1212,7 +1489,10 @@ const AdminDashboard = () => {
                         ? (
                             data.systemStats.totalRevenue /
                             data.systemStats.totalPayments
-                          ).toFixed(2)
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
                         : '0.00'}
                     </span>
                   </div>
@@ -1228,18 +1508,89 @@ const AdminDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-4">Monthly Revenue</h2>
                 <div className="relative h-[200px] w-full">
                   <svg className="h-full w-full">
-                    <path
-                      d={`M ${revenueData[0]?.x || 0} ${revenueData[0]?.y || 0} ${revenueData
-                        .map(point => `L ${point.x} ${point.y}`)
-                        .join(' ')}`}
-                      fill="none"
-                      stroke="#10B981"
-                      strokeWidth="2"
+                    {/* Grid lines */}
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
                     />
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="400"
+                      y2="0"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+                    <line
+                      x1="0"
+                      y1="50"
+                      x2="400"
+                      y2="50"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="400"
+                      y2="100"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="150"
+                      x2="400"
+                      y2="150"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                      strokeDasharray="5,5"
+                    />
+                    <line
+                      x1="0"
+                      y1="200"
+                      x2="400"
+                      y2="200"
+                      stroke="#e5e7eb"
+                      strokeWidth="1"
+                    />
+
+                    {/* Chart line */}
+                    {revenueData.length > 0 && (
+                      <>
+                        {/* Area under the line */}
+                        <path
+                          d={`M ${revenueData[0]?.x || 0} ${revenueData[0]?.y || 0} ${revenueData
+                            .map(point => `L ${point.x} ${point.y}`)
+                            .join(
+                              ' '
+                            )} L ${revenueData[revenueData.length - 1]?.x || 0} 200 L ${revenueData[0]?.x || 0} 200 Z`}
+                          fill="rgba(16, 185, 129, 0.1)"
+                        />
+
+                        {/* Line */}
+                        <path
+                          d={`M ${revenueData[0]?.x || 0} ${revenueData[0]?.y || 0} ${revenueData
+                            .map(point => `L ${point.x} ${point.y}`)
+                            .join(' ')}`}
+                          fill="none"
+                          stroke="#10B981"
+                          strokeWidth="2"
+                        />
+                      </>
+                    )}
+
+                    {/* Data points */}
                     {revenueData.map(point => (
                       <circle
                         key={point.key}
@@ -1250,60 +1601,100 @@ const AdminDashboard = () => {
                       />
                     ))}
                   </svg>
+
+                  {/* Month labels */}
                   <div className="absolute bottom-0 flex w-full justify-between text-sm text-gray-500">
                     {data.revenueData.map((item, idx) => (
-                      <span key={`month-label-${idx}`}>{item.month}</span>
+                      <span
+                        key={`month-label-${idx}`}
+                        className="transform -translate-x-1/2"
+                        style={{
+                          left: `${(idx / Math.max(1, data.revenueData.length - 1)) * 100}%`,
+                        }}
+                      >
+                        {item.month}
+                      </span>
                     ))}
                   </div>
+                </div>
+
+                <div className="mt-4 text-sm text-gray-500">
+                  <p>
+                    Monthly revenue breakdown for the past{' '}
+                    {data.revenueData.length} months
+                  </p>
                 </div>
               </Card>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <h2 className="text-lg font-semibold mb-4">
                 Recent Transactions
               </h2>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Transaction ID</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Purpose</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.recentActivities
-                    .filter(activity => activity.type === 'payment')
-                    .slice(0, 5)
-                    .map(activity => (
-                      <TableRow key={activity.id}>
-                        <TableCell className="font-medium">
-                          #{activity.id.slice(-6)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          $
-                          {parseFloat(
-                            activity.description.split('$')[1]
-                          ).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          {activity.description.split('for ')[1] || 'Services'}
-                        </TableCell>
-                        <TableCell>{formatDate(activity.timestamp)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={getStatusColor(activity.status)}
-                          >
-                            {activity.status}
-                          </Badge>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Purpose</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.recentActivities
+                      .filter(activity => activity.type === 'payment')
+                      .slice(0, 5)
+                      .map(activity => (
+                        <TableRow
+                          key={activity.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <TableCell className="font-medium">
+                            #{activity.id.slice(-6)}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            $
+                            {parseFloat(
+                              activity.description.split('$')?.[1] || '0'
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            {activity.description.split('for ')?.[1] ||
+                              'Services'}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(activity.timestamp)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={getStatusColor(activity.status)}
+                            >
+                              {activity.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {data.recentActivities.filter(
+                      activity => activity.type === 'payment'
+                    ).length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="text-center py-4 text-gray-500"
+                        >
+                          No recent transactions
                         </TableCell>
                       </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="mt-4">
                 <Button

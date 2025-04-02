@@ -488,8 +488,8 @@ const NotificationsPage = () => {
       if (appointmentId) {
         const path =
           user?.role === 'psychologist'
-            ? `/dashboard/appointments/${appointmentId}`
-            : `/appointments/${appointmentId}`;
+            ? `/dashboard/appointments`
+            : `/appointments`;
         router.push(path);
       }
     } else if (type === 'availability_change') {

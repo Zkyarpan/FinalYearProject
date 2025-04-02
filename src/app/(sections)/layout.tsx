@@ -1,7 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { Menu, ArrowRightIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Menu,
+  ArrowRightIcon,
+  Search,
+  Bell,
+  Settings,
+  Users,
+  FileText,
+  Calendar,
+  CreditCard,
+  BarChart2,
+  PieChart,
+  Activity,
+  LogOut,
+  Loader2,
+} from 'lucide-react';
 import BlogRightSection from '@/components/BlogRightSection';
 import PsychologistSection from '@/components/PsychologistSection';
 import StoriesSection from '@/components/StoriesSection';
@@ -35,6 +50,20 @@ import { DEFAULT_AVATAR } from '@/constants';
 import FilterSection from '@/components/FilterSection';
 import PsychologistProfileHighlights from '@/components/PsychologistProfileHighlights';
 import Logout from '@/icons/Logout';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const routeTitles = {
   // User routes
@@ -61,7 +90,7 @@ const routeTitles = {
   '/psychologist/availability': 'My Availability',
 
   // Admin routes
-  '/dashboard/admin': 'Dashboard',
+  '/dashboard/admin': 'Admin Dashboard',
   '/dashboard/admin/users': 'Users Management',
   '/dashboard/admin/psychologist': 'Psychologists Management',
   '/dashboard/admin/articles': 'Articles Management',
@@ -69,12 +98,49 @@ const routeTitles = {
   '/dashboard/admin/settings': 'System Settings',
   '/dashboard/admin/security': 'Security Settings',
   '/dashboard/admin/reports': 'Analytics & Reports',
+  '/dashboard/admin/appointments': 'Appointments Management',
+  '/dashboard/admin/payments': 'Payments',
+  '/dashboard/admin/psychologists/pending': 'Pending Psychologists',
 };
+
+// Enhanced admin nav items with icons
+const ENHANCED_ADMIN_NAV_ITEMS = [
+  {
+    icon: <BarChart2 className="h-5 w-5" />,
+    text: 'Dashboard',
+    href: '/dashboard/admin',
+  },
+  {
+    icon: <Users className="h-5 w-5" />,
+    text: 'Users',
+    href: '/dashboard/admin/users',
+  },
+
+  {
+    icon: <Calendar className="h-5 w-5" />,
+    text: 'Appointments',
+    href: '/dashboard/admin/appointments',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5" />,
+    text: 'Payments',
+    href: '/dashboard/admin/payments',
+  },
+  {
+    icon: <Settings className="h-5 w-5" />,
+    text: 'Settings',
+    href: '/dashboard/admin/settings',
+  },
+];
 
 const RootLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('month');
+
   const {
     isAuthenticated,
     profileImage,
@@ -84,6 +150,7 @@ const RootLayout = ({ children }) => {
     email,
     logout,
   } = useUserStore();
+
   const pathname = usePathname();
   const router = useRouter();
 
@@ -125,7 +192,7 @@ const RootLayout = ({ children }) => {
 
   const pathParts = pathname.split('/').filter(Boolean);
   const baseRoute = `/${pathParts[0]}`;
-  const title = routeTitles[pathname] || routeTitles[baseRoute];
+  const title = routeTitles[pathname] || routeTitles[baseRoute] || 'Mentality';
 
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
@@ -221,6 +288,10 @@ const RootLayout = ({ children }) => {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
   const renderSidebarContent = () => {
     if (isAccountPage && isAuthenticated) {
       return <UserSidebar />;
@@ -263,10 +334,112 @@ const RootLayout = ({ children }) => {
     return null;
   };
 
+  const userInitials =
+    firstName && lastName
+      ? `${firstName[0]}${lastName[0]}`.toUpperCase()
+      : email
+        ? email[0].toUpperCase()
+        : 'A';
+
+  // Enhanced AdminActions component with more functionality
+  // Enhanced AdminActions component with proper logout functionality
+  const EnhancedAdminActions = ({ email, logout, router }) => {
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleLogout = async () => {
+      if (isLoading) return;
+      setIsLoading(true);
+
+      try {
+        // Call the server-side logout API
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          // Call the client-side logout from user store
+          logout();
+          toast.success('Logged out successfully!');
+
+          // Clear all storage
+          localStorage.clear();
+          sessionStorage.clear();
+
+          // Redirect to login page after a short delay
+          setTimeout(() => {
+            router.push('/login');
+          }, 300);
+        } else {
+          const data = await response.json();
+          throw new Error(data.message || 'Failed to log out');
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+        toast.error('Failed to log out. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const userInitials = email ? email[0].toUpperCase() : 'A';
+
+    return (
+      <div className="flex items-center gap-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative" size="sm">
+              <Avatar className="h-8 w-8 mr-2">
+                <AvatarImage src="/avatar-placeholder.png" alt="Admin" />
+                <AvatarFallback>{userInitials}</AvatarFallback>
+              </Avatar>
+              <span className="hidden md:inline font-medium text-sm">
+                {email}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <div className="flex items-center justify-start p-2">
+              <div className="flex flex-col space-y-1 leading-none">
+                <p className="font-medium">Admin Account</p>
+                <p className="text-sm text-muted-foreground w-[200px] truncate">
+                  {email}
+                </p>
+              </div>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => router.push('/dashboard/admin/settings')}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <span>Logging out...</span>
+                </>
+              ) : (
+                <>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </>
+              )}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
+
   // Special rendering for admin routes
   if (isAdminRoute && isAdminUser) {
     return (
-      <div className="flex min-h-screen bg-background text-foreground">
+      <div className="flex min-h-screen bg-background">
         {/* Mobile Header for Admin */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-background/95 backdrop-blur z-[10]">
           <div className="container mx-auto px-4 h-full">
@@ -298,8 +471,17 @@ const RootLayout = ({ children }) => {
                         </div>
                       </SheetTitle>
                     </SheetHeader>
+                    <div className="my-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search..."
+                          className="w-full pl-9"
+                        />
+                      </div>
+                    </div>
                     <nav className="mt-5 overflow-auto scroll-smooth">
-                      {ADMIN_NAV_ITEMS.map(item => (
+                      {ENHANCED_ADMIN_NAV_ITEMS.map(item => (
                         <button
                           key={item.text}
                           onClick={() => handleNavigation(item.href)}
@@ -331,7 +513,7 @@ const RootLayout = ({ children }) => {
                 </Link>
               </div>
 
-              <AdminActions
+              <EnhancedAdminActions
                 email={email || 'admin@mentality.com'}
                 logout={logout}
                 router={router}
@@ -341,8 +523,18 @@ const RootLayout = ({ children }) => {
         </div>
 
         {/* Desktop Sidebar for Admin */}
-        <div className="hidden lg:flex w-[240px] border-r border-border fixed left-0 top-0 h-screen flex-col py-4 bg-background z-[10]">
-          <div className="px-4 py-2 mb-4">
+        <div
+          className={cn(
+            'hidden lg:flex border-r border-border fixed left-0 top-0 h-screen flex-col py-4 bg-background z-[10] transition-all duration-300',
+            sidebarOpen ? 'w-64' : 'w-20'
+          )}
+        >
+          <div
+            className={cn(
+              'px-4 py-2 mb-4 flex items-center',
+              sidebarOpen ? 'justify-between' : 'justify-center'
+            )}
+          >
             <Link href="/dashboard/admin" className="flex items-center">
               <Image
                 alt="Mentality"
@@ -352,61 +544,131 @@ const RootLayout = ({ children }) => {
                 src="/Logo1.png?v=1"
                 priority={true}
               />
-              <div className="ml-2 flex flex-col">
-                <span className="text-lg font-semibold">Admin Panel</span>
-                <span className="text-xs text-muted-foreground">
-                  Mentality Platform
-                </span>
-              </div>
+              {sidebarOpen && (
+                <div className="ml-2 flex flex-col">
+                  <span className="text-lg font-semibold">Admin Panel</span>
+                  <span className="text-xs text-muted-foreground">
+                    Mentality Platform
+                  </span>
+                </div>
+              )}
             </Link>
+            {sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="h-8 w-8"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
-          <div className="px-3 mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full rounded-md bg-muted/50 border border-border py-2 pl-3 pr-4 text-sm outline-none focus:ring-1 focus:ring-primary"
-              />
+          {sidebarOpen && (
+            <div className="px-3 mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full pl-9"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          <nav className="px-3 flex-1 overflow-auto">
-            <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
-              MAIN NAVIGATION
-            </div>
-            {ADMIN_NAV_ITEMS.map(item => (
-              <NavItem
+          <nav
+            className={cn('px-3 flex-1 overflow-auto', !sidebarOpen && 'px-2')}
+          >
+            {sidebarOpen && (
+              <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
+                MAIN NAVIGATION
+              </div>
+            )}
+            {ENHANCED_ADMIN_NAV_ITEMS.map(item => (
+              <Link
                 key={item.text}
-                {...item}
-                isActive={pathname === item.href}
-                onClick={e => {
-                  e.preventDefault();
-                  handleNavigation(item.href);
-                }}
-              />
+                href={item.href}
+                className={cn(
+                  'flex items-center rounded-md transition-colors mb-1',
+                  pathname === item.href
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted',
+                  sidebarOpen ? 'py-2 px-3 gap-3' : 'p-3 justify-center'
+                )}
+              >
+                {item.icon}
+                {sidebarOpen && <span>{item.text}</span>}
+              </Link>
             ))}
           </nav>
 
-          <div className="mt-auto px-3 py-3 border-t border-border">
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <div className="font-medium">Admin Account</div>
-                <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                  {email || 'admin@mentality.com'}
+          {!sidebarOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8 mx-auto mb-2"
+            >
+              <ArrowRightIcon className="h-4 w-4" />
+            </Button>
+          )}
+
+          {sidebarOpen && (
+            <div className="mt-auto px-3 py-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <div className="font-medium">Admin Account</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                    {email || 'admin@mentality.com'}
+                  </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    logout();
+                    router.push('/');
+                  }}
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Main Content Area for Admin */}
-        <div className="lg:ml-[240px] flex-1 flex flex-col min-h-screen">
+        <div
+          className={cn(
+            'flex-1 flex flex-col min-h-screen',
+            sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
+          )}
+        >
           {/* Fixed Header */}
-          <div className="hidden lg:flex h-14 border-b border-border bg-background/95 backdrop-blur fixed top-0 right-0 left-[240px] z-[10]">
+          <div
+            className={cn(
+              'hidden lg:flex h-16 border-b border-border bg-background/95 backdrop-blur fixed top-0 right-0 z-[10]',
+              sidebarOpen ? 'left-64' : 'left-20'
+            )}
+          >
             <div className="w-full px-6 flex items-center justify-between">
-              <h1 className="text-xl font-semibold">{title}</h1>
-              <AdminActions
+              <div className="flex items-center gap-4">
+                {!sidebarOpen && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleSidebar}
+                    className="h-8 w-8"
+                  >
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                )}
+                <h1 className="text-xl font-semibold">{title}</h1>
+              </div>
+              <EnhancedAdminActions
                 email={email || 'admin@mentality.com'}
                 logout={logout}
                 router={router}
@@ -414,7 +676,7 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex-1 pt-16 lg:pt-14">
+          <div className="flex-1 pt-16 lg:pt-16">
             <div className="max-w-full px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>

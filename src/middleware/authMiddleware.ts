@@ -62,31 +62,42 @@ export async function withAuth(
     console.log('Token information:', {
       id: tokenPayload.id,
       role: tokenPayload.role,
+      url: req.nextUrl.pathname,
     });
 
-    if (!allowedRoles.includes(userRole)) {
-      const roleMessages: Record<string, string> = {
-        user: 'This area is restricted to psychologists only',
-        psychologist: 'This area is restricted to users only',
-        admin: 'This area is restricted to administrators only',
+    // FIX: Correctly handle user dashboard access for all authenticated users
+    if (req.nextUrl.pathname === '/api/dashboard/user' && token) {
+      // Allow access to user dashboard regardless of role
+      const normalizedToken = {
+        ...tokenPayload,
+        _id: tokenPayload.id, // Add _id field for backward compatibility
       };
-
-      return NextResponse.json(
-        createErrorResponse(403, roleMessages[userRole] || 'Access denied'),
-        { status: 403 }
-      );
+      return handler(req, normalizedToken);
     }
 
+    // Check if the user's role is included in the allowed roles for this route
+    if (!allowedRoles.includes(userRole)) {
+      // FIX: Improved error messages that clearly state which roles are allowed
+      const allowedRolesText = allowedRoles.join(', ');
+      const errorMessage = `Access denied. This area is restricted to ${allowedRolesText} only.`;
+
+      return NextResponse.json(createErrorResponse(403, errorMessage), {
+        status: 403,
+      });
+    }
+
+    // Additional check for psychologists to ensure they're approved
     if (
       userRole === 'psychologist' &&
       !req.nextUrl.pathname.includes('/dashboard/pending') &&
-      !req.nextUrl.pathname.includes('/api/psychologist/status')
+      !req.nextUrl.pathname.includes('/api/psychologist/status') &&
+      !req.nextUrl.pathname.includes('/api/dashboard/user') // FIX: Allow psychologists to access user dashboard
     ) {
       try {
         await connectDB();
-        const psychologist = await Psychologist.findById(
-          tokenPayload.id
-        ).select('approvalStatus');
+        const psychologist = await Psychologist.findOne({
+          $or: [{ userId: tokenPayload.id }, { _id: tokenPayload.id }],
+        }).select('approvalStatus');
 
         if (psychologist && psychologist.approvalStatus !== 'approved') {
           return NextResponse.json(
@@ -100,7 +111,6 @@ export async function withAuth(
     }
 
     // FIX: Create a normalized token object that has both id and _id properties
-    // This ensures the API route will be able to access the ID regardless of which field name it uses
     const normalizedToken = {
       ...tokenPayload,
       _id: tokenPayload.id, // Add _id field for backward compatibility

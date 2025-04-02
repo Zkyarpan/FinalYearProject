@@ -27,137 +27,79 @@ export async function GET(req: NextRequest) {
       try {
         await connectDB();
 
-        // Check if user is admin
-        if (token.role !== 'admin') {
-          return NextResponse.json(
-            createErrorResponse(
-              403,
-              'Access denied. Admin privileges required.'
-            ),
-            { status: 403 }
-          );
+        // This route should be accessible by any authenticated user
+        // Get user data based on the token
+        const userId = token.id || token._id;
+
+        // Fetch relevant user data
+        const user = await User.findById(userId).lean();
+
+        if (!user) {
+          return NextResponse.json(createErrorResponse(404, 'User not found'), {
+            status: 404,
+          });
         }
 
-        // Parse query parameters
-        const searchParams = req.nextUrl.searchParams;
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '10');
-        const search = searchParams.get('search') || '';
-        const role = searchParams.get('role') || 'all';
-        const status = searchParams.get('status') || 'all';
+        // Fetch profile data
+        const profile = await Profile.findOne({ user: userId }).lean();
 
-        // Build query
-        const query: any = {};
+        // Create mock dashboard data for now (replace with actual data fetching)
+        const dashboardData = {
+          metrics: {
+            profileCompletion: profile ? 80 : 20,
+            totalBlogs: 0,
+            publishedBlogs: 0,
+            draftBlogs: 0,
+            totalStories: 0,
+            publishedStories: 0,
+            totalAppointments: 0,
+            upcomingAppointments: 0,
+            completedAppointments: 0,
+            activeConversations: 0,
+          },
+          wellnessData: {
+            wellnessScore: 75,
+            moodData: [
+              { date: 'Mon', value: 70 },
+              { date: 'Tue', value: 65 },
+              { date: 'Wed', value: 75 },
+              { date: 'Thu', value: 80 },
+              { date: 'Fri', value: 85 },
+            ],
+            sleepData: [],
+            mindfulnessData: [],
+            stressLevel: 25,
+            insights: [
+              {
+                title: 'Mood',
+                value: 'Good',
+                change: '+5%',
+                status: 'improved',
+              },
+              {
+                title: 'Sleep',
+                value: '7h',
+                change: '0%',
+                status: 'stable',
+              },
+              {
+                title: 'Focus',
+                value: 'Med',
+                change: '+10%',
+                status: 'improved',
+              },
+            ],
+          },
+          recentActivities: [],
+          nearestAppointments: [],
+          recentConversations: [],
+        };
 
-        // Add search condition
-        if (search) {
-          query.$or = [{ email: { $regex: search, $options: 'i' } }];
-        }
-
-        // Add role filter
-        if (role && role !== 'all') {
-          query.role = role;
-        }
-
-        // Add status filter
-        if (status && status !== 'all') {
-          query.isActive = status === 'active';
-        }
-
-        // Calculate pagination
-        const skip = (page - 1) * limit;
-
-        // Get total count for pagination
-        const totalUsers = await User.countDocuments(query);
-        const totalPages = Math.ceil(totalUsers / limit);
-
-        // Get users with pagination
-        const users = await User.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean<MongoUser[]>();
-
-        // Get profiles and psychologist data
-        const userIds = users.map(user => user._id);
-
-        const [profiles, psychologists] = await Promise.all([
-          Profile.find({ user: { $in: userIds } }).lean(),
-          Psychologist.find({ userId: { $in: userIds } }).lean(),
-        ]);
-
-        // Create a map for quick lookups
-        const profileMap = new Map();
-        profiles.forEach(profile => {
-          profileMap.set(profile.user.toString(), profile);
+        return NextResponse.json(createSuccessResponse(200, dashboardData), {
+          status: 200,
         });
-
-        const psychologistMap = new Map();
-        psychologists.forEach(psych => {
-          if (psych.userId) {
-            psychologistMap.set(psych.userId.toString(), psych);
-          } else if (psych.email) {
-            // Try to find by email if userId is not available
-            const matchingUser = users.find(
-              user => user.email === psych.email
-            ) as MongoUser | undefined;
-
-            if (matchingUser) {
-              // Now TypeScript knows matchingUser._id exists
-              psychologistMap.set(matchingUser._id.toString(), psych);
-            }
-          }
-        });
-
-        // Enhance user data with profile and psychologist information
-        const enhancedUsers = users.map(user => {
-          const userId = user._id.toString();
-          const profile = profileMap.get(userId);
-          const psychologist = psychologistMap.get(userId);
-
-          // Set display name based on available data
-          let displayName = '';
-
-          if (profile && profile.firstName && profile.lastName) {
-            displayName = `${profile.firstName} ${profile.lastName}`;
-            user.firstName = profile.firstName;
-            user.lastName = profile.lastName;
-          } else if (psychologist) {
-            if (psychologist.firstName && psychologist.lastName) {
-              displayName = `${psychologist.firstName} ${psychologist.lastName}`;
-              user.firstName = psychologist.firstName;
-              user.lastName = psychologist.lastName;
-            } else if (psychologist.fullName) {
-              displayName = psychologist.fullName;
-            }
-          }
-
-          if (!displayName) {
-            // Extract name from email as fallback
-            displayName = user.email.split('@')[0];
-          }
-
-          return {
-            ...user,
-            displayName,
-            profileData: profile || null,
-            psychologistData: psychologist || null,
-            profileImage: profile?.image || null,
-            psychologistImage: psychologist?.profilePhotoUrl || null,
-          };
-        });
-
-        return NextResponse.json(
-          createSuccessResponse(200, {
-            users: enhancedUsers,
-            totalUsers,
-            totalPages,
-            currentPage: page,
-          }),
-          { status: 200 }
-        );
       } catch (error: any) {
-        console.error('Error fetching users:', error);
+        console.error('Error fetching dashboard data:', error);
         return NextResponse.json(
           createErrorResponse(500, error.message || 'Internal Server Error'),
           { status: 500 }
@@ -165,7 +107,7 @@ export async function GET(req: NextRequest) {
       }
     },
     req,
-    ['admin'] // Only allow admins
+    ['user', 'psychologist', 'admin'] // Allow all authenticated user types
   );
 }
 

@@ -15,6 +15,7 @@ import Availability from '@/icons/Availability';
 import Computer from '@/icons/Computer';
 import Exercise from '@/icons/Exercise';
 import Welness from '@/icons/Welness';
+import { Brain, Wind, Heart, Moon, Gamepad2 } from 'lucide-react';
 
 export const USER_NAV_ITEMS = [
   {
@@ -49,8 +50,30 @@ export const USER_NAV_ITEMS = [
   },
   {
     icon: <Welness />,
-    text: 'Breathing',
-    href: '/breathing',
+    text: 'Activities',
+    href: '/wellness',
+    subItems: [
+      {
+        icon: <Wind size={18} />,
+        text: 'Breathing Exercises',
+        href: '/wellness/breathing',
+      },
+      {
+        icon: <Moon size={18} />,
+        text: 'Meditation',
+        href: '/wellness/meditation',
+      },
+      {
+        icon: <Brain size={18} />,
+        text: 'Focus Games',
+        href: '/wellness/focus-games',
+      },
+      {
+        icon: <Heart size={18} />,
+        text: 'Gratitude Journal',
+        href: '/wellness/gratitude',
+      },
+    ],
   },
   {
     icon: <ArticlesIcon />,
@@ -77,8 +100,30 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   },
   {
     icon: <Welness />,
-    text: 'Breathing',
-    href: '/breathing',
+    text: 'Wellness Activities',
+    href: '/wellness',
+    subItems: [
+      {
+        icon: <Wind size={18} />,
+        text: 'Breathing Exercises',
+        href: '/wellness/breathing',
+      },
+      {
+        icon: <Moon size={18} />,
+        text: 'Meditation',
+        href: '/wellness/meditation',
+      },
+      {
+        icon: <Brain size={18} />,
+        text: 'Focus Games',
+        href: '/wellness/focus-games',
+      },
+      {
+        icon: <Heart size={18} />,
+        text: 'Gratitude Journal',
+        href: '/wellness/gratitude',
+      },
+    ],
   },
   {
     icon: <Availability />,
@@ -118,7 +163,6 @@ export const ADMIN_NAV_ITEMS = [
     text: 'Dashboard',
     href: '/dashboard/admin',
   },
-
   {
     icon: <Settings />,
     text: 'Settings',

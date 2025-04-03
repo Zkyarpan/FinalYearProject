@@ -79,6 +79,7 @@ const routeTitles = {
   '/appointments': 'Appointments',
   '/inbox': 'Inbox',
   '/sessions': 'Your Sessions',
+  '/wellness': 'Wellness',
 
   // Psychologist routes
   '/dashboard/psychologist': 'Dashboard',

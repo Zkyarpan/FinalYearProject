@@ -12,6 +12,10 @@ import {
   Calendar,
   FileText,
   Users,
+  BookOpen,
+  LockIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -26,6 +30,8 @@ import { ProfileSkeleton } from '@/components/ProfileSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Store and Types
 import { useUserStore } from '@/store/userStore';
@@ -41,6 +47,22 @@ interface Blog {
   readTime: number;
   publishDate: string;
   isOwner: boolean;
+}
+
+interface Story {
+  _id: string;
+  title: string;
+  content: string;
+  coverImage: string;
+  excerpt: string;
+  tags: string[];
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+  isPublished: boolean;
+  isOwnStory: boolean;
+  privacy: 'public' | 'private' | 'friends';
+  readTime: number;
 }
 
 interface UserProfile {
@@ -59,6 +81,13 @@ interface UserProfile {
   profileCompleted: boolean;
   createdAt: string;
   updatedAt: string;
+  hasStories: boolean;
+  metricsOverview: {
+    blogCount: number;
+    commentCount: number;
+    storiesCount: number;
+    lastActive: string;
+  };
 }
 
 const UserProfileView: React.FC = () => {
@@ -67,7 +96,9 @@ const UserProfileView: React.FC = () => {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storiesLoading, setStoriesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('about');
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -112,6 +143,34 @@ const UserProfileView: React.FC = () => {
 
     fetchUserProfile();
   }, [params?.id]);
+
+  // Fetch stories only when stories tab is clicked
+  useEffect(() => {
+    const fetchStories = async () => {
+      if (activeTab !== 'stories' || !params?.id || storiesLoading) return;
+
+      setStoriesLoading(true);
+      try {
+        const response = await fetch(`/api/user/${params.id}/stories`);
+        const data = await response.json();
+
+        if (data.IsSuccess) {
+          setStories(data.Result.stories || []);
+        } else {
+          throw new Error(
+            data.ErrorMessage?.[0]?.message || 'Failed to load stories'
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching stories:', error);
+        toast.error('Failed to load stories');
+      } finally {
+        setStoriesLoading(false);
+      }
+    };
+
+    fetchStories();
+  }, [activeTab, params?.id]);
 
   // Helper functions for date formatting
   const formatDate = (dateString: string): string => {
@@ -236,9 +295,10 @@ const UserProfileView: React.FC = () => {
           value={activeTab}
           onValueChange={setActiveTab}
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="about">ABOUT</TabsTrigger>
             <TabsTrigger value="blogs">BLOGS</TabsTrigger>
+            <TabsTrigger value="stories">STORIES</TabsTrigger>
           </TabsList>
 
           {/* About Tab Content */}
@@ -316,7 +376,29 @@ const UserProfileView: React.FC = () => {
                         <span className="text-gray-600 dark:text-gray-400">
                           Blog Posts
                         </span>
-                        <span className="font-medium">{blogs.length}</span>
+                        <span className="font-medium">
+                          {profile.metricsOverview?.blogCount || blogs.length}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Stories
+                        </span>
+                        <span className="font-medium">
+                          {profile.metricsOverview?.storiesCount || 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Last Active
+                        </span>
+                        <span className="font-medium">
+                          {profile.metricsOverview?.lastActive
+                            ? formatDate(profile.metricsOverview.lastActive)
+                            : 'Recently'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -415,6 +497,161 @@ const UserProfileView: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Stories Tab Content */}
+          <TabsContent value="stories" className="mt-6">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">
+                  {stories.length > 0
+                    ? 'Personal Stories'
+                    : 'No Stories Shared Yet'}
+                </h3>
+                {isOwnProfile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/stories/create')}
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Write Story
+                  </Button>
+                )}
+              </div>
+
+              {storiesLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <Card key={i} className="w-full">
+                      <CardContent className="p-0">
+                        <div className="flex flex-col md:flex-row">
+                          <Skeleton className="h-40 w-full md:w-1/3" />
+                          <div className="p-4 flex-1">
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-full mb-2" />
+                            <Skeleton className="h-4 w-full mb-2" />
+                            <Skeleton className="h-4 w-2/3" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : stories.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  {profile.hasStories && !isOwnProfile ? (
+                    <>
+                      <LockIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2">
+                        This user has stories but they're not shared publicly.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2">
+                        {isOwnProfile
+                          ? "You haven't shared any stories yet."
+                          : "This user hasn't shared any stories yet."}
+                      </p>
+                      {isOwnProfile && (
+                        <Button
+                          onClick={() => router.push('/stories/create')}
+                          className="mt-2"
+                        >
+                          Share Your First Story
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {stories.map(story => (
+                    <Card
+                      key={story._id}
+                      className="w-full cursor-pointer hover:shadow-md transition-all duration-200"
+                      onClick={() => router.push(`/stories/${story._id}`)}
+                    >
+                      <CardContent className="p-0">
+                        <div className="flex flex-col md:flex-row">
+                          {story.coverImage && (
+                            <div className="relative h-40 md:w-1/3">
+                              <img
+                                src={story.coverImage}
+                                alt={story.title}
+                                className="w-full h-full object-cover"
+                              />
+                              {!story.isPublished && (
+                                <div className="absolute top-2 right-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-yellow-500 text-white"
+                                  >
+                                    Draft
+                                  </Badge>
+                                </div>
+                              )}
+                              {story.privacy !== 'public' && (
+                                <div className="absolute top-2 left-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-gray-700 text-white"
+                                  >
+                                    <LockIcon className="w-3 h-3 mr-1" />
+                                    {story.privacy === 'private'
+                                      ? 'Private'
+                                      : 'Friends'}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="p-4 flex-1">
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-semibold text-lg group-hover:text-blue-500 transition-colors">
+                                {story.title}
+                              </h3>
+                              {story.isOwnStory && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1 h-auto"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    router.push(`/stories/edit/${story._id}`);
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                              {story.excerpt}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">
+                                  {story.category}
+                                </Badge>
+                                <div className="flex items-center text-xs text-gray-500">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {story.readTime} min read
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {formatDate(story.createdAt)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               )}

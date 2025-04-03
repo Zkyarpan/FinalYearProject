@@ -1,5 +1,3 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/db/db';
 import User from '@/models/User';
@@ -7,53 +5,29 @@ import Profile from '@/models/Profile';
 import Psychologist from '@/models/Psychologist';
 import { createSuccessResponse, createErrorResponse } from '@/lib/response';
 import { withAuth } from '@/middleware/authMiddleware';
+import { hash } from 'bcryptjs';
 import { Types } from 'mongoose';
 
-// We'll use the lean() result types which are plain objects, not full Document instances
-type UserLean = {
-  _id: Types.ObjectId | string;
-  email: string;
-  role: 'admin' | 'psychologist' | 'user';
-  isActive: boolean;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  isVerified: boolean;
-  // Other potential fields
-  [key: string]: any;
-};
-
-type ProfileLean = {
-  _id: Types.ObjectId | string;
-  user: Types.ObjectId | string;
-  firstName: string;
-  lastName: string;
-  image: string;
-  address?: string;
-  phone?: string;
-  age?: number;
-  gender?: string;
-  briefBio?: string;
-  // Other fields
-  [key: string]: any;
-};
-
-type PsychologistLean = {
-  _id: Types.ObjectId | string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  profilePhotoUrl?: string;
-  // Other fields
-  [key: string]: any;
-};
+// Define the default avatar constant
+const DEFAULT_AVATAR = '/default-avatar.jpg';
 
 export async function GET(req: NextRequest) {
   return withAuth(
     async (req: NextRequest, token: any) => {
       try {
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
+
         await connectDB();
+        console.log('Connected to database for admin user management');
 
         // Parse query parameters
         const url = new URL(req.url);
@@ -66,111 +40,247 @@ export async function GET(req: NextRequest) {
         // Calculate pagination
         const skip = (page - 1) * limit;
 
-        // Build search query
-        let query: any = {};
+        if (role === 'psychologist') {
+          // For psychologists, query the Psychologist collection directly
+          const psychologistMatchStage: any = {};
 
-        // Role filter
-        if (role && role !== 'all') {
-          query.role = role;
+          if (search) {
+            psychologistMatchStage.$or = [
+              { email: { $regex: search, $options: 'i' } },
+              { firstName: { $regex: search, $options: 'i' } },
+              { lastName: { $regex: search, $options: 'i' } },
+            ];
+          }
+
+          if (status === 'active') {
+            psychologistMatchStage.approvalStatus = 'approved';
+          } else if (status === 'inactive') {
+            psychologistMatchStage.approvalStatus = { $ne: 'approved' };
+          }
+
+          console.log(
+            'Psychologist match stage:',
+            JSON.stringify(psychologistMatchStage)
+          );
+
+          // Use aggregation to get psychologists with pagination and proper formatting
+          const pipeline = [
+            { $match: psychologistMatchStage },
+            { $sort: { createdAt: -1 as -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 1,
+                email: 1,
+                role: { $literal: 'psychologist' },
+                isActive: { $eq: ['$approvalStatus', 'approved'] },
+                isVerified: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                profileData: {
+                  firstName: '$firstName',
+                  lastName: '$lastName',
+                  image: { $ifNull: ['$profilePhotoUrl', DEFAULT_AVATAR] },
+                  phone: { $literal: '' },
+                  age: { $literal: 0 },
+                  gender: { $literal: '' },
+                  briefBio: { $ifNull: ['$about', ''] },
+                },
+                psychologistData: {
+                  email: '$email',
+                  firstName: '$firstName',
+                  lastName: '$lastName',
+                  fullName: {
+                    $ifNull: [
+                      '$fullName',
+                      { $concat: ['$firstName', ' ', '$lastName'] },
+                    ],
+                  },
+                  approvalStatus: { $ifNull: ['$approvalStatus', 'pending'] },
+                  profilePhotoUrl: {
+                    $ifNull: ['$profilePhotoUrl', DEFAULT_AVATAR],
+                  },
+                  specializations: { $ifNull: ['$specializations', []] },
+                  sessionFee: { $ifNull: ['$sessionFee', 0] },
+                  languages: { $ifNull: ['$languages', []] },
+                  licenseNumber: { $ifNull: ['$licenseNumber', ''] },
+                  licenseType: { $ifNull: ['$licenseType', ''] },
+                },
+              },
+            },
+          ];
+
+          const countPipeline = [
+            { $match: psychologistMatchStage },
+            { $count: 'total' },
+          ];
+
+          const psychologists = await Psychologist.aggregate(pipeline);
+          const countResult = await Psychologist.aggregate(countPipeline);
+
+          const totalUsers = countResult.length > 0 ? countResult[0].total : 0;
+          const totalPages = Math.ceil(totalUsers / limit);
+
+          console.log(
+            `Found ${psychologists.length} psychologists via aggregation`
+          );
+
+          return NextResponse.json(
+            createSuccessResponse(200, {
+              users: psychologists,
+              totalUsers,
+              totalPages,
+              currentPage: page,
+            }),
+            { status: 200 }
+          );
+        } else {
+          // For regular users or all users, use a more comprehensive aggregation
+          // that joins data from User, Profile, and Psychologist collections
+          const matchStage: any = {};
+
+          if (search) {
+            matchStage.email = { $regex: search, $options: 'i' };
+          }
+
+          if (role) {
+            matchStage.role = role;
+          }
+
+          if (status) {
+            matchStage.isActive = status === 'active';
+          }
+
+          console.log('User match stage:', JSON.stringify(matchStage));
+
+          // Main aggregation pipeline for users
+          const pipeline = [
+            { $match: matchStage },
+            { $sort: { createdAt: -1 as const } },
+            { $skip: skip },
+            { $limit: limit },
+            // Lookup profiles
+            {
+              $lookup: {
+                from: 'profiles',
+                localField: '_id',
+                foreignField: 'user',
+                as: 'profileArr',
+              },
+            },
+            // Lookup psychologists (by email)
+            {
+              $lookup: {
+                from: 'psychologists',
+                localField: 'email',
+                foreignField: 'email',
+                as: 'psychologistArr',
+              },
+            },
+            // Add processed profile and psychologist data
+            {
+              $addFields: {
+                profile: { $arrayElemAt: ['$profileArr', 0] },
+                psychologist: { $arrayElemAt: ['$psychologistArr', 0] },
+              },
+            },
+            // Format the data for the response
+            {
+              $project: {
+                _id: 1,
+                email: 1,
+                role: 1,
+                isActive: 1,
+                isVerified: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                profileData: {
+                  $cond: {
+                    if: { $gt: [{ $size: '$profileArr' }, 0] },
+                    then: {
+                      firstName: { $ifNull: ['$profile.firstName', ''] },
+                      lastName: { $ifNull: ['$profile.lastName', ''] },
+                      image: { $ifNull: ['$profile.image', DEFAULT_AVATAR] },
+                      phone: { $ifNull: ['$profile.phone', ''] },
+                      age: { $ifNull: ['$profile.age', 0] },
+                      gender: { $ifNull: ['$profile.gender', ''] },
+                      briefBio: { $ifNull: ['$profile.briefBio', ''] },
+                    },
+                    else: null,
+                  },
+                },
+                psychologistData: {
+                  $cond: {
+                    if: { $gt: [{ $size: '$psychologistArr' }, 0] },
+                    then: {
+                      email: { $ifNull: ['$psychologist.email', ''] },
+                      firstName: { $ifNull: ['$psychologist.firstName', ''] },
+                      lastName: { $ifNull: ['$psychologist.lastName', ''] },
+                      fullName: {
+                        $ifNull: [
+                          '$psychologist.fullName',
+                          {
+                            $concat: [
+                              { $ifNull: ['$psychologist.firstName', ''] },
+                              ' ',
+                              { $ifNull: ['$psychologist.lastName', ''] },
+                            ],
+                          },
+                        ],
+                      },
+                      approvalStatus: {
+                        $ifNull: ['$psychologist.approvalStatus', 'pending'],
+                      },
+                      profilePhotoUrl: {
+                        $ifNull: [
+                          '$psychologist.profilePhotoUrl',
+                          DEFAULT_AVATAR,
+                        ],
+                      },
+                      specializations: {
+                        $ifNull: ['$psychologist.specializations', []],
+                      },
+                      sessionFee: { $ifNull: ['$psychologist.sessionFee', 0] },
+                      languages: { $ifNull: ['$psychologist.languages', []] },
+                    },
+                    else: null,
+                  },
+                },
+              },
+            },
+            // Remove temporary fields
+            {
+              $project: {
+                profileArr: 0,
+                psychologistArr: 0,
+                profile: 0,
+                psychologist: 0,
+              },
+            },
+          ];
+
+          // Count pipeline for pagination
+          const countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+
+          const users = await User.aggregate(pipeline);
+          const countResult = await User.aggregate(countPipeline);
+
+          const totalUsers = countResult.length > 0 ? countResult[0].total : 0;
+          const totalPages = Math.ceil(totalUsers / limit);
+
+          console.log(`Found ${users.length} users via aggregation`);
+
+          return NextResponse.json(
+            createSuccessResponse(200, {
+              users,
+              totalUsers,
+              totalPages,
+              currentPage: page,
+            }),
+            { status: 200 }
+          );
         }
-
-        // Status filter
-        if (status === 'active') {
-          query.isActive = true;
-        } else if (status === 'inactive') {
-          query.isActive = false;
-        }
-
-        // Search filter (email only since firstName/lastName are in Profile)
-        if (search) {
-          query.email = { $regex: search, $options: 'i' };
-        }
-
-        // Fetch users with pagination
-        const [users, totalUsers] = await Promise.all([
-          User.find(query)
-            .select('email role isActive createdAt')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-          User.countDocuments(query),
-        ]);
-
-        // Get user IDs
-        const userIds = users.map(user => user._id);
-
-        // Fetch profiles for these users
-        const profiles = await Profile.find({ user: { $in: userIds } })
-          .select('user firstName lastName image phone age gender briefBio')
-          .lean();
-
-        // Create a map of user ID to profile
-        const profileMap = profiles.reduce(
-          (map, profile) => {
-            map[profile.user.toString()] = profile as unknown as ProfileLean;
-            return map;
-          },
-          {} as Record<string, ProfileLean>
-        );
-
-        // Fetch psychologist details for users with role='psychologist'
-        const psychologistEmails = users
-          .filter(user => user.role === 'psychologist')
-          .map(user => user.email);
-
-        const psychologists = await Psychologist.find({
-          email: { $in: psychologistEmails },
-        })
-          .select(
-            'email firstName lastName fullName approvalStatus profilePhotoUrl'
-          )
-          .lean();
-
-        // Create a map of email to psychologist details
-        const psychologistMap = psychologists.reduce(
-          (map, psych) => {
-            map[psych.email] = psych as unknown as PsychologistLean;
-            return map;
-          },
-          {} as Record<string, PsychologistLean>
-        );
-
-        // Merge user data with profile and psychologist data
-        const enrichedUsers = users.map((user: any) => {
-          const profile = profileMap[user._id.toString()];
-          const psychologist =
-            user.role === 'psychologist' ? psychologistMap[user.email] : null;
-
-          // Format exactly like the current response structure
-          return {
-            _id: user._id,
-            email: user.email,
-            role: user.role,
-            isActive: user.isActive,
-            createdAt: user.createdAt,
-            profileData: profile || null,
-            psychologistData: psychologist || null,
-            displayName: profile
-              ? `${profile.firstName} ${profile.lastName}`
-              : psychologist?.fullName || 'undefined undefined',
-            profileImage: profile?.image || null,
-            psychologistImage: psychologist?.profilePhotoUrl || null,
-          };
-        });
-
-        // Calculate total pages
-        const totalPages = Math.ceil(totalUsers / limit);
-
-        return NextResponse.json(
-          createSuccessResponse(200, {
-            users: enrichedUsers,
-            currentPage: page,
-            totalPages,
-            totalUsers,
-          }),
-          { status: 200 }
-        );
       } catch (error: any) {
         console.error('Error fetching users:', error);
         return NextResponse.json(
@@ -180,47 +290,133 @@ export async function GET(req: NextRequest) {
       }
     },
     req,
-    ['admin']
+    ['admin'] // Only allow admins
   );
 }
 
-// Handle user status updates
-export async function PATCH(req: NextRequest) {
+// Create new user
+export async function POST(req: NextRequest) {
   return withAuth(
     async (req: NextRequest, token: any) => {
       try {
+        // Check if user is admin
+        if (token.role !== 'admin') {
+          return NextResponse.json(
+            createErrorResponse(
+              403,
+              'Access denied. Admin privileges required.'
+            ),
+            { status: 403 }
+          );
+        }
+
         await connectDB();
 
-        const { userId, isActive } = await req.json();
+        // Get request body
+        const {
+          email,
+          password,
+          role,
+          firstName,
+          lastName,
+          isActive,
+          sendWelcomeEmail,
+        } = await req.json();
 
-        if (!userId) {
+        // Validate required fields
+        if (!email || !password) {
           return NextResponse.json(
-            createErrorResponse(400, 'User ID is required'),
+            createErrorResponse(400, 'Email and password are required'),
             { status: 400 }
           );
         }
 
-        const user = await User.findByIdAndUpdate(
-          userId,
-          { isActive: isActive },
-          { new: true }
-        ).select('email role isActive');
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+          return NextResponse.json(
+            createErrorResponse(409, 'User with this email already exists'),
+            { status: 409 }
+          );
+        }
 
-        if (!user) {
-          return NextResponse.json(createErrorResponse(404, 'User not found'), {
-            status: 404,
+        // Hash password
+        const hashedPassword = await hash(password, 10);
+
+        // Create new user
+        const newUser = await User.create({
+          email,
+          password: hashedPassword,
+          role: role || 'user',
+          isActive: isActive !== undefined ? isActive : true,
+          isVerified: true, // Admins can create pre-verified accounts
+        });
+
+        // Create profile if first and last name are provided
+        let profile: any = null;
+        if (firstName && lastName) {
+          profile = await Profile.create({
+            user: newUser._id,
+            firstName,
+            lastName,
+            image: DEFAULT_AVATAR,
+            phone: '',
+            age: 0,
+            emergencyContact: '',
+            emergencyPhone: '',
+            therapyHistory: 'no',
+            preferredCommunication: 'video',
+            struggles: [],
+            briefBio: '',
+            profileCompleted: false,
           });
         }
 
+        // If role is psychologist, create psychologist record
+        if (role === 'psychologist') {
+          await Psychologist.create({
+            email: email,
+            userId: newUser._id,
+            firstName: firstName || '',
+            lastName: lastName || '',
+            approvalStatus: 'pending',
+            specializations: [],
+            yearsOfExperience: 0,
+            profilePhotoUrl: DEFAULT_AVATAR,
+            bio: '',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        // TODO: Implement welcome email if sendWelcomeEmail is true
+        if (sendWelcomeEmail) {
+          // Send welcome email logic here
+          console.log(`Welcome email would be sent to ${email}`);
+        }
+
         return NextResponse.json(
-          createSuccessResponse(200, {
-            message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-            user,
+          createSuccessResponse(201, {
+            message: 'User created successfully',
+            user: {
+              _id: newUser._id,
+              email: newUser.email,
+              role: newUser.role,
+              isActive: newUser.isActive,
+              isVerified: newUser.isVerified,
+              createdAt: newUser.createdAt,
+              profile: profile
+                ? {
+                    firstName: profile.firstName,
+                    lastName: profile.lastName,
+                  }
+                : null,
+            },
           }),
-          { status: 200 }
+          { status: 201 }
         );
       } catch (error: any) {
-        console.error('Error updating user status:', error);
+        console.error('Error creating user:', error);
         return NextResponse.json(
           createErrorResponse(500, error.message || 'Internal Server Error'),
           { status: 500 }
@@ -228,6 +424,6 @@ export async function PATCH(req: NextRequest) {
       }
     },
     req,
-    ['admin']
+    ['admin'] // Only allow admins
   );
 }

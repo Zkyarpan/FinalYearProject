@@ -6,6 +6,7 @@ import connectDB from '@/db/db';
 import User from '@/models/User';
 import Profile from '@/models/Profile';
 import Blog from '@/models/Blogs';
+import Story from '@/models/Stories';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 
 interface UserProfileResponse {
@@ -24,6 +25,13 @@ interface UserProfileResponse {
   profileCompleted: boolean;
   createdAt: string;
   updatedAt: string;
+  hasStories: boolean; // Flag to indicate if user has stories
+  metricsOverview: {
+    blogCount: number;
+    commentCount: number;
+    storiesCount: number;
+    lastActive: string;
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -49,6 +57,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Get the authenticated user (if available)
+    const authHeader = req.headers.get('authorization');
+    const currentUserId = authHeader ? authHeader.split(' ')[1] : null;
+    const isOwnProfile = currentUserId === userId;
+
     // Get the user
     const user = await User.findById(userId).lean();
 
@@ -72,6 +85,36 @@ export async function GET(req: NextRequest) {
     const profile = profileDoc as any;
     const userId_str = (user as any)._id.toString();
 
+    // Check if user has stories (only count them here, don't fetch them all)
+    const storiesCount = await Story.countDocuments({ author: userId });
+
+    // Get user metrics
+    const blogCount = await Blog.countDocuments({
+      author: userId,
+      isPublished: true,
+    });
+
+    // Get comment count (assuming you have a Comment model or a comments field in blogs)
+    let commentCount = 0;
+    try {
+      // This will depend on your data model. Using a placeholder approach here
+      // commentCount = await Comment.countDocuments({ user: userId });
+
+      // Alternative: count comments on user's blogs
+      const blogs = await Blog.find({ author: userId }).lean();
+      commentCount = blogs.reduce((total, blog) => {
+        return total + (blog.comments?.length || 0);
+      }, 0);
+    } catch (err) {
+      console.error('Error fetching comment count:', err);
+      // Continue despite error in getting comment count
+    }
+
+    // Get last activity timestamp
+    // This could be last login, last post, etc.
+    const lastActive =
+      (user as any).lastLogin || profile.updatedAt || profile.createdAt;
+
     // Format the response
     const formattedProfile: UserProfileResponse = {
       _id: profile._id.toString(),
@@ -89,6 +132,13 @@ export async function GET(req: NextRequest) {
       profileCompleted: profile.profileCompleted,
       createdAt: new Date(profile.createdAt).toISOString(),
       updatedAt: new Date(profile.updatedAt).toISOString(),
+      hasStories: storiesCount > 0,
+      metricsOverview: {
+        blogCount,
+        commentCount,
+        storiesCount,
+        lastActive: new Date(lastActive).toISOString(),
+      },
     };
 
     return NextResponse.json(

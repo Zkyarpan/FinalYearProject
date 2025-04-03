@@ -93,7 +93,7 @@ function UserSidebar() {
                     {firstName} {lastName}
                   </p>
                   <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                    {displayRole} {/* Display the formatted role here */}
+                    {displayRole}
                   </p>
                 </div>
               </div>

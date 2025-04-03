@@ -34,10 +34,10 @@ const Navbar = () => {
 
             <div className="hidden sm:flex items-center space-x-2">
               <Link
-                href="/stories"
+                href="/articles"
                 className="font-medium text-sm py-1.5 px-6 hover:underline"
               >
-                Stories
+                Articles
               </Link>
               <Link
                 href="/resources"

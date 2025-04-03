@@ -1,7 +1,10 @@
-import React from 'react';
+import AdminDashboard from '@/components/AdminDashboard';
 
-const AdminDashboard = () => {
-  return <div>AdminDashboard</div>;
+export const metadata = {
+  title: 'Admin Dashboard | Mentality Platform',
+  description: 'Administrative dashboard for managing the Mentality Platform',
 };
 
-export default AdminDashboard;
+export default function AdminDashboardPage() {
+  return <AdminDashboard />;
+}

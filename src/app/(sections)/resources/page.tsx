@@ -7,6 +7,10 @@ import Skeleton from '@/components/common/Skeleton';
 import { generateSlug } from '@/helpers/generateSlug';
 import { useUserStore } from '@/store/userStore';
 import { useRouter } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
+import { MessageCircle, Edit, Clock, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import LoginModal from '@/components/LoginModel';
 
 interface Author {
   _id: string;
@@ -51,6 +55,31 @@ interface ApiResponse {
   };
 }
 
+interface UserProfile {
+  _id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  image: string;
+  address?: string;
+  phone: string;
+  age: number;
+  gender?: string;
+  preferredCommunication: 'video' | 'audio' | 'chat' | 'in-person';
+  struggles: string[];
+  briefBio: string;
+  profileCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  metricsOverview: {
+    blogCount: number;
+    commentCount: number;
+    storiesCount: number;
+    resourceCount?: number;
+    lastActive: string;
+  };
+}
+
 const getDifficultyBadgeColor = (level: string) => {
   switch (level) {
     case 'beginner':
@@ -79,6 +108,15 @@ const truncateText = (text: string, maxLength: number) => {
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
+};
+
+// Format date string nicely
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 };
 
 const OwnershipTag = ({
@@ -116,6 +154,7 @@ const ResourcesPage = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(
     null
   );
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const userId = useUserStore(state => state._id);
   const isAuthenticated = useUserStore(state => state.isAuthenticated);
@@ -197,6 +236,11 @@ const ResourcesPage = () => {
   const handleDifficultyChange = (difficulty: string) => {
     setSelectedDifficulty(difficulty === 'All' ? null : difficulty);
     setCurrentPage(1);
+  };
+
+  const handleAuthorClick = (author: Author, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    router.push(`/user/${author._id}`);
   };
 
   const renderPagination = () => {
@@ -406,16 +450,30 @@ const ResourcesPage = () => {
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="relative h-8 w-8">
+                          <div
+                            className="relative h-8 w-8 cursor-pointer"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAuthorClick(resources[0].author);
+                            }}
+                          >
                             <Image
                               src={resources[0].author.avatar || defaultAvatar}
                               alt={`Profile picture of ${resources[0].author.name}`}
                               fill
-                              className="rounded-full object-cover"
+                              className="rounded-full object-cover hover:opacity-80 transition-opacity"
                               sizes="32px"
                             />
                           </div>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          <span
+                            className="text-sm font-semibold text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAuthorClick(resources[0].author);
+                            }}
+                          >
                             {resources[0].author.name}
                           </span>
                         </div>
@@ -423,6 +481,22 @@ const ResourcesPage = () => {
                           <span>{resources[0].publishDate}</span>
                           <span>•</span>
                           <span>{resources[0].viewCount} views</span>
+                          {resources[0].isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="p-1 h-auto"
+                              onClick={e => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                router.push(
+                                  `/resources/edit/${resources[0]._id}`
+                                );
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -540,16 +614,30 @@ const ResourcesPage = () => {
 
                           <div className="flex items-center justify-between mt-auto">
                             <div className="flex items-center gap-2">
-                              <div className="relative h-6 w-6">
+                              <div
+                                className="relative h-6 w-6 cursor-pointer"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAuthorClick(resource.author);
+                                }}
+                              >
                                 <Image
                                   src={resource.author.avatar || defaultAvatar}
                                   alt={`Profile picture of ${resource.author.name}`}
                                   fill
-                                  className="rounded-full object-cover"
+                                  className="rounded-full object-cover hover:opacity-80 transition-opacity"
                                   sizes="24px"
                                 />
                               </div>
-                              <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                              <span
+                                className="text-xs font-semibold text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAuthorClick(resource.author);
+                                }}
+                              >
                                 {resource.author.name}
                               </span>
                             </div>
@@ -557,6 +645,22 @@ const ResourcesPage = () => {
                               <span>{formatDuration(resource.duration)}</span>
                               <span>•</span>
                               <span>{resource.viewCount} views</span>
+                              {resource.isOwner && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1 h-auto"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    router.push(
+                                      `/resources/edit/${resource._id}`
+                                    );
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>

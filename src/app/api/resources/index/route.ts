@@ -9,7 +9,11 @@ import Psychologist from '@/models/Psychologist';
 import { createErrorResponse, createSuccessResponse } from '@/lib/response';
 import { DEFAULT_AVATAR } from '@/constants';
 import { Types } from 'mongoose';
-import { withAuth, TokenPayload } from '@/middleware/authMiddleware';
+import {
+  withAuth,
+  TokenPayload,
+  getTokenFromRequest,
+} from '@/middleware/authMiddleware';
 
 // Define interfaces for better type safety
 interface IProfile {
@@ -31,158 +35,174 @@ interface IPsychologist {
 }
 
 export async function GET(req: NextRequest) {
-  return withAuth(
-    async (req: NextRequest, user: TokenPayload) => {
-      try {
-        await connectDB();
-        console.log('Fetching resources with mediaUrls');
+  try {
+    await connectDB();
+    console.log('Fetching resources');
 
-        // Get query parameters
-        const url = new URL(req.url);
-        const category = url.searchParams.get('category');
-        const tag = url.searchParams.get('tag');
-        const difficulty = url.searchParams.get('difficulty');
-        const limit = parseInt(url.searchParams.get('limit') || '10');
-        const page = parseInt(url.searchParams.get('page') || '1');
-        const skip = (page - 1) * limit;
+    // Try to get the authenticated user token, but continue even if not authenticated
+    let user: TokenPayload | null = null;
+    try {
+      const token = getTokenFromRequest(req);
+      if (token) {
+        user = token as TokenPayload;
+        console.log('User authenticated:', user.id, user.role);
+      }
+    } catch (error) {
+      console.log('No authenticated user, continuing as public access');
+    }
 
-        // Build query
-        const query: any = {};
-        if (category) {
-          query.category = category;
-        }
-        if (tag) {
-          query.tags = { $in: [tag] };
-        }
-        if (difficulty) {
-          query.difficultyLevel = difficulty;
-        }
+    // Get query parameters
+    const url = new URL(req.url);
+    const category = url.searchParams.get('category');
+    const tag = url.searchParams.get('tag');
+    const difficulty = url.searchParams.get('difficulty');
+    const authorId = url.searchParams.get('author');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const skip = (page - 1) * limit;
 
-        // Explicitly include mediaUrls and other fields in the query
-        const resources = await Resource.find(query)
-          .select(
-            'title description content category difficultyLevel duration steps tags mediaUrls resourceImage publishDate author authorType viewCount isPublished'
-          )
-          .sort({ publishDate: -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean();
+    // Build query
+    const query: any = {};
+    if (category) {
+      query.category = category;
+    }
+    if (tag) {
+      query.tags = { $in: [tag] };
+    }
+    if (difficulty) {
+      query.difficultyLevel = difficulty;
+    }
+    if (authorId) {
+      query.author = authorId;
+    }
 
-        console.log(`Found ${resources.length} resources`);
+    // Only show published resources for non-authenticated users
+    if (!user) {
+      query.isPublished = true;
+    }
 
-        // Get total count for pagination
-        const totalCount = await Resource.countDocuments(query);
+    // Explicitly include mediaUrls and other fields in the query
+    const resources = await Resource.find(query)
+      .select(
+        'title description content category difficultyLevel duration steps tags mediaUrls resourceImage publishDate author authorType viewCount isPublished'
+      )
+      .sort({ publishDate: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-        // Get author details for all resources
-        const populatedResources = await Promise.all(
-          resources.map(async (resource: any) => {
-            let authorName = 'Unknown';
-            let authorAvatar = DEFAULT_AVATAR;
-            let authorId = resource.author.toString();
+    console.log(`Found ${resources.length} resources`);
 
-            try {
-              if (resource.authorType === 'user') {
-                // Get user profile
-                const profile = (await Profile.findOne({
-                  user: resource.author,
-                }).lean()) as IProfile | null;
+    // Get total count for pagination
+    const totalCount = await Resource.countDocuments(query);
 
-                const userData = (await User.findById(resource.author)
-                  .select('email')
-                  .lean()) as IUser | null;
+    // Get author details for all resources
+    const populatedResources = await Promise.all(
+      resources.map(async (resource: any) => {
+        let authorName = 'Unknown';
+        let authorAvatar = DEFAULT_AVATAR;
+        let authorId = resource.author.toString();
 
-                if (profile) {
-                  authorName =
-                    `${profile.firstName} ${profile.lastName}`.trim() || 'User';
-                  authorAvatar = profile.image || DEFAULT_AVATAR;
-                } else if (userData) {
-                  // Fallback to email if profile not found
-                  authorName = userData.email
-                    ? userData.email.split('@')[0]
-                    : 'User';
-                }
-              } else if (resource.authorType === 'psychologist') {
-                // Get psychologist details
-                const psychologist = (await Psychologist.findById(
-                  resource.author
-                ).lean()) as IPsychologist | null;
+        try {
+          if (resource.authorType === 'user') {
+            // Get user profile
+            const profile = (await Profile.findOne({
+              user: resource.author,
+            }).lean()) as IProfile | null;
 
-                if (psychologist) {
-                  authorName = psychologist.name || 'Psychologist';
-                  authorAvatar = psychologist.avatar || DEFAULT_AVATAR;
-                }
-              }
-            } catch (error) {
-              console.error('Error fetching author details:', error);
+            const userData = (await User.findById(resource.author)
+              .select('email')
+              .lean()) as IUser | null;
+
+            if (profile) {
+              authorName =
+                `${profile.firstName} ${profile.lastName}`.trim() || 'User';
+              authorAvatar = profile.image || DEFAULT_AVATAR;
+            } else if (userData) {
+              // Fallback to email if profile not found
+              authorName = userData.email
+                ? userData.email.split('@')[0]
+                : 'User';
             }
+          } else if (resource.authorType === 'psychologist') {
+            // Get psychologist details
+            const psychologist = (await Psychologist.findById(
+              resource.author
+            ).lean()) as IPsychologist | null;
 
-            // Check if the current user is the owner
-            const isOwner = user ? authorId === user.id : false;
-
-            // Format date
-            const publishDate = new Date(
-              resource.publishDate
-            ).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            });
-
-            // Ensure mediaUrls is properly formatted and included
-            const mediaUrls = Array.isArray(resource.mediaUrls)
-              ? resource.mediaUrls.map(media => ({
-                  type: media.type,
-                  url: media.url,
-                  ...(media.title ? { title: media.title } : {}),
-                }))
-              : [];
-
-            if (mediaUrls.length > 0) {
-              console.log(
-                `Resource ${resource._id} has ${mediaUrls.length} media items`
-              );
+            if (psychologist) {
+              authorName = psychologist.name || 'Psychologist';
+              authorAvatar = psychologist.avatar || DEFAULT_AVATAR;
             }
+          }
+        } catch (error) {
+          console.error('Error fetching author details:', error);
+        }
 
-            return {
-              ...resource,
-              _id: resource._id.toString(),
-              author: {
-                _id: authorId,
-                name: authorName,
-                avatar: authorAvatar,
-              },
-              publishDate,
-              isOwner,
-              mediaUrls, // Explicitly include mediaUrls in the response
-            };
-          })
-        );
+        // Check if the current user is the owner
+        const isOwner = user ? authorId === user.id : false;
 
-        return NextResponse.json(
-          createSuccessResponse(200, {
-            resources: populatedResources,
-            pagination: {
-              total: totalCount,
-              page,
-              limit,
-              pages: Math.ceil(totalCount / limit),
-            },
-          }),
-          { status: 200 }
-        );
-      } catch (error) {
-        console.error('Failed to fetch resources:', error);
-        return NextResponse.json(
-          createErrorResponse(500, 'Internal Server Error'),
+        // Format date
+        const publishDate = new Date(resource.publishDate).toLocaleDateString(
+          'en-US',
           {
-            status: 500,
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
           }
         );
+
+        // Ensure mediaUrls is properly formatted and included
+        const mediaUrls = Array.isArray(resource.mediaUrls)
+          ? resource.mediaUrls.map(media => ({
+              type: media.type,
+              url: media.url,
+              ...(media.title ? { title: media.title } : {}),
+            }))
+          : [];
+
+        if (mediaUrls.length > 0) {
+          console.log(
+            `Resource ${resource._id} has ${mediaUrls.length} media items`
+          );
+        }
+
+        return {
+          ...resource,
+          _id: resource._id.toString(),
+          author: {
+            _id: authorId,
+            name: authorName,
+            avatar: authorAvatar,
+          },
+          publishDate,
+          isOwner,
+          mediaUrls, // Explicitly include mediaUrls in the response
+        };
+      })
+    );
+
+    return NextResponse.json(
+      createSuccessResponse(200, {
+        resources: populatedResources,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          pages: Math.ceil(totalCount / limit),
+        },
+      }),
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Failed to fetch resources:', error);
+    return NextResponse.json(
+      createErrorResponse(500, 'Internal Server Error'),
+      {
+        status: 500,
       }
-    },
-    req,
-    ['user', 'psychologist', 'admin']
-  ); // Allow all roles to view resources
+    );
+  }
 }
 
 export async function PUT(

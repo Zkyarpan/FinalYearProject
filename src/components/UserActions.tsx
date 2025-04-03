@@ -93,13 +93,13 @@ const UserActions = ({
         <div className="flex items-center gap-3 px-1">
           <Link
             href="/login"
-            className="font-medium text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
+            className="font-semibold text-sm py-1.5 px-4 rounded-xl border border-border dark:border-[#333333] hover:bg-muted transition-colors bg-white dark:bg-[#404040] hover:dark:bg-[#505050]"
           >
             Log in
           </Link>
           <Link
             href="/signup"
-            className="font-medium text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="font-semibold text-sm py-1.5 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             Create Profile
           </Link>

@@ -100,7 +100,7 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   },
   {
     icon: <Welness />,
-    text: 'Wellness Activities',
+    text: 'Activities',
     href: '/wellness',
     subItems: [
       {
@@ -147,13 +147,18 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
   },
   {
     icon: <ArticlesIcon />,
-    text: 'My Articles',
-    href: '/psychologist/articles',
+    text: 'Articles',
+    href: '/articles',
+  },
+  {
+    icon: <ResourcesIcon />,
+    text: 'Resources',
+    href: '/resources',
   },
   {
     icon: <BlogIcon />,
-    text: 'My Blogs',
-    href: '/psychologist/blog',
+    text: 'Blogs',
+    href: '/blogs',
   },
 ];
 

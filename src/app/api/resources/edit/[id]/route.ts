@@ -36,7 +36,7 @@ export async function GET(
         }
 
         // Find the resource
-        const resource = await Resource.findById(resourceId).lean() as any;
+        const resource = (await Resource.findById(resourceId).lean()) as any;
 
         if (!resource) {
           return NextResponse.json(
@@ -69,10 +69,10 @@ export async function GET(
               lastName?: string;
               image?: string;
             }
-            
-            const profile = await Profile.findOne({
+
+            const profile = (await Profile.findOne({
               user: resource.author,
-            }).lean() as ProfileType;
+            }).lean()) as ProfileType;
 
             if (profile) {
               authorName =
@@ -84,9 +84,9 @@ export async function GET(
               interface UserData {
                 email?: string;
               }
-              const userData = await User.findById(resource.author)
+              const userData = (await User.findById(resource.author)
                 .select('email')
-                .lean() as UserData;
+                .lean()) as UserData;
 
               if (userData && userData.email) {
                 authorName = userData.email.split('@')[0];
@@ -99,9 +99,9 @@ export async function GET(
               avatar?: string;
             }
 
-            const psychologist = await Psychologist.findById(
+            const psychologist = (await Psychologist.findById(
               resource.author
-            ).lean() as PsychologistType;
+            ).lean()) as PsychologistType;
 
             if (psychologist) {
               authorName = psychologist.name || 'Psychologist';

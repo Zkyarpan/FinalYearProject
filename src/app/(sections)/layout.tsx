@@ -197,6 +197,9 @@ const RootLayout = ({ children }) => {
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
 
+  const isWellnessNestedRoute =
+    pathname.startsWith('/wellness/') && pathname !== '/wellness';
+
   // Check for detail or edit pages
   const isNestedArticleRoute =
     pathname.startsWith('/articles/') &&
@@ -225,6 +228,7 @@ const RootLayout = ({ children }) => {
     isNestedBlogRoute ||
     isNestedArticleRoute ||
     isNestedStoryRoute ||
+    isWellnessNestedRoute ||
     (pathname.startsWith('/psychologist/') &&
       pathname !== '/psychologist' &&
       !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route)));
@@ -282,6 +286,8 @@ const RootLayout = ({ children }) => {
       router.push('/blogs');
     } else if (isNestedPsychologistRoute) {
       router.push('/psychologist');
+    } else if (isWellnessNestedRoute) {
+      router.push('/wellness');
     } else if (
       isArticleEditPage ||
       (isNestedArticleRoute && !isArticleEditPage)

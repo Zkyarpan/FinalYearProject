@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Info, Heart, Brain, Wind, Moon, Zap } from 'lucide-react';
+import { Info, Heart, Brain, Wind, Moon, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +13,6 @@ import {
 import BreathingExercise from '@/components/breathing/BreathingExercise';
 
 export default function BreathingPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('exercise');
   const exerciseRef = useRef<HTMLDivElement>(null);
 
@@ -27,14 +25,6 @@ export default function BreathingPage() {
 
   return (
     <div className="mx-auto px-4 py-8">
-      <Button
-        variant="ghost"
-        className="mb-6"
-        onClick={() => router.push('/wellness')}
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Wellness
-      </Button>
-
       {/* Hero section */}
       <div className="relative bg-card rounded-md">
         <div className="absolute inset-0 bg-[url('/breathing-pattern.svg')] opacity-10"></div>
@@ -49,7 +39,7 @@ export default function BreathingPage() {
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white border-0"
+                className="bg-primary hover:bg-primary/90 text-white border-0"
                 size="lg"
                 onClick={scrollToExercise}
               >
@@ -57,7 +47,6 @@ export default function BreathingPage() {
               </Button>
               <Button
                 variant="outline"
-                className="border-white hover:bg-white/10 text-white"
                 size="lg"
                 onClick={() => setActiveTab('learn')}
               >
@@ -74,14 +63,14 @@ export default function BreathingPage() {
           <h2 className="text-3xl font-bold">
             Benefits of Regular Breathing Practice
           </h2>
-          <p className="mt-4 max-w-2xl mx-auto text-gray-500 dark:text-gray-400">
+          <p className="mt-4 max-w-2xl mx-auto text-muted-foreground">
             Just a few minutes of focused breathing can have profound effects on
             your physical and mental wellbeing.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+          <Card className="border-border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 mb-4">
                 <Brain size={24} />
@@ -89,14 +78,14 @@ export default function BreathingPage() {
               <CardTitle className="text-xl">Mental Clarity</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Improves focus, concentration, and cognitive function by
                 increasing oxygen to the brain.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+          <Card className="border-border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 mb-4">
                 <Heart size={24} />
@@ -104,14 +93,14 @@ export default function BreathingPage() {
               <CardTitle className="text-xl">Stress Reduction</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Activates the parasympathetic nervous system, lowering cortisol
                 levels and reducing anxiety.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+          <Card className="border-border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 mb-4">
                 <Moon size={24} />
@@ -119,14 +108,14 @@ export default function BreathingPage() {
               <CardTitle className="text-xl">Better Sleep</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Calms the mind and relaxes the body, helping you fall asleep
                 faster and improve sleep quality.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+          <Card className="border-border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 mb-4">
                 <Zap size={24} />
@@ -134,7 +123,7 @@ export default function BreathingPage() {
               <CardTitle className="text-xl">Energy Boost</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-muted-foreground">
                 Certain breathing techniques can increase alertness and provide
                 a natural energy lift without caffeine.
               </p>
@@ -150,7 +139,7 @@ export default function BreathingPage() {
             <h2 className="text-3xl font-bold flex items-center gap-2">
               <Wind className="h-7 w-7 text-blue-500" /> Breathing Exercise
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-muted-foreground mt-2">
               Select a technique below and follow the guided exercise.
             </p>
           </div>
@@ -181,8 +170,8 @@ export default function BreathingPage() {
 
               {/* Tips Sidebar */}
               <div>
-                <Card className="border-0 shadow-md sticky top-8">
-                  <CardHeader className="bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30">
+                <Card className="border-border shadow-sm sticky top-8">
+                  <CardHeader className="bg-primary/10">
                     <CardTitle className="flex items-center text-xl">
                       <Info className="h-5 w-5 mr-2" /> Quick Tips
                     </CardTitle>
@@ -190,31 +179,31 @@ export default function BreathingPage() {
                   <CardContent className="pt-6">
                     <ul className="space-y-3">
                       <li className="flex gap-2">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                           1
                         </div>
                         <span>Find a comfortable, quiet position</span>
                       </li>
                       <li className="flex gap-2">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                           2
                         </div>
                         <span>Breathe through your nose when possible</span>
                       </li>
                       <li className="flex gap-2">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                           3
                         </div>
                         <span>Focus on your breath, not distractions</span>
                       </li>
                       <li className="flex gap-2">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                           4
                         </div>
                         <span>Use diaphragmatic (belly) breathing</span>
                       </li>
                       <li className="flex gap-2">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                           5
                         </div>
                         <span>
@@ -223,9 +212,9 @@ export default function BreathingPage() {
                       </li>
                     </ul>
 
-                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm font-medium mb-2">Did you know?</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                      <p className="text-sm text-muted-foreground">
                         Practicing breathing exercises for just 5 minutes daily
                         can significantly reduce stress levels and improve your
                         overall wellbeing.
@@ -236,9 +225,9 @@ export default function BreathingPage() {
               </div>
             </>
           ) : (
-            // Content for the Learn tab would go here
+            // Content for the Learn tab
             <div className="lg:col-span-3">
-              <Card className="border-0 shadow-md">
+              <Card className="border-border shadow-sm">
                 <CardHeader>
                   <CardTitle>Understanding Breathing Techniques</CardTitle>
                 </CardHeader>

@@ -71,6 +71,7 @@
     "dropdown-menu": "^0.1.1",
     "express": "^4.21.2",
     "formidable": "^3.5.2",
+    "framer-motion": "12.6.3",
     "install": "^0.13.0",
     "jose": "^5.9.6",
     "js-cookie": "^3.0.5",

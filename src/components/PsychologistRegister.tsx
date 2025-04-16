@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from './ui/button';
 import Loader from '@/components/common/Loader';
 import { ArrowRight } from 'lucide-react';
-// import StyledCountrySelect from './CountrySelect';
+import StyledCountrySelect from './CountrySelect';
 import { useRouter } from 'next/navigation';
 import {
   Select,
@@ -137,68 +137,68 @@ const PsychologistRegister = () => {
     },
   });
 
-  // useEffect(() => {
-  //   let isMounted = true;
-  //   let retryCount = 0;
-  //   const MAX_RETRIES = 3;
+  useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
 
-  //   const fetchCountries = async () => {
-  //     try {
-  //       setIsLoading(true);
-  //       setError(null);
+    const fetchCountries = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-  //       const response = await fetch('https://restcountries.com/v3.1/all', {
-  //         method: 'GET',
-  //         headers: {
-  //           Accept: 'application/json',
-  //         },
-  //       });
+        const response = await fetch('https://restcountries.com/v3.1/all', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
 
-  //       if (!response.ok) {
-  //         throw new Error(`HTTP error! status: ${response.status}`);
-  //       }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-  //       const data = await response.json();
+        const data = await response.json();
 
-  //       if (isMounted) {
-  //         const countryOptions = data
-  //           .sort((a: any, b: any) =>
-  //             a.name.common.localeCompare(b.name.common)
-  //           )
-  //           .map((country: any) => ({
-  //             label: country.name.common,
-  //             value: country.cca2,
-  //           }));
+        if (isMounted) {
+          const countryOptions = data
+            .sort((a: any, b: any) =>
+              a.name.common.localeCompare(b.name.common)
+            )
+            .map((country: any) => ({
+              label: country.name.common,
+              value: country.cca2,
+            }));
 
-  //         setCountries(countryOptions);
-  //         setIsLoading(false);
-  //         retryCount = 0;
-  //       }
-  //     } catch (error) {
-  //       console.error('Error fetching countries:', error);
+          setCountries(countryOptions);
+          setIsLoading(false);
+          retryCount = 0;
+        }
+      } catch (error) {
+        console.error('Error fetching countries:', error);
 
-  //       if (isMounted) {
-  //         setError('Failed to load countries. Retrying...');
-  //         retryCount++;
+        if (isMounted) {
+          setError('Failed to load countries. Retrying...');
+          retryCount++;
 
-  //         if (retryCount < MAX_RETRIES) {
-  //           setTimeout(fetchCountries, 3000);
-  //         } else {
-  //           setError(
-  //             'Failed to load countries. Please refresh the page or try again later.'
-  //           );
-  //           setIsLoading(false);
-  //         }
-  //       }
-  //     }
-  //   };
+          if (retryCount < MAX_RETRIES) {
+            setTimeout(fetchCountries, 3000);
+          } else {
+            setError(
+              'Failed to load countries. Please refresh the page or try again later.'
+            );
+            setIsLoading(false);
+          }
+        }
+      }
+    };
 
-  //   fetchCountries();
+    fetchCountries();
 
-  //   return () => {
-  //     isMounted = false;
-  //   };
-  // }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleChange = (e: { target: { name: any; value: any } }) => {
     const { name, value } = e.target;
@@ -517,13 +517,13 @@ const PsychologistRegister = () => {
                   </div>
                 </div>
 
-                {/* {countries && countries.length > 0 && (
+                {countries && countries.length > 0 && (
                   <StyledCountrySelect
                     formData={formData}
                     handleChange={handleChange}
                     countries={countries}
                   />
-                )} */}
+                )}
 
                 <div className="col-span-3">
                   <label

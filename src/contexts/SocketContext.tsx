@@ -969,7 +969,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     isMounted.current = true;
 
-    if (user?._id && user?.role) {
+    if (user?._id && user?.role && user?.isAuthenticated) {
+      console.log('Initializing socket for authenticated user:', user._id);
       initializeSocket(user._id, user.role);
     }
 
@@ -1020,7 +1021,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         // Don't disconnect here: globalSocketInstance.disconnect();
       }
     };
-  }, [user?._id, user?.role, initializeSocket]);
+  }, [user?._id, user?.role, user?.isAuthenticated, initializeSocket]);
 
   // Add network status event listeners
   useEffect(() => {

@@ -19,6 +19,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 
+// Create a global auth event name - VERY IMPORTANT
+export const AUTH_SUCCESS_EVENT = 'mentality_auth_success';
+
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
   password: z.string().min(1, 'Please enter a password.'),
@@ -37,7 +40,7 @@ export default function LoginForm() {
   const [dialogTitle, setDialogTitle] = useState('Account Approval Required');
   const [dialogIcon, setDialogIcon] = useState('warning');
 
-  // Handle submit function with simplified approval detection
+  // Handle submit function
   const handleSubmit = async e => {
     e.preventDefault();
 
@@ -51,6 +54,7 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
+      console.log('Attempting login...');
       const response = await fetch('/api/login', {
         method: 'POST',
         credentials: 'include',
@@ -63,7 +67,7 @@ export default function LoginForm() {
 
       // Direct check for 403 status - approval required
       if (response.status === 403) {
-        // Get the message from the response
+        // Handle approval required logic
         const message =
           data.ErrorMessage?.[0]?.message ||
           'Your account is pending approval by an administrator. Please check your email for updates.';
@@ -124,9 +128,19 @@ export default function LoginForm() {
           return;
         }
 
+        // Store auth token in localStorage (if available)
+        try {
+          localStorage.setItem('auth_token', data.Result.accessToken);
+          localStorage.setItem('user_authenticated', 'true');
+          localStorage.setItem('user_id', userData.id);
+        } catch (err) {
+          console.warn('Could not store auth data in localStorage:', err);
+        }
+
         // Create user object and set in store
         const userObj = {
           _id: userData.id,
+          id: userData.id, // Include both for compatibility
           email: userData.email,
           role: userData.role,
           isVerified: userData.isVerified,
@@ -135,25 +149,45 @@ export default function LoginForm() {
           lastName: userData.lastName || null,
           profileImage: userData.profileImage || null,
           approvalStatus: userData.approvalStatus || 'approved',
-          isAuthenticated: true,
+          isAuthenticated: true, // Critical for auth checks
         };
 
+        // Set user in store first before navigation
+        console.log('Setting authenticated user in store:', userObj);
         setUser(userObj);
-        toast.success('Login successful!');
-        setIsRedirecting(true);
 
+        // IMPORTANT: Wait a moment for state to update
         setTimeout(() => {
-          switch (userData.role) {
-            case 'admin':
-              router.push('/dashboard/admin');
-              break;
-            case 'psychologist':
-              router.push('/dashboard/psychologist');
-              break;
-            default:
-              router.push('/dashboard');
-          }
-        }, 500);
+          // Dispatch authentication success event BEFORE navigation
+          console.log('Dispatching auth success event');
+          window.dispatchEvent(
+            new CustomEvent(AUTH_SUCCESS_EVENT, {
+              detail: {
+                userId: userData.id,
+                role: userData.role,
+                timestamp: new Date().toISOString(),
+              },
+            })
+          );
+
+          // Show success toast
+          toast.success('Login successful!');
+          setIsRedirecting(true);
+
+          // Delayed redirect to ensure auth state propagates
+          setTimeout(() => {
+            switch (userData.role) {
+              case 'admin':
+                router.push('/dashboard/admin');
+                break;
+              case 'psychologist':
+                router.push('/dashboard/psychologist');
+                break;
+              default:
+                router.push('/dashboard');
+            }
+          }, 500);
+        }, 200);
       } else {
         toast.error('Login failed. Please check your credentials.');
         setIsLoading(false);
@@ -306,10 +340,10 @@ export default function LoginForm() {
                 dialogIcon === 'error'
                   ? 'bg-red-50 dark:bg-red-900/20'
                   : dialogIcon === 'info'
-                  ? 'bg-blue-50 dark:bg-blue-900/20'
-                  : dialogIcon === 'success'
-                  ? 'bg-green-50 dark:bg-green-900/20'
-                  : 'bg-yellow-50 dark:bg-yellow-900/20'
+                    ? 'bg-blue-50 dark:bg-blue-900/20'
+                    : dialogIcon === 'success'
+                      ? 'bg-green-50 dark:bg-green-900/20'
+                      : 'bg-yellow-50 dark:bg-yellow-900/20'
               } p-4 rounded-md`}
             >
               <p
@@ -317,10 +351,10 @@ export default function LoginForm() {
                   dialogIcon === 'error'
                     ? 'text-red-700 dark:text-red-200'
                     : dialogIcon === 'info'
-                    ? 'text-blue-700 dark:text-blue-200'
-                    : dialogIcon === 'success'
-                    ? 'text-green-700 dark:text-green-200'
-                    : 'text-yellow-700 dark:text-yellow-200'
+                      ? 'text-blue-700 dark:text-blue-200'
+                      : dialogIcon === 'success'
+                        ? 'text-green-700 dark:text-green-200'
+                        : 'text-yellow-700 dark:text-yellow-200'
                 }`}
               >
                 {approvalMessage}
@@ -330,10 +364,10 @@ export default function LoginForm() {
                   dialogIcon === 'error'
                     ? 'text-red-700 dark:text-red-200'
                     : dialogIcon === 'info'
-                    ? 'text-blue-700 dark:text-blue-200'
-                    : dialogIcon === 'success'
-                    ? 'text-green-700 dark:text-green-200'
-                    : 'text-yellow-700 dark:text-yellow-200'
+                      ? 'text-blue-700 dark:text-blue-200'
+                      : dialogIcon === 'success'
+                        ? 'text-green-700 dark:text-green-200'
+                        : 'text-yellow-700 dark:text-yellow-200'
                 }`}
               >
                 Please check your email for updates on your account status.

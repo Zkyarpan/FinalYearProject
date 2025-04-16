@@ -250,7 +250,6 @@ const RootLayout = ({ children }) => {
       pathname === '/articles' ||
       pathname === '/psychologist' ||
       pathname === '/services' ||
-      pathname === '/resources' ||
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
       pathname === '/' ||
@@ -315,7 +314,6 @@ const RootLayout = ({ children }) => {
     const sections = {
       '/blogs': BlogRightSection,
       '/psychologist': FilterSection,
-      '/psychologist/:path*': FilterSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,

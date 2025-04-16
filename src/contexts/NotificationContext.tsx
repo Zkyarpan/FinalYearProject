@@ -221,8 +221,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   const { socket, isConnected } = useSocket();
   const { user } = useUserStore();
 
-  // Add this to your NotificationContext useEffect to debug socket connections
-
   useEffect(() => {
     if (!socket || !isConnected) {
       console.log(
@@ -281,7 +279,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // First try REST API
       const response = await fetch(
-        `/api/notifications?limit=${pagination.limit}&skip=${newSkip}`
+        `/api/notifications?limit=${pagination.limit}&skip=${newSkip}`,
+        {
+          credentials: 'include',
+        }
       );
 
       if (!response.ok) {
@@ -338,7 +339,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   // Fetch notifications from the server
   const fetchNotifications = useCallback(
     async (resetPagination = true) => {
-      if (!user?._id) return;
+      if (!user?._id || !user?.isAuthenticated) {
+        console.log(
+          'Skipping notification fetch - user not fully authenticated'
+        );
+        return;
+      }
 
       // Don't set loading state if we already have notifications and are just refreshing
       const showLoadingState = resetPagination || notifications.length === 0;
@@ -362,16 +368,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             credentials: 'include', // Add this to include cookies with the request
           }
         );
-
-        // Improve error handling - don't throw error on 403
-        if (response.status === 403) {
-          console.warn(
-            'Access forbidden to notifications API, using fallback methods'
-          );
-          // Use fallback methods (localStorage or socket) instead of throwing
-        } else if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
 
         // Only try to parse response if it was successful
         if (response.ok) {
@@ -1175,7 +1171,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Load notifications when component mounts or user changes
   useEffect(() => {
-    if (!isInitialized && user?._id) {
+    if (!isInitialized && user?._id && user?.isAuthenticated) {
       console.log('Initial fetch of notifications');
       fetchNotifications(true);
 

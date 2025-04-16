@@ -61,7 +61,7 @@ const FilterSection = ({ onFilter }) => {
       <div ref={dropdownRef} className="relative">
         <div
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full py-1 outline-none text-sm rounded-lg border transition-all duration-100 group bg-gray-00  border-gray-200 dark:border-[#333333] bg-gray-00 text-gray-1k hover:border-gray-300 focus-within:border-gray-300 dark:bg-input shadow-input hover:shadow-input-hover focus-within:shadow-input cursor-pointer"
+          className="w-full py-1 outline-none text-sm rounded-lg border transition-all duration-100 group bg-gray-00  border-gray-200 dark:border-[#333333]  hover:border-gray-300 focus-within:border-gray-300 dark:bg-input shadow-input hover:shadow-input-hover focus-within:shadow-input cursor-pointer"
         >
           <div className="css-8akrpk flex items-center justify-between px-3 py-1">
             <div className="flex flex-wrap gap-1">

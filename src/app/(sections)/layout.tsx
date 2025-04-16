@@ -87,7 +87,7 @@ const routeTitles = {
   '/psychologist/appointments': 'Your Appointments',
   '/psychologist/messages': 'Inbox',
   '/psychologist/articles': 'My Articles',
-  '/psychologist/blog': 'My Blogs',
+  '/psychologist/blogs': 'My Blogs',
   '/psychologist/availability': 'My Availability',
 
   // Admin routes
@@ -182,13 +182,12 @@ const RootLayout = ({ children }) => {
 
   const EXCLUDED_NESTED_ROUTES = [
     '/psychologist/appointments',
-    '/psychologist/articles',
-    '/psychologist/blog',
     '/psychologist/messages',
     '/psychologist/patients',
     '/psychologist/resources',
     '/psychologist/services',
     '/psychologist/availability',
+    '/psychologist/resources',
   ];
 
   const pathParts = pathname.split('/').filter(Boolean);
@@ -197,6 +196,9 @@ const RootLayout = ({ children }) => {
 
   const isNestedBlogRoute =
     pathname.startsWith('/blogs/') && pathname !== '/blogs';
+
+  const isWellnessNestedRoute =
+    pathname.startsWith('/wellness/') && pathname !== '/wellness';
 
   // Check for detail or edit pages
   const isNestedArticleRoute =
@@ -226,6 +228,7 @@ const RootLayout = ({ children }) => {
     isNestedBlogRoute ||
     isNestedArticleRoute ||
     isNestedStoryRoute ||
+    isWellnessNestedRoute ||
     (pathname.startsWith('/psychologist/') &&
       pathname !== '/psychologist' &&
       !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route)));
@@ -238,12 +241,15 @@ const RootLayout = ({ children }) => {
   // Updated showRightSidebar condition to exclude admin routes
   const showRightSidebar =
     ((!isAuthenticated && pathname !== '/dashboard') ||
-      (isAuthenticated && !isDashboardPage && role === 'user')) &&
+      (isAuthenticated &&
+        !isDashboardPage &&
+        (role === 'user' || role === 'psychologist'))) &&
     !isAdminRoute &&
     (pathname === '/stories' ||
       pathname === '/blogs' ||
       pathname === '/articles' ||
       pathname === '/psychologist' ||
+      pathname === '/services' ||
       (pathname.startsWith('/psychologist/') &&
         !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))) ||
       pathname === '/' ||
@@ -279,6 +285,8 @@ const RootLayout = ({ children }) => {
       router.push('/blogs');
     } else if (isNestedPsychologistRoute) {
       router.push('/psychologist');
+    } else if (isWellnessNestedRoute) {
+      router.push('/wellness');
     } else if (
       isArticleEditPage ||
       (isNestedArticleRoute && !isArticleEditPage)
@@ -302,19 +310,21 @@ const RootLayout = ({ children }) => {
       return null;
     }
 
+    // Common sections that work for both users and psychologists
     const sections = {
       '/blogs': BlogRightSection,
       '/psychologist': FilterSection,
-      '/psychologist/:path*': FilterSection,
       '/stories': StoriesSection,
       '/services': ServicesSection,
       '/articles': ArticlesSection,
       '/resources': ResourcesSection,
       '/': StoriesSection,
+      '/user/*': StoriesSection,
     };
 
     let SectionComponent = sections[pathname];
 
+    // Special handling for psychologist profile routes
     if (
       pathname.startsWith('/psychologist/') &&
       !EXCLUDED_NESTED_ROUTES.some(route => pathname.startsWith(route))
@@ -328,6 +338,7 @@ const RootLayout = ({ children }) => {
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           handleNavigation={handleNavigation}
+          isPsychologist={role === 'psychologist'} // Add this prop to pass to the component
         />
       );
     }
@@ -342,7 +353,6 @@ const RootLayout = ({ children }) => {
         ? email[0].toUpperCase()
         : 'A';
 
-  // Enhanced AdminActions component with more functionality
   // Enhanced AdminActions component with proper logout functionality
   const EnhancedAdminActions = ({ email, logout, router }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -786,7 +796,6 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
         </div>
-
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex w-[212px] border-r border-border fixed left-0 top-0 h-screen flex-col justify-between py-4 dark:border-[#333333] bg-background z-[10]">
           <div className="flex flex-col h-full">
@@ -831,7 +840,6 @@ const RootLayout = ({ children }) => {
             </nav>
           </div>
         </div>
-
         {/* Main Content Area */}
         <div
           className={`flex-1 ${
@@ -882,13 +890,14 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto hide-scrollbar relative mt-10">
+          {/* IMPORTANT: Remove this empty div that appears during refresh */}
+          {/* <div className="flex-1 overflow-auto hide-scrollbar relative mt-10"> */}
+          <div className="flex-1 relative mt-10">
             <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
               {children}
             </div>
           </div>
         </div>
-
         {/* Right Sidebar */}
         {showRightSidebar && (
           <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[50]">
@@ -909,7 +918,26 @@ const RootLayout = ({ children }) => {
             </div>
           </div>
         )}
-
+        {/* Right Sidebar */}
+        {showRightSidebar && (
+          <div className="hidden lg:flex w-[420px] fixed right-0 top-0 h-screen border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#333333] flex-col z-[50]">
+            <div className="h-14 border-b border-border dark:border-[#333333] flex items-center px-8 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <UserActions
+                isAuthenticated={isAuthenticated}
+                profileImage={profileImage}
+                role={role}
+                firstName={firstName}
+                lastName={lastName}
+                router={router}
+                onLoginClick={() => setShowLoginModal(true)}
+                logout={logout}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+              <div className="p-8">{renderSidebarContent()}</div>
+            </div>
+          </div>
+        )}
         <LoginModal
           isOpen={showLoginModal}
           onClose={() => setShowLoginModal(false)}

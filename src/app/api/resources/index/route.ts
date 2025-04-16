@@ -54,12 +54,13 @@ export async function GET(req: NextRequest) {
     // Get query parameters
     const url = new URL(req.url);
     const category = url.searchParams.get('category');
-    const tag = url.searchParams.get('tag');
     const difficulty = url.searchParams.get('difficulty');
     const authorId = url.searchParams.get('author');
     const limit = parseInt(url.searchParams.get('limit') || '10');
     const page = parseInt(url.searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
+    const search = url.searchParams.get('search');
+    const tag = url.searchParams.get('tag');
 
     // Build query
     const query: any = {};
@@ -74,6 +75,14 @@ export async function GET(req: NextRequest) {
     }
     if (authorId) {
       query.author = authorId;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } },
+      ];
     }
 
     // Only show published resources for non-authenticated users

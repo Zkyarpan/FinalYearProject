@@ -3,14 +3,11 @@ import { Inter, Instrument_Serif } from 'next/font/google';
 import './globals.css';
 import { Suspense, lazy } from 'react';
 import { ThemeProviders } from '@/providers/ThemeProviders';
-import { Toaster } from 'sonner';
+import CustomToaster from '@/components/CustomToaster';
 import NextTopLoader from 'nextjs-toploader';
-import { NotificationProvider } from '@/contexts/NotificationContext';
 
-// Lazy load client components
 const ClientProviders = lazy(() => import('@/components/core/ClientOnly'));
 
-// Further optimize fonts - only load weights you actually use
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
@@ -48,12 +45,9 @@ export default function RootLayout({
       >
         <ThemeProviders>
           <NextTopLoader color="#0466C8" showSpinner={false} height={2} />
-          <Toaster position="bottom-right" richColors />
-
+          <CustomToaster /> 
           <Suspense fallback={<div className="min-h-screen"></div>}>
-            <ClientProviders>
-              <NotificationProvider>{children}</NotificationProvider>
-            </ClientProviders>
+            <ClientProviders>{children}</ClientProviders>
           </Suspense>
         </ThemeProviders>
       </body>

@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Brain,
   Trophy,
   Dices,
@@ -13,6 +11,9 @@ import {
   X,
   CheckCircle,
   Star,
+  ArrowUp,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 
 // Import from your store
 import { useActivityStore, logActivity } from '@/store/activity-store';
@@ -45,6 +47,7 @@ const MemoryMatchGame = ({ onComplete }) => {
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(
     null
   );
+  const [streakCount, setStreakCount] = useState(0);
 
   // Card icons
   const icons = [
@@ -81,9 +84,17 @@ const MemoryMatchGame = ({ onComplete }) => {
     setScore(0);
     setGameOver(false);
     setTimer(0);
+    setStreakCount(0);
 
     if (timerInterval) {
       clearInterval(timerInterval);
+    }
+
+    if (gameStarted) {
+      toast.info('Game reset', {
+        description: 'Starting a new game with fresh cards',
+        icon: <RefreshCw className="h-4 w-4" />,
+      });
     }
   };
 
@@ -97,6 +108,11 @@ const MemoryMatchGame = ({ onComplete }) => {
     }, 1000);
 
     setTimerInterval(interval);
+
+    toast.success('Game started!', {
+      description: 'Find all matching pairs as quickly as you can.',
+      icon: <Dices className="h-5 w-5" />,
+    });
   };
 
   // Handle card flipping
@@ -122,11 +138,33 @@ const MemoryMatchGame = ({ onComplete }) => {
       setMatched(prev => [...prev, flipped[0], id]);
       setScore(prev => prev + 10);
       setFlipped([]);
+
+      // Increment streak count
+      const newStreakCount = streakCount + 1;
+      setStreakCount(newStreakCount);
+
+      // Show toast for match
+      if (newStreakCount >= 3) {
+        toast.success(`${newStreakCount} streak! 🔥`, {
+          description: "You're on fire!",
+          icon: <Sparkles className="h-4 w-4 text-amber-400" />,
+        });
+      } else {
+        toast('Match found!', {
+          description: `+10 points added to your score`,
+          icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+        });
+      }
     } else {
       // No match, flip back after delay
       setTimeout(() => {
         setFlipped([]);
       }, 1000);
+
+      // Reset streak
+      if (streakCount > 0) {
+        setStreakCount(0);
+      }
     }
   };
 
@@ -152,6 +190,8 @@ const MemoryMatchGame = ({ onComplete }) => {
         time: timer,
         gameType: 'memory-match',
       });
+
+      // Don't need to show a toast here since we'll show the completion modal
     }
   }, [matched, cards, timerInterval, score, timer, moves, onComplete]);
 
@@ -175,16 +215,18 @@ const MemoryMatchGame = ({ onComplete }) => {
   return (
     <div className="flex flex-col items-center">
       {!gameStarted ? (
-        <div className="text-center p-8 bg-card rounded-xl max-w-md mx-auto">
-          <Dices className="h-16 w-16 mx-auto mb-4 text-amber-500" />
+        <div className="text-center p-8 bg-card border border-border rounded-xl max-w-md mx-auto shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4">
+            <Dices className="h-8 w-8" />
+          </div>
           <h2 className="text-2xl font-bold mb-4">Memory Match</h2>
-          <p className="mb-6 text-gray-500">
+          <p className="mb-6 text-muted-foreground">
             Test your memory by matching pairs of cards. Find all matches as
             quickly as possible!
           </p>
           <Button
             onClick={startGame}
-            className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-8 py-6 text-lg"
+            className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-6 text-lg"
           >
             Start Game
           </Button>
@@ -192,19 +234,23 @@ const MemoryMatchGame = ({ onComplete }) => {
       ) : (
         <div className="w-full max-w-3xl mx-auto">
           {/* Game stats */}
-          <div className="flex justify-between items-center mb-6 bg-card p-4 rounded-lg">
+          <div className="flex justify-between items-center mb-6 bg-card p-4 rounded-lg border border-border shadow-sm">
             <div className="flex items-center gap-6">
               <div>
-                <span className="block text-sm text-gray-500">Moves</span>
+                <span className="block text-sm text-muted-foreground">
+                  Moves
+                </span>
                 <span className="text-xl font-bold">{moves}</span>
               </div>
               <div>
-                <span className="block text-sm text-gray-500">Time</span>
+                <span className="block text-sm text-muted-foreground">
+                  Time
+                </span>
                 <span className="text-xl font-bold">{formatTime(timer)}</span>
               </div>
             </div>
             <div>
-              <span className="block text-sm text-gray-500">Score</span>
+              <span className="block text-sm text-muted-foreground">Score</span>
               <span className="text-xl font-bold">{score}</span>
             </div>
           </div>
@@ -216,10 +262,10 @@ const MemoryMatchGame = ({ onComplete }) => {
                 key={card.id}
                 className={`aspect-square rounded-lg cursor-pointer transition-all duration-300 transform ${
                   matched.includes(card.id)
-                    ? 'bg-green-100 dark:bg-green-900/30 scale-95'
+                    ? 'bg-green-500/20 dark:bg-green-500/30 scale-95'
                     : flipped.includes(card.id)
-                      ? 'bg-amber-100 dark:bg-amber-900/30 rotate-y-180'
-                      : 'bg-card hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-amber-500/20 dark:bg-amber-500/30 rotate-y-180'
+                      : 'bg-card border border-border hover:bg-muted dark:hover:bg-muted'
                 } flex items-center justify-center text-3xl`}
                 onClick={() => handleCardClick(card.id)}
               >
@@ -257,25 +303,25 @@ const GameCompletionModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative bg-card w-full max-w-md rounded-xl shadow-2xl p-6 animate-fade-in-up transform transition-all">
+      <div className="relative bg-card w-full max-w-md rounded-xl shadow-2xl p-6 animate-in fade-in-0 slide-in-from-bottom-10 border border-border">
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
         >
           <X className="h-6 w-6" />
         </button>
 
         <div className="text-center mb-4">
-          <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
+          <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle className="h-10 w-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold mb-1">Game Complete!</h2>
-          <p className="text-gray-500 mb-4">
+          <p className="text-muted-foreground mb-4">
             Great job on completing the challenge.
           </p>
 
           {isNewHighScore && (
-            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 p-3 rounded-lg mb-4 flex items-center justify-center">
+            <div className="bg-amber-500/10 text-amber-600 p-3 rounded-lg mb-4 flex items-center justify-center">
               <Star className="h-5 w-5 mr-2 text-amber-500" />
               <span className="font-medium">New High Score!</span>
             </div>
@@ -283,24 +329,24 @@ const GameCompletionModal = ({
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-center">
-            <div className="text-sm text-gray-500 mb-1">Score</div>
+          <div className="bg-muted p-3 rounded-lg text-center">
+            <div className="text-sm text-muted-foreground mb-1">Score</div>
             <div className="text-2xl font-bold">{gameData.score}</div>
           </div>
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-center">
-            <div className="text-sm text-gray-500 mb-1">Time</div>
+          <div className="bg-muted p-3 rounded-lg text-center">
+            <div className="text-sm text-muted-foreground mb-1">Time</div>
             <div className="text-2xl font-bold">
               {Math.floor(gameData.time / 60)}:
               {gameData.time % 60 < 10 ? '0' : ''}
               {gameData.time % 60}
             </div>
           </div>
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-center">
-            <div className="text-sm text-gray-500 mb-1">Moves</div>
+          <div className="bg-muted p-3 rounded-lg text-center">
+            <div className="text-sm text-muted-foreground mb-1">Moves</div>
             <div className="text-2xl font-bold">{gameData.moves}</div>
           </div>
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-center">
-            <div className="text-sm text-gray-500 mb-1">High Score</div>
+          <div className="bg-muted p-3 rounded-lg text-center">
+            <div className="text-sm text-muted-foreground mb-1">High Score</div>
             <div className="text-2xl font-bold">{highScore}</div>
           </div>
         </div>
@@ -310,7 +356,7 @@ const GameCompletionModal = ({
             Back to Games
           </Button>
           <Button
-            className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
             onClick={() => {
               onClose();
               // This would trigger the game to reset and start again
@@ -327,7 +373,6 @@ const GameCompletionModal = ({
 
 // Main Focus Games Page
 export default function FocusGamesPage() {
-  const router = useRouter();
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('games');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -360,7 +405,9 @@ export default function FocusGamesPage() {
   });
 
   // Get stats from your activity store
-  const focusStats = useActivityStore(state => state.getActivityStats('focus'));
+  const focusStats = useActivityStore(state =>
+    state.getActivityStats<any>('focus')
+  );
 
   const games = [
     {
@@ -370,7 +417,7 @@ export default function FocusGamesPage() {
       icon: <Dices className="h-6 w-6" />,
       color: 'bg-amber-500',
       textColor: 'text-amber-600',
-      bgColor: 'bg-amber-100',
+      bgColor: 'bg-amber-500/10',
       difficulty: 'beginner',
       duration: '3-5 min',
       stats: {
@@ -387,7 +434,7 @@ export default function FocusGamesPage() {
       icon: <Brain className="h-6 w-6" />,
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
-      bgColor: 'bg-emerald-100',
+      bgColor: 'bg-emerald-500/10',
       difficulty: 'intermediate',
       duration: '5-10 min',
       stats: {
@@ -422,6 +469,19 @@ export default function FocusGamesPage() {
       const bestTime = prevStats.gameStats[gameID]?.bestTime
         ? Math.min(prevStats.gameStats[gameID].bestTime, data.time)
         : data.time;
+
+      // Show appropriate toast
+      if (isNewHigh) {
+        toast.success('New high score!', {
+          description: `You've beaten your previous record of ${currentHighScore} points!`,
+          icon: <ArrowUp className="h-4 w-4 text-green-500" />,
+        });
+      } else {
+        toast.success('Game completed!', {
+          description: `You scored ${data.score} points in ${Math.floor(data.time / 60)}:${data.time % 60 < 10 ? '0' : ''}${data.time % 60}`,
+          icon: <Trophy className="h-4 w-4 text-amber-500" />,
+        });
+      }
 
       // Update all stats
       return {
@@ -458,61 +518,68 @@ export default function FocusGamesPage() {
     setShowCompletionModal(false);
   };
 
+  // Handle selecting a game
+  const handleSelectGame = gameId => {
+    setSelectedGame(gameId);
+
+    // Show toast when game is selected
+    const game = games.find(g => g.id === gameId);
+    if (game) {
+      toast.info(`Loading ${game.title}`, {
+        description: game.description,
+        icon: game.icon,
+      });
+    }
+  };
+
   return (
     <div className="mx-auto px-4 py-8">
-      <Button
-        variant="ghost"
-        className="mb-6"
-        onClick={() => {
-          if (selectedGame) {
-            setSelectedGame(null);
-          } else {
-            router.push('/wellness');
-          }
-        }}
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        {selectedGame ? 'Back to Games' : 'Back to Wellness'}
-      </Button>
-
       {!selectedGame ? (
         <>
           {/* Hero section */}
-          <div className="relative bg-card rounded-xl shadow-lg mb-10 overflow-hidden">
+          <div className="relative bg-card rounded-xl shadow-sm mb-10 overflow-hidden border dark:border-[#333333]">
             <div className="absolute inset-0 bg-[url('/focus-pattern.svg')] opacity-10"></div>
             <div className="py-12 px-6 sm:px-8 relative z-10">
               <div className="max-w-3xl mx-auto text-center">
-                <h1 className="text-4xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-500">
+                <h1 className="text-4xl font-extrabold mb-4">
                   Focus & Cognitive Games
                 </h1>
-                <p className="text-xl opacity-90 max-w-2xl mx-auto">
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                   Fun, interactive games designed to improve your concentration,
                   memory, and mental flexibility.
                 </p>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                  <div className="border dark:border-[#333333] rounded-lg p-4">
                     <div className="text-3xl font-bold">
                       {stats.gamesPlayed}
                     </div>
-                    <div className="text-sm opacity-80">Games Played</div>
+                    <div className="text-sm text-muted-foreground">
+                      Games Played
+                    </div>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="text-3xl font-bold">{stats.highScore}</div>
-                    <div className="text-sm opacity-80">High Score</div>
+                  <div className="border dark:border-[#333333] rounded-lg p-4">
+                    <div className="text-3xl font-bold ">{stats.highScore}</div>
+                    <div className="text-sm text-muted-foreground">
+                      High Score
+                    </div>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="text-3xl font-bold">
+                  <div className="border dark:border-[#333333] rounded-lg p-4">
+                    <div className="text-3xl font-bold ">
                       {stats.totalTime} min
                     </div>
-                    <div className="text-sm opacity-80">Total Time</div>
+                    <div className="text-sm text-muted-foreground">
+                      Total Time
+                    </div>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="text-3xl font-bold">
+                  <div className="border dark:border-[#333333] rounded-lg p-4">
+                    <div className="text-3xl font-bold ">
                       {stats.averageScore}
                     </div>
-                    <div className="text-sm opacity-80">Average Score</div>
+                    <div className="text-sm text-muted-foreground">
+                      Average Score
+                    </div>
                   </div>
                 </div>
               </div>
@@ -527,7 +594,7 @@ export default function FocusGamesPage() {
           >
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold flex items-center gap-2">
-                <Brain className="h-7 w-7 text-emerald-500" /> Brain Games
+                <Brain className="h-7 w-7 text-primary" /> Brain Games
               </h2>
 
               <TabsList>
@@ -541,10 +608,10 @@ export default function FocusGamesPage() {
                 {games.map(game => (
                   <Card
                     key={game.id}
-                    className="border-0 shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
-                    onClick={() => setSelectedGame(game.id)}
+                    className="border-border shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden group"
+                    onClick={() => handleSelectGame(game.id)}
                   >
-                    <div className={`h-2 w-full ${game.color}`}></div>
+                    <div className={`h-1 w-full ${game.color}`}></div>
                     <CardHeader className="pb-2">
                       <div className="flex justify-between">
                         <div
@@ -561,18 +628,18 @@ export default function FocusGamesPage() {
                     </CardHeader>
                     <CardContent className="pb-2">
                       <div className="flex justify-between items-center text-sm mt-2">
-                        <div className="flex items-center text-gray-500">
+                        <div className="flex items-center text-muted-foreground">
                           <Clock className="h-4 w-4 mr-1" />
                           <span>{game.duration}</span>
                         </div>
-                        <div className="flex items-center text-gray-500">
+                        <div className="flex items-center text-muted-foreground">
                           <Trophy className="h-4 w-4 mr-1 text-amber-500" />
                           <span>{game.stats.highScore}</span>
                         </div>
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 group-hover:shadow-lg transition-shadow">
+                      <Button className="w-full bg-primary hover:bg-primary/90 group-hover:shadow-sm transition-shadow">
                         Start Game
                       </Button>
                     </CardFooter>
@@ -580,31 +647,31 @@ export default function FocusGamesPage() {
                 ))}
               </div>
 
-              <div className="bg-card rounded-lg p-6 shadow-md">
+              <div className="bg-card rounded-lg p-6 shadow-sm border dark:border-[#333333]">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-amber-500" /> Benefits of
                   Brain Games
                 </h3>
-                <p className="mb-4 text-gray-500">
+                <p className="mb-4 text-muted-foreground">
                   Regular cognitive training has been shown to improve various
                   aspects of mental performance:
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="p-4 border dark:border-[#333333] rounded-lg">
                     <h4 className="font-medium mb-2">Memory</h4>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Strengthens working memory and recall abilities
                     </p>
                   </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="p-4 border dark:border-[#333333] rounded-lg">
                     <h4 className="font-medium mb-2">Attention</h4>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Enhances focus duration and ability to ignore distractions
                     </p>
                   </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="p-4 border dark:border-[#333333] rounded-lg">
                     <h4 className="font-medium mb-2">Processing Speed</h4>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Improves how quickly you can process and respond to
                       information
                     </p>
@@ -614,10 +681,10 @@ export default function FocusGamesPage() {
             </TabsContent>
 
             <TabsContent value="progress">
-              <Card className="border-0 shadow-md">
+              <Card className="border-border shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <BarChart className="h-5 w-5 text-emerald-500" />
+                    <BarChart className="h-5 w-5 text-primary" />
                     Your Progress
                   </CardTitle>
                   <CardDescription>
@@ -643,7 +710,7 @@ export default function FocusGamesPage() {
                                     ></span>
                                     {game.title}
                                   </h4>
-                                  <span className="text-sm text-gray-500">
+                                  <span className="text-sm text-muted-foreground">
                                     {gameStats.totalGames} plays
                                   </span>
                                 </div>
@@ -670,7 +737,7 @@ export default function FocusGamesPage() {
                         )}
                       </div>
                     ) : (
-                      <p className="text-center text-gray-500">
+                      <p className="text-center text-muted-foreground">
                         Progress tracking statistics will appear here as you
                         play more games.
                       </p>
@@ -688,7 +755,7 @@ export default function FocusGamesPage() {
             <h1 className="text-3xl font-bold">
               {games.find(g => g.id === selectedGame)?.title}
             </h1>
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               {games.find(g => g.id === selectedGame)?.description}
             </p>
           </div>
@@ -698,14 +765,27 @@ export default function FocusGamesPage() {
           )}
 
           {selectedGame === 'attention-training' && (
-            <div className="text-center p-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="text-center p-12 bg-muted/50 rounded-lg">
               <Brain className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-2">
                 Attention Training Game
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-muted-foreground mb-6">
                 This game will be available soon. Check back later!
               </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedGame(null);
+                  toast.info('Coming soon!', {
+                    description:
+                      "We're still developing this game. Try Memory Match in the meantime!",
+                    icon: <Brain className="h-4 w-4" />,
+                  });
+                }}
+              >
+                Return to Games
+              </Button>
             </div>
           )}
         </div>

@@ -496,7 +496,7 @@ const NotificationsPage = () => {
       const path =
         user?.role === 'psychologist'
           ? '/dashboard/availability'
-          : '/appointments/book';
+          : '/appointments/';
       router.push(path);
     }
   };

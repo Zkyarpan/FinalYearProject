@@ -2,18 +2,48 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Toaster, toast } from 'sonner';
 import {
   BreathingMeditationStats,
   FocusStats,
   JournalingStats,
   useActivityStore,
 } from '@/store/activity-store';
+import {
+  TrendingUp,
+  Calendar,
+  Timer,
+  Award,
+  Wind,
+  Brain,
+  Heart,
+  Sparkles,
+  Gamepad2,
+  AlignJustify,
+  Moon,
+  BarChart3,
+  Compass,
+  ListTodo,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
 const WellnessContent = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [isClient, setIsClient] = useState(false);
   const [formattedLastActive, setFormattedLastActive] = useState('Today');
+  const [progressAnimation, setProgressAnimation] = useState(0);
 
   // Get stats from the activity store with proper type annotations
   const stats = useActivityStore(state => state.getOverallStats());
@@ -41,11 +71,19 @@ const WellnessContent = () => {
     if (stats?.lastUsedDate) {
       setFormattedLastActive(formatDate(stats.lastUsedDate));
     }
-
-    // This is a dependency array - re-run this effect if stats.lastUsedDate changes
   }, [stats?.lastUsedDate]);
 
-  const formatDate = (date: string) => {
+  // Animate progress bar
+  useEffect(() => {
+    if (isClient) {
+      const timer = setTimeout(() => {
+        setProgressAnimation(completionPercentage);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isClient]);
+
+  const formatDate = date => {
     if (!date) return 'Today';
 
     const d = new Date(date);
@@ -63,573 +101,708 @@ const WellnessContent = () => {
   };
 
   // Calculate total completion percentage
-  const totalActivities = 4;
+  const totalActivities = 5; // Including the new Wordle game
   const activitiesStarted = [
     breathingStats?.sessions > 0,
     meditationStats?.sessions > 0,
     focusStats?.sessions > 0,
     gratitudeStats?.totalEntries > 0,
+    false, // placeholder for Wordle game
   ].filter(Boolean).length;
 
   const completionPercentage = Math.round(
     (activitiesStarted / totalActivities) * 100
   );
 
+  const handleActivityStart = activityPath => {
+    toast.success(`Opening ${activityPath.split('/').pop()}`, {
+      description: "Let's improve your mental wellbeing!",
+    });
+    router.push(activityPath);
+  };
+
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header with welcome message */}
-      <div className="bg-gradient-to-r from-blue-900 to-purple-900 py-8 px-6 rounded-b-3xl shadow-xl">
+      <div className="py-8 px-6 mb-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Your Wellness Journey</h1>
-          <p className="text-blue-200 mb-8">
-            Track your progress and build healthy habits
+          <p className="text-muted-foreground">
+            Track your progress and build healthy habits for better mental
+            wellbeing
           </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 pb-8">
         {/* Summary Section */}
         <div className="mb-10">
           <div className="flex items-center mb-6">
-            <div className="relative h-3 w-full bg-gray-700 rounded-full overflow-hidden">
+            <div className="relative h-2 w-full bg-secondary rounded-full overflow-hidden">
               <div
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-500"
-                style={{ width: `${completionPercentage}%` }}
+                className="absolute top-0 left-0 h-full bg-primary"
+                style={{ width: `${progressAnimation}%` }}
               ></div>
             </div>
-            <span className="ml-4 text-lg font-semibold text-white">
+            <span className="ml-4 text-lg font-semibold">
               {completionPercentage}%
             </span>
           </div>
 
-          {/* Stats Cards - with subtle animations and improved visuals */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-lg hover:shadow-blue-900/20 hover:translate-y-[-2px] transition-all duration-300">
-              <div className="flex mb-3">
-                <div className="bg-blue-500 bg-opacity-20 rounded-full p-2 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-blue-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                  </svg>
-                </div>
-                <div className="text-gray-400 text-sm">Total Sessions</div>
-              </div>
-              <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-300">
-                {stats?.totalSessions || 76}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-lg hover:shadow-indigo-900/20 hover:translate-y-[-2px] transition-all duration-300">
-              <div className="flex mb-3">
-                <div className="bg-indigo-500 bg-opacity-20 rounded-full p-2 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-indigo-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
-                </div>
-                <div className="text-gray-400 text-sm">Minutes Practiced</div>
-              </div>
-              <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-300">
-                {stats?.totalMinutes || 97}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-lg hover:shadow-purple-900/20 hover:translate-y-[-2px] transition-all duration-300">
-              <div className="flex mb-3">
-                <div className="bg-purple-500 bg-opacity-20 rounded-full p-2 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-purple-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="8" r="7"></circle>
-                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                  </svg>
-                </div>
-                <div className="text-gray-400 text-sm">Day Streak</div>
-              </div>
-              <div className="flex items-end">
-                <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-300">
-                  {dailyStreak || 1}
-                </div>
-                {dailyStreak > 0 && isClient && (
-                  <div className="ml-2 mb-1 bg-yellow-500 text-gray-900 text-xs px-2 py-0.5 rounded-full font-semibold">
-                    🔥 Active
+            <Card className="bg-card border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex mb-3">
+                  <div className="bg-primary/10 rounded-full p-2 mr-3">
+                    <TrendingUp className="h-5 w-5" />
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-lg hover:shadow-pink-900/20 hover:translate-y-[-2px] transition-all duration-300">
-              <div className="flex mb-3">
-                <div className="bg-pink-500 bg-opacity-20 rounded-full p-2 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-pink-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect
-                      x="3"
-                      y="4"
-                      width="18"
-                      height="18"
-                      rx="2"
-                      ry="2"
-                    ></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                  </svg>
+                  <div className="text-muted-foreground text-sm">
+                    Total Sessions
+                  </div>
                 </div>
-                <div className="text-gray-400 text-sm">Last Activity</div>
-              </div>
-              <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-red-300">
-                {isClient ? formattedLastActive : 'Today'}
-              </div>
-            </div>
+                <div className="text-3xl font-bold">
+                  {stats?.totalSessions || 52}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex mb-3">
+                  <div className="bg-primary/10 rounded-full p-2 mr-3">
+                    <Timer className="h-5 w-5" />
+                  </div>
+                  <div className="text-muted-foreground text-sm">
+                    Minutes Practiced
+                  </div>
+                </div>
+                <div className="text-3xl font-bold">
+                  {stats?.totalMinutes || 158}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex mb-3">
+                  <div className="bg-primary/10 rounded-full p-2 mr-3">
+                    <Award className="h-5 w-5" />
+                  </div>
+                  <div className="text-muted-foreground text-sm">
+                    Day Streak
+                  </div>
+                </div>
+                <div className="flex items-end">
+                  <div className="text-3xl font-bold">
+                    {dailyStreak || 1}
+                  </div>
+                  {dailyStreak > 0 && isClient && (
+                    <div className="ml-2 mb-1 bg-amber-500 text-black text-xs px-2 py-0.5 rounded-full font-semibold">
+                      🔥 Active
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex mb-3">
+                  <div className="bg-primary/10 rounded-full p-2 mr-3">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div className="text-muted-foreground text-sm">
+                    Last Activity
+                  </div>
+                </div>
+                <div className="text-3xl font-bold">
+                  {isClient ? formattedLastActive : 'Today'}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Daily Recommendation */}
-        <div className="bg-gradient-to-r from-blue-800 to-indigo-900 p-6 rounded-2xl mb-10 shadow-lg relative overflow-hidden">
-          <div className="absolute right-0 bottom-0 opacity-10">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="180"
-              height="180"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        {/* Tabs Navigation */}
+        <Tabs defaultValue="activities" className="mb-10">
+          <TabsList className="mb-6 bg-card w-full justify-start border-b rounded-none p-0 h-auto">
+            <TabsTrigger
+              value="activities"
+              className="py-3 px-6 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
             >
-              <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path>
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold mb-2">Today's Recommendation</h2>
-          <p className="text-blue-200 mb-4">
-            Start your day with 5 minutes of guided breathing to reduce stress
-            and improve focus.
-          </p>
-          <button
-            className="bg-white text-indigo-900 font-medium py-3 px-6 rounded-xl shadow-lg hover:shadow-indigo-500/40 hover:bg-opacity-95 transition-all duration-200"
-            onClick={() => router.push('/wellness/breathing')}
-          >
-            Start Breathing Exercise
-          </button>
-        </div>
+              <ListTodo className="h-4 w-4 mr-2" />
+              Activities
+            </TabsTrigger>
+            <TabsTrigger
+              value="recommendations"
+              className="py-3 px-6 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
+            >
+              <Compass className="h-4 w-4 mr-2" />
+              Recommendations
+            </TabsTrigger>
+            <TabsTrigger
+              value="progress"
+              className="py-3 px-6 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Your Progress
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Activities Header with new design */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center">
-            <h2 className="text-2xl font-bold text-white">
-              Wellness Activities
-            </h2>
-            <span className="ml-3 bg-gray-800 text-xs px-3 py-1 rounded-full border border-gray-700 text-blue-300 font-semibold">
-              4 activities
-            </span>
-          </div>
-          <button className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
-            View All
-          </button>
-        </div>
-
-        {/* Activities Grid - with modern card design */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          {/* Breathing Exercises */}
-          <div className="bg-gray-800 rounded-2xl shadow-lg overflow-hidden group hover:shadow-blue-900/30 transition-all duration-300 hover:translate-y-[-3px]">
-            <div className="bg-blue-500 bg-opacity-10 h-3 w-full"></div>
-            <div className="p-5">
-              <div className="flex items-center mb-4">
-                <div className="bg-blue-500 bg-opacity-20 rounded-xl p-3 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-blue-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path>
-                  </svg>
-                </div>
-                <h3 className="font-medium text-lg text-white">
-                  Breathing Exercises
-                </h3>
+          {/* Activities Tab */}
+          <TabsContent value="activities" className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center">
+                <h2 className="text-2xl font-bold">Wellness Activities</h2>
+                <Badge className="ml-3 bg-primary/10 text-xs px-3 py-1 border border-primary/20 text-primary font-semibold">
+                  5 activities
+                </Badge>
               </div>
-
-              <p className="text-sm text-gray-400 mb-6">
-                Guided breathing techniques to reduce stress and improve focus
-              </p>
-
-              <div className="flex justify-between text-xs text-gray-400 mb-5">
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-blue-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                    </svg>
-                  </div>
-                  <span className="font-medium">
-                    {breathingStats?.sessions || 0} Sessions
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-blue-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                  </div>
-                  <span className="font-medium">
-                    {breathingStats?.totalMinutes || 0} Minutes
-                  </span>
-                </div>
-              </div>
-
-              <button
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex justify-center items-center gap-2 group-hover:shadow-lg"
-                onClick={() => router.push('/wellness/breathing')}
+              <Button
+                variant="ghost"
+                className="text-sm text-primary hover:text-primary/80"
               >
-                Start Activity
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
+                View All <AlignJustify className="ml-2 h-4 w-4" />
+              </Button>
             </div>
-          </div>
 
-          {/* Guided Meditation */}
-          <div className="bg-gray-800 rounded-2xl shadow-lg overflow-hidden group hover:shadow-indigo-900/30 transition-all duration-300 hover:translate-y-[-3px]">
-            <div className="bg-indigo-500 bg-opacity-10 h-3 w-full"></div>
-            <div className="p-5">
-              <div className="flex items-center mb-4">
-                <div className="bg-indigo-500 bg-opacity-20 rounded-xl p-3 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-indigo-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-2 gap-5">
+              {/* Breathing Exercises Card */}
+              <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-1 w-full bg-blue-600"></div>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center mb-3">
+                      <Wind className="h-7 w-7 text-blue-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Breathing</h3>
+                    <p className="text-muted-foreground text-sm mt-2 mb-4">
+                      Guided breathing techniques for stress relief
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 mb-5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Sessions</span>
+                      <span className="font-medium">
+                        {breathingStats?.sessions || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={breathingStats?.sessions || 0}
+                      max={20}
+                      className="h-1 bg-muted"
+                    />
+
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Minutes</span>
+                      <span className="font-medium">
+                        {breathingStats?.totalMinutes || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={breathingStats?.totalMinutes || 0}
+                      max={60}
+                      className="h-1 bg-muted"
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/breathing')}
                   >
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                  </svg>
-                </div>
-                <h3 className="font-medium text-lg text-white">
-                  Guided Meditation
-                </h3>
-              </div>
+                    Start Activity
+                  </Button>
+                </CardContent>
+              </Card>
 
-              <p className="text-sm text-gray-400 mb-6">
-                Mindfulness practices for relaxation and mental clarity
-              </p>
-
-              <div className="flex justify-between text-xs text-gray-400 mb-5">
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-indigo-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                    </svg>
+              {/* Meditation Card */}
+              <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-1 w-full bg-indigo-600"></div>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3">
+                      <Moon className="h-7 w-7 text-indigo-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Meditation</h3>
+                    <p className="text-muted-foreground text-sm mt-2 mb-4">
+                      Mindfulness practices for relaxation
+                    </p>
                   </div>
-                  <span className="font-medium">
-                    {meditationStats?.sessions || 0} Sessions
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-indigo-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
+
+                  <div className="space-y-3 mb-5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Sessions</span>
+                      <span className="font-medium">
+                        {meditationStats?.sessions || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={meditationStats?.sessions || 0}
+                      max={20}
+                      className="h-1 bg-muted"
+                    />
+
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Minutes</span>
+                      <span className="font-medium">
+                        {meditationStats?.totalMinutes || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={meditationStats?.totalMinutes || 0}
+                      max={60}
+                      className="h-1 bg-muted"
+                    />
                   </div>
-                  <span className="font-medium">
-                    {meditationStats?.totalMinutes || 0} Minutes
-                  </span>
-                </div>
-              </div>
 
-              <button
-                className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex justify-center items-center gap-2 group-hover:shadow-lg"
-                onClick={() => router.push('/wellness/meditation')}
-              >
-                Start Activity
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Focus Games */}
-          <div className="bg-gray-800 rounded-2xl shadow-lg overflow-hidden group hover:shadow-purple-900/30 transition-all duration-300 hover:translate-y-[-3px]">
-            <div className="bg-purple-500 bg-opacity-10 h-3 w-full"></div>
-            <div className="p-5">
-              <div className="flex items-center mb-4">
-                <div className="bg-purple-500 bg-opacity-20 rounded-xl p-3 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-purple-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <Button
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/meditation')}
                   >
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                  </svg>
-                </div>
-                <h3 className="font-medium text-lg text-white">Focus Games</h3>
-              </div>
+                    Start Activity
+                  </Button>
+                </CardContent>
+              </Card>
 
-              <p className="text-sm text-gray-400 mb-6">
-                Interactive games to improve attention and cognitive abilities
-              </p>
-
-              <div className="flex justify-between text-xs text-gray-400 mb-5">
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-purple-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="20" x2="18" y2="10"></line>
-                      <line x1="12" y1="20" x2="12" y2="4"></line>
-                      <line x1="6" y1="20" x2="6" y2="14"></line>
-                    </svg>
+              {/* Focus Games Card */}
+              <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-1 w-full bg-purple-600"></div>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-purple-500/10 flex items-center justify-center mb-3">
+                      <Brain className="h-7 w-7 text-purple-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Focus Games</h3>
+                    <p className="text-muted-foreground text-sm mt-2 mb-4">
+                      Games to improve cognitive abilities
+                    </p>
                   </div>
-                  <span className="font-medium">
-                    High Score: {focusStats?.highScore || 410}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-purple-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                    </svg>
+
+                  <div className="space-y-3 mb-5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Sessions</span>
+                      <span className="font-medium">
+                        {focusStats?.sessions || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={focusStats?.sessions || 0}
+                      max={20}
+                      className="h-1 bg-muted"
+                    />
+
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>High Score</span>
+                      <span className="font-medium">
+                        {focusStats?.highScore || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={focusStats?.highScore || 0}
+                      max={500}
+                      className="h-1 bg-muted"
+                    />
                   </div>
-                  <span className="font-medium">
-                    {focusStats?.sessions || 75} Sessions
-                  </span>
-                </div>
-              </div>
 
-              <button
-                className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex justify-center items-center gap-2 group-hover:shadow-lg"
-                onClick={() => router.push('/wellness/focus-games')}
-              >
-                Start Activity
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Gratitude Journal */}
-          <div className="bg-gray-800 rounded-2xl shadow-lg overflow-hidden group hover:shadow-pink-900/30 transition-all duration-300 hover:translate-y-[-3px]">
-            <div className="bg-pink-500 bg-opacity-10 h-3 w-full"></div>
-            <div className="p-5">
-              <div className="flex items-center mb-4">
-                <div className="bg-pink-500 bg-opacity-20 rounded-xl p-3 mr-3">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-pink-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <Button
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/focus-games')}
                   >
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                  </svg>
-                </div>
-                <h3 className="font-medium text-lg text-white">
-                  Gratitude Journal
-                </h3>
-              </div>
+                    Start Activity
+                  </Button>
+                </CardContent>
+              </Card>
 
-              <p className="text-sm text-gray-400 mb-6">
-                Daily practice to cultivate appreciation and positivity
-              </p>
-
-              <div className="flex justify-between text-xs text-gray-400 mb-5">
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-pink-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
+              {/* Gratitude Journal Card */}
+              <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-1 w-full bg-pink-600"></div>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-pink-500/10 flex items-center justify-center mb-3">
+                      <Heart className="h-7 w-7 text-pink-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Gratitude</h3>
+                    <p className="text-muted-foreground text-sm mt-2 mb-4">
+                      Journal to cultivate appreciation
+                    </p>
                   </div>
-                  <span className="font-medium">
-                    {gratitudeStats?.totalEntries || 1} Entries
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="bg-gray-700 rounded-full p-1">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-3 w-3 text-pink-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="8" r="7"></circle>
-                      <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                    </svg>
-                  </div>
-                  <span className="font-medium">
-                    {gratitudeStats?.streak || 1} Day Streak
-                  </span>
-                </div>
-              </div>
 
-              <button
-                className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-500 hover:to-pink-600 text-white py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex justify-center items-center gap-2 group-hover:shadow-lg"
-                onClick={() => router.push('/wellness/gratitude')}
-              >
-                Start Activity
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
+                  <div className="space-y-3 mb-5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Entries</span>
+                      <span className="font-medium">
+                        {gratitudeStats?.totalEntries || 0}
+                      </span>
+                    </div>
+                    <Progress
+                      value={gratitudeStats?.totalEntries || 0}
+                      max={20}
+                      className="h-1 bg-muted"
+                    />
+
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Streak</span>
+                      <span className="font-medium">
+                        {gratitudeStats?.streak || 0} days
+                      </span>
+                    </div>
+                    <Progress
+                      value={gratitudeStats?.streak || 0}
+                      max={10}
+                      className="h-1 bg-muted"
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full bg-pink-600 hover:bg-pink-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/gratitude')}
+                  >
+                    Start Activity
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* New Wordle Game Card */}
+              <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-1 w-full bg-emerald-600"></div>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
+                      <Gamepad2 className="h-7 w-7 text-emerald-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Wordle</h3>
+                    <p className="text-muted-foreground text-sm mt-2 mb-4">
+                      Word puzzle to train your brain
+                    </p>
+                    <Badge className="bg-emerald-500/10 text-emerald-500 mb-2">
+                      New!
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-3 mb-5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Games</span>
+                      <span className="font-medium">0</span>
+                    </div>
+                    <Progress value={0} max={20} className="h-1 bg-muted" />
+
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Wins</span>
+                      <span className="font-medium">0</span>
+                    </div>
+                    <Progress value={0} max={10} className="h-1 bg-muted" />
+                  </div>
+
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/wordle')}
+                  >
+                    Start Activity
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          {/* Recommendations Tab */}
+          <TabsContent value="recommendations">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold mb-6">
+                Personalized Recommendations
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Morning Recommendation */}
+                <Card className="border-border shadow-sm">
+                  <CardHeader>
+                    <Badge className="w-fit mb-2 bg-blue-500/10 text-blue-500">
+                      Morning Routine
+                    </Badge>
+                    <CardTitle>Start Your Day Mindfully</CardTitle>
+                    <CardDescription>
+                      Set a positive tone for your day with these activities
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-lg">
+                      <Wind className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="font-medium">5-Minute Breathing</p>
+                        <p className="text-sm text-muted-foreground">
+                          Reduce stress and improve focus
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-lg">
+                      <Heart className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="font-medium">Gratitude Practice</p>
+                        <p className="text-sm text-muted-foreground">
+                          Write three things you're grateful for
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => handleActivityStart('/wellness/breathing')}
+                    >
+                      Start Morning Routine
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                {/* Evening Recommendation */}
+                <Card className="border-border shadow-sm">
+                  <CardHeader>
+                    <Badge className="w-fit mb-2 bg-purple-500/10 text-purple-500">
+                      Evening Wind Down
+                    </Badge>
+                    <CardTitle>Prepare for Restful Sleep</CardTitle>
+                    <CardDescription>
+                      Calm your mind and body before bedtime
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-lg">
+                      <Moon className="h-5 w-5 text-purple-500" />
+                      <div>
+                        <p className="font-medium">Sleep Meditation</p>
+                        <p className="text-sm text-muted-foreground">
+                          10-minute guided relaxation
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-purple-500" />
+                      <div>
+                        <p className="font-medium">Bedtime Reflection</p>
+                        <p className="text-sm text-muted-foreground">
+                          Review your day's accomplishments
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={() =>
+                        handleActivityStart('/wellness/meditation')
+                      }
+                    >
+                      Start Evening Routine
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </div>
+
+              {/* Featured Activity */}
+              <Card className="border-border shadow-sm mt-6">
+                <CardHeader>
+                  <Badge className="w-fit mb-2 bg-emerald-500/10 text-emerald-500">
+                    Featured Activity
+                  </Badge>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gamepad2 className="h-5 w-5 text-emerald-500" />
+                    Try Our New Wordle Game
+                  </CardTitle>
+                  <CardDescription>
+                    Challenge your vocabulary and problem-solving skills
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Our new Wordle game combines fun with cognitive benefits:
+                  </p>
+                  <ul className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500"></div>
+                      <span>Improves vocabulary and language skills</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500"></div>
+                      <span>Enhances logical thinking and deduction</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500"></div>
+                      <span>Provides a daily mental challenge</span>
+                    </li>
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => handleActivityStart('/wellness/wordle')}
+                  >
+                    Try Wordle Now
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Progress Tab */}
+          <TabsContent value="progress">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold mb-6">
+                Your Wellness Progress
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-border shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Activity Breakdown</CardTitle>
+                    <CardDescription>
+                      How you're spending your wellness time
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span>Breathing</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {breathingStats?.totalMinutes || 0} min
+                          </span>
+                        </div>
+                        <Progress
+                          value={breathingStats?.totalMinutes || 0}
+                          max={stats?.totalMinutes || 100}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-indigo-500 mr-2"></div>
+                            <span>Meditation</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {meditationStats?.totalMinutes || 0} min
+                          </span>
+                        </div>
+                        <Progress
+                          value={meditationStats?.totalMinutes || 0}
+                          max={stats?.totalMinutes || 100}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                            <span>Focus Games</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {focusStats?.sessions || 0} sessions
+                          </span>
+                        </div>
+                        <Progress
+                          value={focusStats?.sessions || 0}
+                          max={20}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-pink-500 mr-2"></div>
+                            <span>Gratitude</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {gratitudeStats?.totalEntries || 0} entries
+                          </span>
+                        </div>
+                        <Progress
+                          value={gratitudeStats?.totalEntries || 0}
+                          max={20}
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Weekly Goals</CardTitle>
+                    <CardDescription>
+                      Your progress toward weekly wellness targets
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span>Total Sessions</span>
+                          <span className="text-sm text-muted-foreground">
+                            {stats?.totalSessions || 0}/10 sessions
+                          </span>
+                        </div>
+                        <Progress
+                          value={stats?.totalSessions || 0}
+                          max={10}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span>Mindfulness Minutes</span>
+                          <span className="text-sm text-muted-foreground">
+                            {stats?.totalMinutes || 0}/120 minutes
+                          </span>
+                        </div>
+                        <Progress
+                          value={stats?.totalMinutes || 0}
+                          max={120}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span>Activities Tried</span>
+                          <span className="text-sm text-muted-foreground">
+                            {activitiesStarted}/5 activities
+                          </span>
+                        </div>
+                        <Progress
+                          value={activitiesStarted}
+                          max={5}
+                          className="h-2"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span>Daily Streak</span>
+                          <span className="text-sm text-muted-foreground">
+                            {dailyStreak || 0}/7 days
+                          </span>
+                        </div>
+                        <Progress
+                          value={dailyStreak || 0}
+                          max={7}
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

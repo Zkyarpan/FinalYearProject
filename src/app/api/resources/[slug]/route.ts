@@ -58,13 +58,13 @@ interface ResourceDocument {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { slug: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
     await connectDB();
 
     // Get the slug from context.params properly
-    const resourceId = context.params.slug;
+    const resourceId = params.slug;
 
     console.log('Fetching resource with identifier:', resourceId);
 

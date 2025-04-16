@@ -112,7 +112,6 @@ const nextConfig = {
   // Production optimizations
   compress: true,
   generateEtags: true,
-  swcMinify: true,
 
   // Only include necessary page extensions
   pageExtensions: ['tsx', 'ts'],

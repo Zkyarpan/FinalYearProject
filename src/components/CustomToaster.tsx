@@ -8,16 +8,16 @@ export default function CustomToaster() {
     <Toaster
       theme="dark"
       position="bottom-right"
-      closeButton
+      closeButton // keep the close‑btn but override its contents
       offset={12}
       toastOptions={{
         style: {
-          background: '#0d0d0d', 
-          color: '#f5f5f5', 
-          borderRadius: '12px', 
-          boxShadow: '0 6px 20px rgba(0,0,0,0.45)', 
+          background: 'hsl(0 0% 15%)', // toast bg
+          color: '#f5f5f5',
+          borderRadius: '12px',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
           padding: '18px 20px',
-          border: '1px solid #1a1a1a',
+          border: '1px solid #333333', // dark:border-[#333333]
           fontSize: '15px',
           fontWeight: 500,
         },
@@ -26,7 +26,17 @@ export default function CustomToaster() {
       }}
       icons={{
         close: (
-          <XMarkIcon className="h-4 w-4 text-gray-400 hover:text-gray-200 transition duration-150" />
+          <div
+            className="
+              flex items-center justify-center
+              w-4 h-4 rounded-full
+              bg-[hsl(0_0%_15%)]
+              hover:bg-[hsl(0_0%_20%)]
+              transition-colors duration-150
+            "
+          >
+            <XMarkIcon className="h-3 w-3 text-gray-400 hover:text-gray-200" />
+          </div>
         ),
       }}
     />

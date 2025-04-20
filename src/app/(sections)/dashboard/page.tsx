@@ -302,27 +302,6 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* Profile Completion Bar - only shown if not 100% complete */}
-        {data.metrics.profileCompletion < 100 && (
-          <Card className="mb-6 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium">Profile Completion</h3>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 h-auto text-blue-500"
-                onClick={() => router.push('/settings/profile')}
-              >
-                Complete Now
-              </Button>
-            </div>
-            <Progress value={data.metrics.profileCompletion} className="h-2" />
-            <p className="mt-2 text-xs text-gray-500">
-              Complete your profile to get better recommendations and services
-            </p>
-          </Card>
-        )}
-
         {/* Main Stats Grid */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           {/* Mental Wellness Score */}

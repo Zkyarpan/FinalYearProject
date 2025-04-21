@@ -26,6 +26,7 @@ export interface IPsychologist extends Document {
   lastName: string;
   fullName: string;
   email: string;
+  country: string;
   city: string;
   streetAddress: string;
   about: string;
@@ -179,6 +180,10 @@ const PsychologistSchema: Schema = new Schema(
       trim: true,
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address.'],
+    },
+    country: {
+      type: String,
+      required: true,
     },
     city: {
       type: String,

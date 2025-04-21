@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Button } from './ui/button';
 import Loader from '@/components/common/Loader';
 import { ArrowRight } from 'lucide-react';
+import StyledCountrySelect from './CountrySelect';
 import { useRouter } from 'next/navigation';
 import {
   Select,
@@ -28,6 +29,9 @@ const PsychologistRegister = () => {
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
 
+  const [countries, setCountries] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const specializations = [
     { value: 'anxiety_depression', label: 'Anxiety & Depression' },
@@ -49,6 +53,7 @@ const PsychologistRegister = () => {
     lastName: string;
     email: string;
     password: string;
+    country: string;
     streetAddress: string;
     city: string;
     about: string;
@@ -87,13 +92,17 @@ const PsychologistRegister = () => {
     lastName: '',
     email: '',
     password: '',
+
+    country: '',
     streetAddress: '',
     city: '',
+
     about: '',
     profilePhoto: null,
     certificateOrLicense: null,
     profilePhotoPreview: '',
     certificateOrLicensePreview: '',
+
     licenseType: '',
     licenseNumber: '',
     yearsOfExperience: '',
@@ -106,13 +115,17 @@ const PsychologistRegister = () => {
     ],
     languages: [],
     specializations: [],
+
     sessionDuration: '60',
     sessionFee: '',
     sessionFormats: [] as string[],
+
     acceptsInsurance: false,
     insuranceProviders: [],
+
     acceptingNewClients: true,
     ageGroups: [] as string[],
+
     availability: {
       monday: { available: false, startTime: '', endTime: '' },
       tuesday: { available: false, startTime: '', endTime: '' },
@@ -124,9 +137,72 @@ const PsychologistRegister = () => {
     },
   });
 
+  useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
+    const fetchCountries = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('https://restcountries.com/v3.1/all', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (isMounted) {
+          const countryOptions = data
+            .sort((a: any, b: any) =>
+              a.name.common.localeCompare(b.name.common)
+            )
+            .map((country: any) => ({
+              label: country.name.common,
+              value: country.cca2,
+            }));
+
+          setCountries(countryOptions);
+          setIsLoading(false);
+          retryCount = 0;
+        }
+      } catch (error) {
+        console.error('Error fetching countries:', error);
+
+        if (isMounted) {
+          setError('Failed to load countries. Retrying...');
+          retryCount++;
+
+          if (retryCount < MAX_RETRIES) {
+            setTimeout(fetchCountries, 3000);
+          } else {
+            setError(
+              'Failed to load countries. Please refresh the page or try again later.'
+            );
+            setIsLoading(false);
+          }
+        }
+      }
+    };
+
+    fetchCountries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleChange = (e: { target: { name: any; value: any } }) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleFileChange = (e: { target: { name: any; files: any } }) => {
@@ -134,11 +210,11 @@ const PsychologistRegister = () => {
     if (files && files[0]) {
       const file = files[0];
       const previewURL = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
+      setFormData({
+        ...formData,
         [name]: file,
         [`${name}Preview`]: previewURL,
-      }));
+      });
     }
   };
 
@@ -170,7 +246,6 @@ const PsychologistRegister = () => {
       ),
     }));
   };
-
   const handleSpecializationSelect = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -202,6 +277,7 @@ const PsychologistRegister = () => {
       'firstName',
       'lastName',
       'email',
+      'country',
       'streetAddress',
       'city',
       'about',
@@ -223,7 +299,7 @@ const PsychologistRegister = () => {
 
     const missingFields = allRequiredFields.filter(field => !formData[field]);
     if (missingFields.length > 0) {
-      toast.error('Please fill in all fields!');
+      toast.error(`Please fill in all fields !`);
       setIsLoading(false);
       return;
     }
@@ -440,6 +516,14 @@ const PsychologistRegister = () => {
                     </Button>
                   </div>
                 </div>
+
+                {countries && countries.length > 0 && (
+                  <StyledCountrySelect
+                    formData={formData}
+                    handleChange={handleChange}
+                    countries={countries}
+                  />
+                )}
 
                 <div className="col-span-3">
                   <label
@@ -986,7 +1070,7 @@ const PsychologistRegister = () => {
               <div className="space-y-6">
                 <div className="mt-6 flex items-center justify-end gap-x-6 pb-10">
                   <Link
-                    href="/signup"
+                    href={`/signup`}
                     className="rounded-md bg-[hsl(var(--secondary))] px-3 py-2 text-sm font-semibold text-[hsl(var(--secondary-foreground))] shadow-sm hover:bg-[hsl(var(--secondary))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--secondary))] dark:bg-input"
                   >
                     Go Back
@@ -1022,7 +1106,7 @@ const PsychologistRegister = () => {
           onVerificationComplete={() => {
             setShowVerificationDialog(false);
             toast.success('Registration completed successfully!');
-            router.push('/login');
+            router.push('/psychologist/dashboard');
           }}
           isLoading={isLoading}
         />

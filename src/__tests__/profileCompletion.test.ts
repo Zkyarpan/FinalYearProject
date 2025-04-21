@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 
 interface Profile {
-  user: string; // ID reference
+  user: string; 
   firstName: string;
   lastName: string;
   image: string;

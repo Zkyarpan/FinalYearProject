@@ -8,16 +8,16 @@ export default function CustomToaster() {
     <Toaster
       theme="dark"
       position="bottom-right"
-      closeButton // keep the close‑btn but override its contents
+      closeButton     // keep the close‑btn but override its contents
       offset={12}
       toastOptions={{
         style: {
-          background: 'hsl(0 0% 15%)', // toast bg
+          background: 'hsl(0 0% 15%)',      // toast bg
           color: '#f5f5f5',
           borderRadius: '12px',
           boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
           padding: '18px 20px',
-          border: '1px solid #333333', // dark:border-[#333333]
+          border: '1px solid #333333',      // dark:border-[#333333]
           fontSize: '15px',
           fontWeight: 500,
         },

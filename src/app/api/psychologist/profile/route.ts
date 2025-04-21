@@ -1,4 +1,3 @@
-// app/api/psychologist/ui/route.ts
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';

@@ -258,7 +258,7 @@ const AdminDashboard = () => {
   // Handle psychologist approval
   const handleApprove = async (id: string) => {
     try {
-      const response = await fetch(`/api/psychologist/${id}/approve`, {
+      const response = await fetch(`/api/admim/psychologists/${id}/approve`, {
         method: 'PUT',
       });
 

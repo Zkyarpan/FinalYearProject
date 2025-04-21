@@ -1,7 +1,6 @@
 import mongoose, {
   Schema,
   model,
-  models,
   Document,
   Types,
   Model,
@@ -313,7 +312,7 @@ appointmentSchema.pre('save', async function (next) {
 });
 
 const Appointment =
-  (models.Appointment as IAppointmentModel) ||
+  (mongoose.models.Appointment as IAppointmentModel) ||
   model<IAppointment, IAppointmentModel>('Appointment', appointmentSchema);
 
 export default Appointment;

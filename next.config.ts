@@ -6,7 +6,8 @@ const nextConfig = {
 
   // Enable server components as much as possible for better performance
   experimental: {
-    serverComponentsExternalPackages: ['mongoose', 'bcryptjs'],
+    // Changed to the new property name
+    serverExternalPackages: ['mongoose', 'bcryptjs'],
     optimizeCss: true, // Optimize CSS
     scrollRestoration: true,
     optimisticClientCache: true,
@@ -66,47 +67,9 @@ const nextConfig = {
     ];
   },
 
-  // Enhanced webpack configuration
-  webpack: (config, { dev, isServer }) => {
-    // Only apply these optimizations in production
-    if (!dev) {
-      // Enable production mode optimizations
-      config.mode = 'production';
-
-      // Optimize chunk splitting
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            vendors: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-            },
-            commons: {
-              name: 'commons',
-              minChunks: 2,
-              priority: 1,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-        runtimeChunk: {
-          name: 'runtime',
-        },
-      };
-    }
-
-    // Add module resolvers
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      // Add any needed aliases
-    };
-
-    return config;
+  // Turbopack configuration (replacing webpack config)
+  turbo: {
+    // Turbopack rules go here
   },
 
   // Production optimizations

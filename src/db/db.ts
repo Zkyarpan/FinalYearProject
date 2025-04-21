@@ -1,4 +1,3 @@
-// File: src/db/db.ts - Safe version with minimal changes
 import mongoose from 'mongoose';
 import User from '../models/User';
 import Appointment from '../models/Appointment';
@@ -7,6 +6,7 @@ import dotenv from 'dotenv';
 import Psychologist from '../models/Psychologist';
 import Conversation from '../models/Conversation';
 import Message from '../models/Message';
+import bcrypt from 'bcryptjs';
 
 // Load environment variables
 dotenv.config();
@@ -39,50 +39,46 @@ globalThis.mongooseCache = globalThis.mongooseCache || {
 // Track model initialization status
 let modelsInitialized = false;
 
-// Initialize models function - keeping close to your original implementation
+// Seed default admin user if not exists
+async function seedAdmin() {
+  const adminEmail = 'admin@mentality.com';
+  const existingAdmin = await User.findOne({ email: adminEmail });
+
+  if (!existingAdmin) {
+    const hashedPassword = await bcrypt.hash('Admin@123', 10);
+
+    await User.create({
+      email: adminEmail,
+      password: hashedPassword,
+      role: 'admin',
+      isVerified: true,
+    });
+
+    console.log(`✅  Admin user seeded: ${adminEmail}`);
+  } else {
+    console.log('ℹ️  Admin user already exists.');
+  }
+}
+
+// Initialize models function
 async function initializeModels() {
   try {
-    if (modelsInitialized) {
-      return;
-    }
+    if (modelsInitialized) return;
 
-    // Wait for connection to be ready
     await mongoose.connection.asPromise();
 
-    // Initialize all models in order of dependency
-    if (!mongoose.models.User) {
-      console.log('Initializing User model');
-      User;
-    }
-
-    if (!mongoose.models.Psychologist) {
-      console.log('Initializing Psychologist model');
-      Psychologist;
-    }
-
-    if (!mongoose.models.Conversation) {
-      console.log('Initializing Conversation model');
-      Conversation;
-    }
-
-    if (!mongoose.models.Message) {
-      console.log('Initializing Message model');
-      Message;
-    }
-
-    if (!mongoose.models.Appointment) {
-      console.log('Initializing Appointment model');
-      Appointment;
-    }
-
-    if (!mongoose.models.Availability) {
-      console.log('Initializing Availability model');
-      Availability;
-    }
+    if (!mongoose.models.User) User;
+    if (!mongoose.models.Psychologist) Psychologist;
+    if (!mongoose.models.Conversation) Conversation;
+    if (!mongoose.models.Message) Message;
+    if (!mongoose.models.Appointment) Appointment;
+    if (!mongoose.models.Availability) Availability;
 
     modelsInitialized = true;
     console.log('✅ Models initialized successfully');
 
+    // Seed admin after models are ready
+    await seedAdmin();
   } catch (error) {
     console.error('❌ Error initializing models:', error);
     modelsInitialized = false;
@@ -90,27 +86,24 @@ async function initializeModels() {
   }
 }
 
-// Safe optimization of your database connection logic
+// Connect to database
 const connectDB = async (): Promise<typeof mongoose> => {
   try {
-    // If we have an existing connection, return it
     if (mongoose.connections[0].readyState === 1) {
       console.log('✅ Using existing MongoDB connection');
-      await initializeModels(); // Ensure models are initialized
+      await initializeModels();
       return mongoose;
     }
 
-    // If we have a pending connection promise, wait for it
     if (globalThis.mongooseCache.promise) {
       console.log('⏳ Waiting for existing MongoDB connection promise');
       await globalThis.mongooseCache.promise;
-      await initializeModels(); // Ensure models are initialized
+      await initializeModels();
       return mongoose;
     }
 
     console.log('🔄 Creating new MongoDB connection...');
 
-    // Using your original options with slight optimization
     const opts = {
       bufferCommands: true,
       maxPoolSize: 10,
@@ -125,13 +118,11 @@ const connectDB = async (): Promise<typeof mongoose> => {
       },
     };
 
-    // Store the connection promise
     globalThis.mongooseCache.promise = mongoose.connect(MONGODB_URI, opts);
 
-    // Set up event listeners - keeping your original approach
     mongoose.connection.on('connected', async () => {
       console.log('✅ Successfully connected to MongoDB');
-      await initializeModels(); // Initialize models on connection
+      await initializeModels();
     });
 
     mongoose.connection.on('error', err => {
@@ -141,16 +132,14 @@ const connectDB = async (): Promise<typeof mongoose> => {
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('❗MongoDB disconnected');
+      console.log('❗ MongoDB disconnected');
       modelsInitialized = false;
       globalThis.mongooseCache.promise = null;
     });
 
-    // Wait for the connection and model initialization
     await globalThis.mongooseCache.promise;
     globalThis.mongooseCache.conn = mongoose;
 
-    // Make sure models are initialized
     await initializeModels();
 
     return mongoose;

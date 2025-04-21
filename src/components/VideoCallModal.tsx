@@ -659,8 +659,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                         (callStats?.bitrate ?? 0) > 500
                           ? 'bg-green-500'
                           : (callStats?.bitrate ?? 0) > 200
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
                       }`}
                     />
                     <div
@@ -668,8 +668,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                         (callStats?.packetLoss ?? 0) < 2
                           ? 'bg-green-500'
                           : (callStats?.packetLoss ?? 0) < 5
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
                       }`}
                     />
                     <div
@@ -677,8 +677,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                         (callStats?.jitter ?? 100) < 30
                           ? 'bg-green-500'
                           : (callStats?.jitter ?? 100) < 80
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
                       }`}
                     />
                   </div>
@@ -687,9 +687,9 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                     (callStats?.packetLoss ?? 100) < 2
                       ? 'Good'
                       : (callStats?.bitrate ?? 0) > 200 &&
-                        (callStats?.packetLoss ?? 100) < 5
-                      ? 'Fair'
-                      : 'Poor'}{' '}
+                          (callStats?.packetLoss ?? 100) < 5
+                        ? 'Fair'
+                        : 'Poor'}{' '}
                     Connection
                   </span>
                 </div>

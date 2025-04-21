@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 
 const EditArticleForm = dynamic(
@@ -6,10 +6,8 @@ const EditArticleForm = dynamic(
   {
     ssr: true,
     loading: () => (
-      <div className="flex justify-center items-center min-h-[70vh]">
-        <div className="animate-pulse text-center">
-          <p>Loading editor...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <p className="animate-pulse text-center">Loading editor&hellip;</p>
       </div>
     ),
   }
@@ -17,13 +15,13 @@ const EditArticleForm = dynamic(
 
 export const metadata: Metadata = {
   title: 'Edit Article',
-  description: 'Update your mental health article',
+  description: 'Update your mental‑health article',
 };
 
-export default function EditArticlePage({
-  params,
-}: {
+interface PageProps {
   params: { id: string };
-}) {
+}
+
+export default function EditArticlePage({ params }: PageProps) {
   return <EditArticleForm articleId={params.id} />;
 }

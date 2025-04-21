@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
 
-First, run the development server:
+# **🧠 Mentality - Your Personalized Mental Health Companion**  
 
-```bash
+### **A mental health platform offering psychologist support, resources, video calls, chat, and progress tracking.**  
+
+---
+
+## **🚀 Features**  
+- **User Authentication**: Secure login and signup with email verification.  
+- **Profile Completion**: Users must complete their profile to access psychologists.  
+- **Mood Tracking & Survey**: Personalized content suggestions based on user input.  
+- **Resource Hub**: Mental health articles categorized by topics.  
+- **Chat System**: Real-time messaging with psychologists.  
+- **Video Call Support**: Instant video sessions with psychologists.  
+- **Payment Integration**: Secure transactions via **Stripe** for sessions.  
+- **Admin Dashboard**: Manage users, psychologists, and resources.  
+- **Responsive UI**: Fully optimized for mobile and desktop.  
+
+---
+
+## **📸 Screenshots**  
+![image](https://github.com/user-attachments/assets/d2e6c03a-9cf3-4aad-8f39-c12893815f8b)
+
+
+---
+
+## **🛠️ Tech Stack**  
+
+### **Frontend:**  
+- **Next.js** - Full-stack framework  
+- **Tailwind CSS** - Styling framework  
+
+### **Backend:**  
+- **Next.js API Routes** - Server-side functions  
+- **MongoDB Atlas** - NoSQL Database  
+- **Mongoose** - Database ODM  
+- **WebRTC & Peer.js** - Video Calling  
+- **Socket.io** - Real-time Chat  
+
+### **Authentication & Security:**  
+- **JWT & Cookies** - Session management  
+- **Bcrypt.js** - Password hashing  
+- **NextAuth.js (optional)** - Third-party login  
+
+### **Payments & Transactions:**  
+- **Stripe API** - Secure payments for psychologist sessions  
+
+---
+
+## **⚙️ Installation & Setup**  
+
+### **1️⃣ Clone the Repository**  
+```sh
+git clone https://github.com/yourusername/mentality.git
+cd mentality
+```
+
+### **2️⃣ Install Dependencies**  
+```sh
+npm install
+# or
+yarn install
+```
+
+### **3️⃣ Set Up Environment Variables**  
+Create a `.env.local` file in the root directory and add the following:  
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+STRIPE_SECRET_KEY=your_stripe_secret_key
+NEXT_PUBLIC_CLOUDINARY_URL=your_cloudinary_url
+```
+
+### **4️⃣ Start the Development Server**  
+```sh
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
+The app will be running on `http://localhost:3000`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## **📌 Contributing**  
+1. **Fork the Repository**  
+2. **Create a Feature Branch** (`git checkout -b feature-name`)  
+3. **Commit Changes** (`git commit -m "Add new feature"`)  
+4. **Push to Branch** (`git push origin feature-name`)  
+5. **Create a Pull Request**  
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## **📜 License**  
+This project is **open-source** under the **MIT License**.  
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+🚀 **Built with ❤️ by [Arpan Lama Karki]**  
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---

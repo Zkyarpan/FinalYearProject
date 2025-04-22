@@ -258,15 +258,25 @@ const AdminDashboard = () => {
   // Handle psychologist approval
   const handleApprove = async (id: string) => {
     try {
-      const response = await fetch(`/api/psychologist/${id}/approve`, {
+      console.log('Approving psychologist:', id); // Debug log
+
+      // Update to use new admin API route
+      const response = await fetch(`/api/admin/psychologists/${id}/approve`, {
         method: 'PUT',
       });
 
+      console.log('Approval response status:', response.status); // Debug log
+
       if (response.ok) {
+        const data = await response.json();
+        console.log('Approval success data:', data); // Debug log
+
         toast.success('Psychologist approved successfully');
 
         // Update the dashboard data without refetching
         if (dashboardData) {
+          console.log('Updating dashboard data after approval'); // Debug log
+
           setDashboardData({
             ...dashboardData,
             pendingApprovals: dashboardData.pendingApprovals.filter(
@@ -283,6 +293,7 @@ const AdminDashboard = () => {
         }
       } else {
         const error = await response.json();
+        console.error('Approval error response:', error); // Debug log
         throw new Error(
           error.ErrorMessage?.[0]?.message || 'Failed to approve psychologist'
         );
@@ -298,15 +309,32 @@ const AdminDashboard = () => {
   // Handle psychologist rejection
   const handleReject = async (id: string) => {
     try {
-      const response = await fetch(`/api/psychologist/${id}/reject`, {
+      console.log('Rejecting psychologist:', id); // Debug log
+
+      // Get rejection reason (you can implement a modal for this)
+      const feedback = prompt('Provide feedback for rejection') || '';
+
+      // Update to use new admin API route
+      const response = await fetch(`/api/admin/psychologists/${id}/reject`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feedback }),
       });
 
+      console.log('Rejection response status:', response.status); // Debug log
+
       if (response.ok) {
+        const data = await response.json();
+        console.log('Rejection success data:', data); // Debug log
+
         toast.success('Psychologist rejected');
 
         // Update the dashboard data without refetching
         if (dashboardData) {
+          console.log('Updating dashboard data after rejection'); // Debug log
+
           setDashboardData({
             ...dashboardData,
             pendingApprovals: dashboardData.pendingApprovals.filter(
@@ -321,6 +349,7 @@ const AdminDashboard = () => {
         }
       } else {
         const error = await response.json();
+        console.error('Rejection error response:', error); // Debug log
         throw new Error(
           error.ErrorMessage?.[0]?.message || 'Failed to reject psychologist'
         );

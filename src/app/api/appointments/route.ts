@@ -259,6 +259,37 @@ export async function POST(req: NextRequest) {
         appointment.insertedId
       );
 
+      try {
+        const { sendAppointmentConfirmationEmail } = await import(
+          '@/helpers/sendEmailVerification'
+        );
+
+        const psychologistName = populatedAppointment[0]?.psychologist
+          ? `${populatedAppointment[0].psychologist.firstName} ${populatedAppointment[0].psychologist.lastName}`
+          : 'Your Provider';
+
+        const sessionFee = populatedAppointment[0]?.psychologist?.sessionFee
+          ? Number(populatedAppointment[0].psychologist.sessionFee)
+          : Number(paymentIntent.amount) / 100;
+
+        await sendAppointmentConfirmationEmail(
+          appointmentData.email,
+          appointmentData.patientName,
+          startDate,
+          endDate,
+          psychologistName,
+          appointmentData.sessionFormat,
+          sessionFee
+        );
+
+        console.log('Appointment confirmation email sent successfully');
+      } catch (emailError) {
+        console.error(
+          'Error sending appointment confirmation email:',
+          emailError
+        );
+      }
+
       return NextResponse.json(
         createSuccessResponse(200, {
           message: 'Appointment booked successfully',

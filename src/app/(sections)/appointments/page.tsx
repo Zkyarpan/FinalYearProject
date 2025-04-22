@@ -97,10 +97,13 @@ export default function AppointmentScheduler() {
   // Clear notification highlights after 10 minutes to avoid persistent UI clutter
   useEffect(() => {
     if (newAvailabilityData) {
-      const clearHighlightTimer = setTimeout(() => {
-        setNewAvailabilityData(null);
-        setHighlightedSlots(new Set());
-      }, 10 * 60 * 1000); // 10 minutes
+      const clearHighlightTimer = setTimeout(
+        () => {
+          setNewAvailabilityData(null);
+          setHighlightedSlots(new Set());
+        },
+        10 * 60 * 1000
+      ); // 10 minutes
 
       return () => clearTimeout(clearHighlightTimer);
     }

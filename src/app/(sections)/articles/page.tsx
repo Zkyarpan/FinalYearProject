@@ -77,6 +77,11 @@ const truncateText = (text: string, maxLength: number) => {
   return text.slice(0, maxLength) + '...';
 };
 
+// Strip HTML tags for text previews
+const stripHtmlTags = (html: string) => {
+  return html.replace(/<\/?[^>]+(>|$)/g, '');
+};
+
 // Format date string nicely
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -306,7 +311,7 @@ const ArticlesPage = () => {
                         {articles[0].title}
                       </h2>
                       <p className="text-sm mb-4 line-clamp-3 text-gray-700 dark:text-gray-300">
-                        {truncateText(articles[0].content, 200)}
+                        {truncateText(stripHtmlTags(articles[0].content), 200)}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -402,7 +407,7 @@ const ArticlesPage = () => {
                             {article.title}
                           </h2>
                           <p className="text-sm line-clamp-2 mb-4 text-gray-700 dark:text-gray-300">
-                            {truncateText(article.content, 120)}
+                            {truncateText(stripHtmlTags(article.content), 120)}
                           </p>
 
                           <div className="flex items-center justify-between">

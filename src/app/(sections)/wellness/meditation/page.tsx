@@ -41,11 +41,11 @@ interface Meditation {
   level: string;
   duration: number;
   audioSrc: string;
-  imageSrc?: string;
+  imageSrc: string;
   tags: string[];
 }
 
-// Sample meditation data with updated image paths
+// Updated meditation data with Unsplash images
 const MEDITATIONS: Meditation[] = [
   {
     id: 'breath-awareness',
@@ -56,7 +56,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Beginner',
     duration: 10,
     audioSrc: '/meditations/breathe.mp3',
-    imageSrc: '/images/meditation/breath-awareness.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=2070&auto=format&fit=crop',
     tags: ['stress', 'focus', 'beginner'],
   },
   {
@@ -68,7 +69,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Beginner',
     duration: 15,
     audioSrc: '/meditations/mindfulness.mp3',
-    imageSrc: '/images/meditation/body-scan.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1545205597-3d9d02c29597?q=80&w=2070&auto=format&fit=crop',
     tags: ['relaxation', 'sleep', 'stress'],
   },
   {
@@ -80,7 +82,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Intermediate',
     duration: 12,
     audioSrc: '/meditations/loving-kindness.mp3',
-    imageSrc: '/images/meditation/loving-kindness.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=2033&auto=format&fit=crop',
     tags: ['compassion', 'emotional', 'healing'],
   },
   {
@@ -92,7 +95,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Beginner',
     duration: 8,
     audioSrc: '/meditations/mindful-walking.mp3',
-    imageSrc: '/images/meditation/mindful-walking.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?q=80&w=2070&auto=format&fit=crop',
     tags: ['movement', 'mindfulness', 'daily'],
   },
   {
@@ -104,7 +108,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'All Levels',
     duration: 20,
     audioSrc: '/meditations/sleep-meditation.mp3',
-    imageSrc: '/images/meditation/sleep.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1455642305367-68834a1da7ab?q=80&w=2069&auto=format&fit=crop',
     tags: ['sleep', 'relaxation', 'evening'],
   },
   {
@@ -116,7 +121,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Beginner',
     duration: 10,
     audioSrc: '/meditations/gratitude.mp3',
-    imageSrc: '/images/meditation/gratitude.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=2070&auto=format&fit=crop',
     tags: ['gratitude', 'positivity', 'morning'],
   },
   {
@@ -128,7 +134,8 @@ const MEDITATIONS: Meditation[] = [
     level: 'Intermediate',
     duration: 15,
     audioSrc: '/meditations/anxiety-relief.mp3',
-    imageSrc: '/images/meditation/anxiety-relief.jpg',
+    imageSrc:
+      'https://images.unsplash.com/photo-1497561813398-8fcc7a37b567?q=80&w=2070&auto=format&fit=crop',
     tags: ['anxiety', 'stress', 'therapeutic'],
   },
   {
@@ -141,7 +148,7 @@ const MEDITATIONS: Meditation[] = [
     duration: 8,
     audioSrc: '/meditations/morning-clarity.mp3',
     imageSrc:
-      'https://images.unsplash.com/photo-1589310287002-b26eddda5e6a?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'https://images.unsplash.com/photo-1589310287002-b26eddda5e6a?q=80&w=2069&auto=format&fit=crop',
     tags: ['morning', 'focus', 'energy'],
   },
 ];
@@ -236,10 +243,15 @@ const MindfulnessGrid = ({
                 </button>
               </div>
 
-              <div className={`h-40 relative ${categoryColor.bg}`}>
-                <div className="absolute inset-0 bg-[url('/meditation-pattern.svg')] opacity-20 mix-blend-overlay"></div>
-                <div className="absolute inset-0 flex items-center justify-center transition-transform group-hover:scale-110 duration-300">
-                  <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center">
+              <div className="h-40 relative overflow-hidden">
+                <img
+                  src={meditation.imageSrc}
+                  alt={meditation.title}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-300"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent mix-blend-overlay"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
                     <Play className="h-8 w-8 text-white" />
                   </div>
                 </div>
@@ -253,7 +265,10 @@ const MindfulnessGrid = ({
               </p>
 
               <div className="flex flex-wrap gap-2 mb-3">
-                <Badge variant="outline" className="text-xs">
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${categoryColor.text} border-${categoryColor.text}/30`}
+                >
                   {meditation.category}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
@@ -432,12 +447,16 @@ const MeditationPlayer = ({
       <div className="lg:col-span-2">
         <Card className="border-border shadow-sm overflow-hidden">
           <div className="relative h-64">
-            <div className={`absolute inset-0 ${categoryColor.bg}`}></div>
-            <div className="absolute inset-0 bg-[url('/meditation-pattern.svg')] opacity-20 mix-blend-overlay"></div>
+            <img
+              src={meditation.imageSrc}
+              alt={meditation.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <button
                 onClick={togglePlayPause}
-                className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center"
+                className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center backdrop-blur-sm"
               >
                 {isPlaying ? (
                   <Pause className="h-10 w-10 text-white" />
@@ -455,7 +474,12 @@ const MeditationPlayer = ({
             </p>
 
             <div className="flex items-center gap-4 mb-6">
-              <Badge variant="outline">{meditation.category}</Badge>
+              <Badge
+                variant="outline"
+                className={`${categoryColor.text} border-${categoryColor.text}/30`}
+              >
+                {meditation.category}
+              </Badge>
               <Badge variant="outline">{meditation.level}</Badge>
               <div className="flex items-center text-muted-foreground">
                 <Clock className="h-4 w-4 mr-1" />
@@ -590,10 +614,12 @@ const MeditationPlayer = ({
                       setTimeout(() => onClose(), 0); // This is a hack to reset the player
                     }}
                   >
-                    <div
-                      className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${relatedColor.bgOpacity} ${relatedColor.text}`}
-                    >
-                      <Moon className="h-5 w-5" />
+                    <div className="w-12 h-12 rounded-md flex-shrink-0 overflow-hidden">
+                      <img
+                        src={relMeditation.imageSrc}
+                        alt={relMeditation.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
                       <h4 className="font-medium">{relMeditation.title}</h4>
@@ -665,7 +691,7 @@ export default function MeditationPage() {
     <div className="mx-auto px-4 py-8">
       {/* Hero section */}
       <div className="relative bg-card rounded-md mb-10 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/meditation-pattern.svg')] opacity-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
         <div className="py-12 px-6 sm:px-8 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl font-extrabold mb-4">Guided Meditation</h1>
@@ -676,19 +702,19 @@ export default function MeditationPage() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8">
-              <div className="border dark:border-[#333333] rounded-lg p-4">
+              <div className="border dark:border-[#333333] rounded-lg p-4 bg-card/80 backdrop-blur-sm">
                 <div className="text-3xl font-bold ">
                   {meditationStats.sessions}
                 </div>
                 <div className="text-sm text-muted-foreground">Sessions</div>
               </div>
-              <div className="border dark:border-[#333333] rounded-lg p-4">
+              <div className="border dark:border-[#333333] rounded-lg p-4 bg-card/80 backdrop-blur-sm">
                 <div className="text-3xl font-bold ">
                   {meditationStats.minutes}
                 </div>
                 <div className="text-sm text-muted-foreground">Minutes</div>
               </div>
-              <div className="border dark:border-[#333333] rounded-lg p-4">
+              <div className="border dark:border-[#333333] rounded-lg p-4 bg-card/80 backdrop-blur-sm">
                 <div className="text-3xl font-bold ">
                   {meditationStats.streak}
                 </div>
@@ -716,19 +742,19 @@ export default function MeditationPage() {
               your mental and physical wellbeing:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border dark:border-[#333333]  rounded-lg">
+              <div className="p-4 border dark:border-[#333333] rounded-lg bg-blue-500/5">
                 <h4 className="font-medium mb-2">Stress Reduction</h4>
                 <p className="text-sm text-muted-foreground">
                   Lowers cortisol levels and helps manage stress responses
                 </p>
               </div>
-              <div className="p-4 border dark:border-[#333333] rounded-lg">
+              <div className="p-4 border dark:border-[#333333] rounded-lg bg-purple-500/5">
                 <h4 className="font-medium mb-2">Emotional Regulation</h4>
                 <p className="text-sm text-muted-foreground">
                   Improves ability to manage difficult emotions
                 </p>
               </div>
-              <div className="p-4 border dark:border-[#333333] rounded-lg">
+              <div className="p-4 border dark:border-[#333333] rounded-lg bg-indigo-500/5">
                 <h4 className="font-medium mb-2">Better Sleep</h4>
                 <p className="text-sm text-muted-foreground">
                   Helps calm the mind for more restful and higher quality sleep

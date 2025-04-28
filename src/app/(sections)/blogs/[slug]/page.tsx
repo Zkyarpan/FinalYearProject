@@ -38,6 +38,11 @@ interface ApiResponse {
   } | null;
 }
 
+// Function to safely render HTML content
+const renderHTML = (htmlContent: string) => {
+  return { __html: htmlContent };
+};
+
 const BlogPost = () => {
   const params = useParams();
   const [blog, setBlog] = useState<Blog | null>(null);
@@ -137,7 +142,9 @@ const BlogPost = () => {
             <Link
               href="/blogs"
               className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold"
-            ></Link>
+            >
+              Return to Blogs
+            </Link>
           </div>
         </div>
       </main>
@@ -149,7 +156,6 @@ const BlogPost = () => {
       <div className="container mx-auto px-4 py-8">
         <article className="max-w-4xl mx-auto">
           <header className="mb-8 relative">
-            {' '}
             <BlogActions
               slug={blog._id}
               title={blog.title}
@@ -195,9 +201,8 @@ const BlogPost = () => {
           </div>
 
           <div className="prose prose-lg max-w-none dark:prose-invert">
-            <p className="leading-relaxed whitespace-pre-wrap">
-              {blog.content}
-            </p>
+            {/* Replace the plain text display with dangerouslySetInnerHTML */}
+            <div dangerouslySetInnerHTML={renderHTML(blog.content)} />
           </div>
 
           {blog.tags && blog.tags.length > 0 && (

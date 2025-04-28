@@ -26,6 +26,7 @@ const NavbarWrapper = () => {
     '/user/*',
     '/breathing',
     '/wellness',
+    '/assessments'
   ];
 
   const shouldHideNavbar = pathname => {

@@ -503,10 +503,6 @@ const AdminDashboard = () => {
           </Select>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <FileText className="mr-2 h-4 w-4" />
-              Export Report
-            </Button>
             <Button
               variant="default"
               size="sm"

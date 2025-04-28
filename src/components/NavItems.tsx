@@ -15,7 +15,14 @@ import Availability from '@/icons/Availability';
 import Computer from '@/icons/Computer';
 import Exercise from '@/icons/Exercise';
 import Welness from '@/icons/Welness';
-import { Brain, Wind, Heart, Moon, Gamepad2 } from 'lucide-react';
+import {
+  Brain,
+  Wind,
+  Heart,
+  Moon,
+  Gamepad2,
+  ClipboardCheck,
+} from 'lucide-react';
 
 export const USER_NAV_ITEMS = [
   {
@@ -37,6 +44,28 @@ export const USER_NAV_ITEMS = [
     icon: <Computer />,
     text: 'Sessions',
     href: '/sessions',
+  },
+  {
+    icon: <ClipboardCheck size={18} />,
+    text: 'Assessments',
+    href: '/assessments',
+    subItems: [
+      {
+        icon: <Brain size={18} />,
+        text: 'Mental Health',
+        href: '/assessments/mental-health',
+      },
+      {
+        icon: <Heart size={18} />,
+        text: 'Emotional Wellbeing',
+        href: '/assessments/emotional-wellbeing',
+      },
+      {
+        icon: <Wind size={18} />,
+        text: 'Stress Levels',
+        href: '/assessments/stress',
+      },
+    ],
   },
   {
     icon: <ServicesIcon />,
@@ -97,6 +126,23 @@ export const PSYCHOLOGIST_NAV_ITEMS = [
     icon: <Dashboard />,
     text: 'Dashboard',
     href: '/dashboard/psychologist',
+  },
+  {
+    icon: <ClipboardCheck size={18} />,
+    text: 'Assessments',
+    href: '/assessments/manage',
+    subItems: [
+      {
+        icon: <Brain size={18} />,
+        text: 'Create Assessment',
+        href: '/assessments/create',
+      },
+      {
+        icon: <Heart size={18} />,
+        text: 'Patient Reports',
+        href: '/assessments/reports',
+      },
+    ],
   },
   {
     icon: <Welness />,
@@ -167,6 +213,23 @@ export const ADMIN_NAV_ITEMS = [
     icon: <Dashboard />,
     text: 'Dashboard',
     href: '/dashboard/admin',
+  },
+  {
+    icon: <ClipboardCheck size={18} />,
+    text: 'Assessments',
+    href: '/dashboard/admin/assessments',
+    subItems: [
+      {
+        icon: <Brain size={18} />,
+        text: 'Manage Templates',
+        href: '/dashboard/admin/assessments/templates',
+      },
+      {
+        icon: <Heart size={18} />,
+        text: 'User Statistics',
+        href: '/dashboard/admin/assessments/statistics',
+      },
+    ],
   },
   {
     icon: <Settings />,

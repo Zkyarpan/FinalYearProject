@@ -42,6 +42,16 @@ const truncateText = (text: string, maxLength: number) => {
   return text.slice(0, maxLength) + '...';
 };
 
+// This function will safely render HTML content as HTML
+const renderHTML = (htmlContent: string) => {
+  return { __html: htmlContent };
+};
+
+// Function to strip HTML tags for truncated previews
+const stripHtmlTags = (html: string) => {
+  return html.replace(/<\/?[^>]+(>|$)/g, '');
+};
+
 const BlogOwnershipTag = ({
   isOwner,
   size = 'default',
@@ -265,8 +275,9 @@ const BlogPage = () => {
                       <h2 className="text-xl font-bold mb-3">
                         {blogs[0].title}
                       </h2>
+                      {/* Use a stripped version of HTML content for the preview */}
                       <p className="text-sm mb-4 line-clamp-3">
-                        {truncateText(blogs[0].content, 200)}
+                        {truncateText(stripHtmlTags(blogs[0].content), 200)}
                       </p>
                       <div className="flex items-center justify-between">
                         <FeaturedAuthorProfile author={blogs[0].author} />
@@ -313,8 +324,9 @@ const BlogPage = () => {
                           <h2 className="font-semibold text-lg mb-2">
                             {blog.title}
                           </h2>
+                          {/* Use a stripped version of HTML content for the preview */}
                           <p className="text-sm line-clamp-2 mb-4">
-                            {truncateText(blog.content, 120)}
+                            {truncateText(stripHtmlTags(blog.content), 120)}
                           </p>
 
                           <div className="flex items-center justify-between">

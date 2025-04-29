@@ -85,7 +85,6 @@ const appointmentSchema = new Schema<
       index: true,
     },
     startTime: {
-      // Changed from dateTime to startTime
       type: Date,
       required: [true, 'Appointment start time is required'],
       validate: {

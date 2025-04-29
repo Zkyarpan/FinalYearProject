@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check for regular user first
     let user = await Account.findOne({ email }).select('+password');
     let userType = 'user';
     let profile;

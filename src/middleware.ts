@@ -39,7 +39,6 @@ const authFlowRoutes = {
   passwordConfirmation: '/forgot-password/confirmation',
 };
 
-// Role-based permissions for dashboard access
 const rolePermissions = {
   admin: [
     '/dashboard/admin',
@@ -68,17 +67,12 @@ export default async function middleware(req: NextRequest) {
     const resetToken = cookieStore.get('resetToken')?.value;
     const tempToken = cookieStore.get('tempToken')?.value;
 
-    // Get any redirect-from query params from login
     const fromPath = req.nextUrl.searchParams.get('from');
 
-    // Check if we're on the verification page
     if (path === '/verify') {
-      // If we have tempToken, allow access
       if (tempToken) {
         return NextResponse.next();
       }
-
-      // If we have sessionCookie but user isn't verified, allow access
       if (sessionCookie) {
         const session = await decrypt(sessionCookie);
         if (session && !session.isVerified) {
@@ -86,15 +80,12 @@ export default async function middleware(req: NextRequest) {
         }
       }
 
-      // Otherwise redirect to signup
       return NextResponse.redirect(new URL('/signup', req.nextUrl));
     }
 
-    // Regular session handling
     const session = sessionCookie ? await decrypt(sessionCookie) : null;
     const resetSession = resetToken ? await decrypt(resetToken) : null;
 
-    // Handle password reset flow
     if (path === authFlowRoutes.passwordConfirmation && !resetSession) {
       return NextResponse.redirect(
         new URL(authFlowRoutes.forgotPassword, req.nextUrl)
@@ -105,18 +96,15 @@ export default async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Handle authenticated users
     if (session?.id) {
       const userRole = session.role || 'user';
       const dashboardPath = getDashboardByRole(userRole);
       const allowedPaths = rolePermissions[userRole] || ['/dashboard'];
 
-      // If user isn't verified and trying to access protected routes
       if (!session.isVerified && isProtectedRoute(path)) {
         return NextResponse.redirect(new URL('/verify', req.nextUrl));
       }
 
-      // Handle auth page access for logged-in users (login, signup, forgot-password)
       if (
         path === '/' ||
         path === '/login' ||
@@ -127,7 +115,6 @@ export default async function middleware(req: NextRequest) {
           return NextResponse.redirect(new URL('/verify', req.nextUrl));
         }
 
-        // If there's a 'from' param and it's a valid path, redirect there
         if (
           fromPath &&
           (isProtectedRoute(fromPath) ||
@@ -139,25 +126,20 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
       }
 
-      // Handle dashboard routes - with improved role-based access
       if (path.startsWith('/dashboard')) {
         if (!session.isVerified) {
           return NextResponse.redirect(new URL('/verify', req.nextUrl));
         }
 
-        // For base dashboard path, redirect to appropriate dashboard by role
         if (path === '/dashboard' && dashboardPath !== '/dashboard') {
           return NextResponse.redirect(new URL(dashboardPath, req.nextUrl));
         }
 
-        // For dashboard paths, check if the user can access based on their role
         if (path.startsWith('/dashboard/')) {
-          // Allow admin to access all dashboard paths
           if (userRole === 'admin') {
             return NextResponse.next();
           }
 
-          // For non-admin users, check permission based on role
           const hasAccess = allowedPaths.some(
             allowedPath =>
               path === allowedPath || path.startsWith(allowedPath + '/')
@@ -169,11 +151,9 @@ export default async function middleware(req: NextRequest) {
         }
       }
 
-      // For all other valid routes, just allow access
       return NextResponse.next();
     }
 
-    // Handle non-authenticated users
     if (isProtectedRoute(path)) {
       const searchParams = new URLSearchParams();
       searchParams.set('from', path);
@@ -185,7 +165,6 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('Middleware error:', error);
-    // Don't redirect to login if we're on the verify page
     if (req.nextUrl.pathname === '/verify') {
       return NextResponse.next();
     }

@@ -11,7 +11,7 @@ export interface IResource extends Document {
     url: string;
     title?: string;
   }[];
-  duration: number; // in minutes
+  duration: number; 
   difficultyLevel: 'beginner' | 'intermediate' | 'advanced';
   steps: string[];
   tags: string[];

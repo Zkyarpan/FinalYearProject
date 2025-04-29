@@ -75,10 +75,8 @@ const PsychologistProfilePage = () => {
         console.log('API Response:', data);
 
         if (data.IsSuccess && data.Result?.psychologists?.length > 0) {
-          // Extract the first psychologist from the array
           const profileData = data.Result.psychologists[0];
 
-          // Initialize with empty arrays and objects for properties that will be mapped
           const safeProfile = {
             ...profileData,
             education: profileData.education || [],

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Star, Calendar, MessageCircle } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import Message from '@/icons/Messages';
 import Verified from '@/icons/Verified';
 import Time from '@/icons/Clock';
@@ -61,20 +61,14 @@ const PsychologistDirectory = () => {
         const response = await fetch('/api/psychologist/profile');
         const data = await response.json();
 
-        // Check the structure of the response data
         console.log('API Response:', data);
 
         if (data.IsSuccess) {
-          // If the response has the old structure with nested psychologists
           if (data.Result && data.Result.psychologists) {
             setPsychologists(data.Result.psychologists);
-          }
-          // If the response has the new structure with direct array
-          else if (Array.isArray(data.Result)) {
+          } else if (Array.isArray(data.Result)) {
             setPsychologists(data.Result);
-          }
-          // Fallback for other structures
-          else {
+          } else {
             console.error('Unexpected API response structure:', data);
             setPsychologists([]);
           }
